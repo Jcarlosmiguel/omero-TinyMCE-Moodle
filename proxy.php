@@ -250,6 +250,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
     $rewritten = rewrite_response_urls($responsebody, $proxybase);
     if ($path === '/iviewer/' && str_contains($contenttype, 'text/html')) {
         $rewritten = inject_server_workaround($rewritten, $proxybase);
+        $rewritten = inject_hide_overview_css($rewritten);
     }
     echo $rewritten;
 } else {
@@ -360,4 +361,21 @@ function inject_server_workaround(string $body, string $proxybase): string {
     // If there's genuinely no </head> tag (shouldn't happen for iviewer's own page,
     // but fail safe rather than silently dropping the fix) fall back to appending.
     return $withhook !== null ? $withhook : ($body . $script);
+}
+
+/**
+ * Hides iviewer's built-in "overview map" (OpenLayers' standard
+ * .ol-overviewmap control - a small inset thumbnail of the whole image with a
+ * box showing the current viewport) for both the authoring tool's live preview
+ * and the final student-facing embed, since both load through this same proxy.
+ * Purely cosmetic, no functional effect on pan/zoom/view-links - a plain CSS
+ * override is enough, no JS needed.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_hide_overview_css(string $body): string {
+    $style = '<style>.ol-overviewmap { display: none !important; }</style>';
+    $withstyle = preg_replace('#(</head>)#i', $style . '$1', $body, 1);
+    return $withstyle !== null ? $withstyle : ($body . $style);
 }
