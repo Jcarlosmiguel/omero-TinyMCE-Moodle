@@ -52,6 +52,7 @@ $string['layoutslideleft'] = 'Slide on the left, text on the right';
 $string['layoutslideright'] = 'Text on the left, slide on the right';
 $string['layoutimageonly'] = 'Slide only, no write-up text';
 $string['widthlabel'] = 'Width';
+$string['widthdesc'] = 'Match this to the actual content width of a course page/label/book in your Moodle theme, so the view you pick here looks right once pasted there - the default is measured from this site\'s own content column, but themes vary.';
 $string['heightlabel'] = 'Height';
 $string['loadslide'] = 'Load slide';
 $string['insertviewlink'] = 'Insert view link';

@@ -76,6 +76,46 @@
         return url.toString();
     }
 
+    /**
+     * Which layout is in effect *right now* - not necessarily config.layout,
+     * which only reflects the page's initial GET params. Switching layout is a
+     * client-side-only toggle (see applyLayout()), so anything that needs to
+     * know the current arrangement (generateEmbed()) has to check the actual
+     * checked radio, not the stale config value from page load.
+     */
+    function currentLayout() {
+        var checked = document.querySelector('input[name="layout"]:checked');
+        return checked ? checked.value : config.layout;
+    }
+
+    /**
+     * Switches between "slide+write-up side by side" and "slide only" purely in
+     * the DOM - no form submission, no page reload. Reloading to apply a layout
+     * change would wipe out whatever the teacher had already typed in the
+     * write-up box, since that content only ever exists client-side until
+     * "Generate embed HTML" reads it - a plain hide/show and flex-direction
+     * swap keeps it intact regardless of how many times layout is changed.
+     */
+    function applyLayout(layout) {
+        var pane = document.getElementById('omero-split-pane');
+        var writeup = document.getElementById(config.writeupId);
+        var insertBtn = document.getElementById('omero-insert-link-btn');
+        var iframeWrap = document.getElementById('omero-iframe-wrap');
+
+        if (layout === 'imageonly') {
+            writeup.style.display = 'none';
+            insertBtn.style.display = 'none';
+            iframeWrap.style.flex = '1 1 100%';
+            pane.style.flexDirection = 'row';
+        } else {
+            writeup.style.display = '';
+            insertBtn.style.display = '';
+            iframeWrap.style.flex = '1';
+            iframeWrap.style.minWidth = '0';
+            pane.style.flexDirection = layout === 'slideright' ? 'row-reverse' : 'row';
+        }
+    }
+
     function insertViewLink() {
         var view = readCurrentView();
         if (!view) {
@@ -114,13 +154,18 @@
         selection.removeAllRanges();
     }
 
+    // The opening view chosen via setOpeningView() below - stored here rather
+    // than applied to the live preview iframe's src, so setting it doesn't
+    // reload/jump the preview the teacher is actively looking at. Read by
+    // generateEmbed() when building the final iframe src.
+    var openingView = null;
+
     /**
-     * Reads the current pan/zoom position and bakes it into the live iframe's own
-     * src, so it becomes the position the embed opens on - independent of, and in
-     * addition to, any view-links inserted in the write-up text. Since
-     * generateEmbed() below reads the iframe's *current* src attribute verbatim,
-     * this is the only piece of state needed - no separate "opening view" tracked
-     * on the side.
+     * Reads the current pan/zoom position and remembers it as the position the
+     * *generated embed* should open on - independent of, and in addition to, any
+     * view-links inserted in the write-up text. Deliberately does not touch the
+     * live preview iframe at all: it should feel the same as bookmarking a page
+     * without navigating there, not like clicking a view-link.
      */
     function setOpeningView() {
         var view = readCurrentView();
@@ -129,8 +174,7 @@
             return;
         }
 
-        var iframe = document.getElementById(config.iframeId);
-        iframe.src = buildViewUrl(view);
+        openingView = view;
 
         var button = document.getElementById('omero-set-opening-btn');
         var original = button.textContent;
@@ -142,23 +186,35 @@
 
     function generateEmbed() {
         var iframe = document.getElementById(config.iframeId);
+        var layout = currentLayout();
+
+        // The live preview iframe's own src never changes (see setOpeningView()
+        // above) - the opening view, if any, is applied here instead, at the
+        // point the embed is actually generated.
+        var iframeSrc = openingView ? buildViewUrl(openingView) : config.baseProxyUrl;
 
         var iframeHtml = '<iframe style="width: 100%; height: ' + iframe.style.height + ';" src="' +
-            iframe.getAttribute('src') + '" name="' + config.iframeName + '"></iframe>';
+            iframeSrc + '" name="' + config.iframeName + '"></iframe>';
 
-        var html;
-        if (config.imageOnly) {
-            html = iframeHtml;
+        var inner;
+        if (layout === 'imageonly') {
+            inner = iframeHtml;
         } else {
             var writeup = document.getElementById(config.writeupId);
             var slideCell = '<td>' + iframeHtml + '</td>';
             var writeupCell = '<td style="width: 50%; text-align: left;">' + writeup.innerHTML + '</td>';
-            var cells = config.layout === 'slideright' ? (writeupCell + '\n      ' + slideCell)
+            var cells = layout === 'slideright' ? (writeupCell + '\n      ' + slideCell)
                 : (slideCell + '\n      ' + writeupCell);
 
-            html = '<table style="width: 100%; height: ' + iframe.style.height + ';" cellspacing="1" cellpadding="10">\n' +
+            inner = '<table style="width: 100%; height: ' + iframe.style.height + ';" cellspacing="1" cellpadding="10">\n' +
                 '  <tbody>\n    <tr>\n      ' + cells + '\n    </tr>\n  </tbody>\n</table>';
         }
+
+        // Wrapped in the same max-width the live preview itself is constrained
+        // to (see author.php's #omero-preview-wrap and $width's own comment) -
+        // otherwise the embed would render full-width wherever it's pasted,
+        // same mismatch this whole constraint exists to avoid.
+        var html = '<div style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
 
         var output = document.getElementById('omero-output');
         output.value = html;
@@ -189,13 +245,20 @@
         }
     }
 
-    // "Insert view link" doesn't exist in image-only mode (no write-up text to
-    // link from) - guard it rather than assume it's always on the page.
-    var insertLinkBtn = document.getElementById('omero-insert-link-btn');
-    if (insertLinkBtn) {
-        insertLinkBtn.addEventListener('click', insertViewLink);
-    }
+    document.getElementById('omero-insert-link-btn').addEventListener('click', insertViewLink);
     document.getElementById('omero-set-opening-btn').addEventListener('click', setOpeningView);
     document.getElementById('omero-generate-btn').addEventListener('click', generateEmbed);
     document.getElementById('omero-copy-btn').addEventListener('click', copyEmbed);
+
+    // Layout radios live inside the setup form (so the initial choice survives
+    // a bookmark/reload), but changing them here must never submit that form -
+    // only "Load slide" does, since that's the only action that actually needs
+    // a server round trip (a different image/subject/dataset). Applying the new
+    // layout is handled entirely client-side, in place.
+    var layoutRadios = document.querySelectorAll('input[name="layout"]');
+    for (var i = 0; i < layoutRadios.length; i++) {
+        layoutRadios[i].addEventListener('change', function(e) {
+            applyLayout(e.target.value);
+        });
+    }
 }());

@@ -50,7 +50,13 @@ if ($dataset === 0) {
 }
 $browsable = optional_param('browsable', 0, PARAM_BOOL);
 $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
-$width = optional_param('width', '100%', PARAM_TEXT);
+// Default matches the actual measured width of this Moodle instance's own
+// content column (mod/page's #region-main, ~814px at a 1920px window) - NOT
+// "100%", which only reflects how wide THIS tool's own page happens to be,
+// not the much narrower column a Label/Page/Book will actually render the
+// final embed inside. This is a max-width on the preview/output, not a fixed
+// iframe width - see where it's used below.
+$width = optional_param('width', '800px', PARAM_TEXT);
 $height = optional_param('height', '500px', PARAM_TEXT);
 
 $pageurl = new moodle_url('/local/omeroembed/author.php', ['courseid' => $courseid]);
@@ -97,6 +103,7 @@ if ($hasslide) {
         'baseProxyUrl' => $proxyurl->out(false),
         'layout' => $layout,
         'imageOnly' => $imageonly,
+        'maxWidth' => $width,
         'strings' => [
             'previewnotready' => get_string('previewnotready', 'local_omeroembed'),
             'selecttextfirst' => get_string('selecttextfirst', 'local_omeroembed'),
@@ -158,6 +165,7 @@ echo html_writer::tag('label', get_string('heightlabel', 'local_omeroembed') . '
     html_writer::empty_tag('input', ['type' => 'text', 'name' => 'height', 'value' => $height,
         'class' => 'form-control', 'style' => 'width:8em;']));
 echo html_writer::end_div();
+echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), ['class' => 'text-muted', 'style' => 'margin-top:-0.5rem;']);
 
 echo html_writer::empty_tag('input', [
     'type' => 'submit', 'value' => get_string('loadslide', 'local_omeroembed'), 'class' => 'btn btn-primary',
@@ -180,6 +188,14 @@ if ($hasslide) {
         'type' => 'application/json', 'id' => 'omero-embed-config',
     ]);
 
+    // Constrains the whole preview (and, via config.maxWidth, the generated embed
+    // too) to roughly the real width a Label/Page/Book will actually render it at -
+    // not "however wide this tool's own page happens to be". Without this, a view
+    // chosen while looking at a much wider preview doesn't match how the embed
+    // actually frames the slide once pasted somewhere narrower - see $width's own
+    // comment above for where the default came from.
+    echo html_writer::start_div('', ['id' => 'omero-preview-wrap', 'style' => 'max-width:' . s($width) . ';']);
+
     // Shared toolbar above both boxes - not just above the write-up - so the
     // iframe and write-up boxes themselves start at the same vertical position
     // and end up the same height, instead of the write-up box being pushed down
@@ -188,47 +204,45 @@ if ($hasslide) {
     // glance - "insert a link" and "set the opening view" are easy to mix up
     // otherwise, since both work from the same live pan/zoom position.
     echo html_writer::start_div('', ['style' => 'display:flex; gap:0.5rem; margin-bottom:0.5rem;']);
-    if (!$imageonly) {
-        echo html_writer::tag('button', get_string('insertviewlink', 'local_omeroembed'), [
-            'type' => 'button', 'id' => 'omero-insert-link-btn', 'class' => 'btn btn-secondary',
-        ]);
-    }
+    echo html_writer::tag('button', get_string('insertviewlink', 'local_omeroembed'), [
+        'type' => 'button', 'id' => 'omero-insert-link-btn', 'class' => 'btn btn-secondary',
+        'style' => $imageonly ? 'display:none;' : '',
+    ]);
     echo html_writer::tag('button', get_string('setopeningview', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-set-opening-btn', 'class' => 'btn btn-info',
     ]);
     echo html_writer::end_div();
 
-    if ($imageonly) {
-        echo html_writer::tag('iframe', '', [
-            'id' => 'omero-live-preview',
-            'name' => $iframename,
-            'src' => $proxyurl->out(false),
-            'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
-            'allowfullscreen' => 'allowfullscreen',
-        ]);
-    } else {
-        echo html_writer::start_div('omero-split-pane', [
-            'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($layout === 'slideright' ? ' flex-direction:row-reverse;' : ''),
-        ]);
+    // Both the write-up box and the iframe are *always* rendered here, regardless
+    // of layout - switching layout is a client-side-only, non-destructive toggle
+    // (see js/author.js's applyLayout()), so a teacher who already wrote text and
+    // then tries a different layout doesn't lose it to a full page reload. Only
+    // the *initial* display/flex-direction below reflects $layout, to avoid a
+    // flash of the wrong arrangement before author.js finishes attaching.
+    echo html_writer::start_div('', [
+        'id' => 'omero-split-pane',
+        'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($layout === 'slideright' ? ' flex-direction:row-reverse;' : ''),
+    ]);
 
-        $iframe = html_writer::tag('iframe', '', [
-            'id' => 'omero-live-preview',
-            'name' => $iframename,
-            'src' => $proxyurl->out(false),
-            'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
-            'allowfullscreen' => 'allowfullscreen',
-        ]);
-        echo html_writer::div($iframe, '', ['style' => 'flex:1; min-width:0;']);
+    $iframe = html_writer::tag('iframe', '', [
+        'id' => 'omero-live-preview',
+        'name' => $iframename,
+        'src' => $proxyurl->out(false),
+        'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
+        'allowfullscreen' => 'allowfullscreen',
+    ]);
+    echo html_writer::div($iframe, '', [
+        'id' => 'omero-iframe-wrap', 'style' => $imageonly ? 'flex:1 1 100%;' : 'flex:1; min-width:0;',
+    ]);
 
-        echo html_writer::div('', '', [
-            'id' => 'omero-writeup',
-            'contenteditable' => 'true',
-            'style' => 'flex:1; min-width:0; height:' . s($height) . '; border:1px solid #ccc; padding:0.5rem;'
-                . ' box-sizing:border-box; overflow:auto;',
-        ]);
+    echo html_writer::div('', '', [
+        'id' => 'omero-writeup',
+        'contenteditable' => 'true',
+        'style' => 'flex:1; min-width:0; height:' . s($height) . '; border:1px solid #ccc; padding:0.5rem;'
+            . ' box-sizing:border-box; overflow:auto;' . ($imageonly ? ' display:none;' : ''),
+    ]);
 
-        echo html_writer::end_div();
-    }
+    echo html_writer::end_div();
 
     echo html_writer::tag('button', get_string('generateembed', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-generate-btn', 'class' => 'btn btn-primary', 'style' => 'margin-top:1rem;',
@@ -242,6 +256,7 @@ if ($hasslide) {
     echo html_writer::tag('button', get_string('copyembed', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-copy-btn', 'class' => 'btn btn-secondary', 'style' => 'margin-top:0.5rem;',
     ]);
+    echo html_writer::end_div();
     echo html_writer::end_div();
 }
 
