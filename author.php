@@ -88,17 +88,21 @@ if ($hasslide) {
     $idfragment = $images !== '' ? $images : $dataset;
     $iframename = 'omero-embed-' . preg_replace('/[^A-Za-z0-9]/', '', (string) $idfragment);
 
+    $imageonly = ($layout === 'imageonly');
+
     $jsconfig = [
         'iframeId' => 'omero-live-preview',
         'iframeName' => $iframename,
         'writeupId' => 'omero-writeup',
         'baseProxyUrl' => $proxyurl->out(false),
         'layout' => $layout,
+        'imageOnly' => $imageonly,
         'strings' => [
             'previewnotready' => get_string('previewnotready', 'local_omeroembed'),
             'selecttextfirst' => get_string('selecttextfirst', 'local_omeroembed'),
             'selectinsidewriteup' => get_string('selectinsidewriteup', 'local_omeroembed'),
             'copied' => get_string('copied', 'local_omeroembed'),
+            'openingviewset' => get_string('openingviewset', 'local_omeroembed'),
         ],
     ];
     $PAGE->requires->js(new moodle_url('/local/omeroembed/js/author.js'));
@@ -136,7 +140,7 @@ echo html_writer::end_div();
 
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('layoutlabel', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-foreach (['slideleft' => 'layoutslideleft', 'slideright' => 'layoutslideright'] as $value => $stringkey) {
+foreach (['slideleft' => 'layoutslideleft', 'slideright' => 'layoutslideright', 'imageonly' => 'layoutimageonly'] as $value => $stringkey) {
     $attrs = ['type' => 'radio', 'name' => 'layout', 'value' => $value];
     if ($layout === $value) {
         $attrs['checked'] = 'checked';
@@ -179,32 +183,52 @@ if ($hasslide) {
     // Shared toolbar above both boxes - not just above the write-up - so the
     // iframe and write-up boxes themselves start at the same vertical position
     // and end up the same height, instead of the write-up box being pushed down
-    // (and therefore taller overall) by a button sitting only above it.
-    echo html_writer::tag('button', get_string('insertviewlink', 'local_omeroembed'), [
-        'type' => 'button', 'id' => 'omero-insert-link-btn', 'class' => 'btn btn-secondary', 'style' => 'margin-bottom:0.5rem;',
+    // (and therefore taller overall) by a button sitting only above it. Buttons
+    // sit side by side with distinct colours so they're easy to tell apart at a
+    // glance - "insert a link" and "set the opening view" are easy to mix up
+    // otherwise, since both work from the same live pan/zoom position.
+    echo html_writer::start_div('', ['style' => 'display:flex; gap:0.5rem; margin-bottom:0.5rem;']);
+    if (!$imageonly) {
+        echo html_writer::tag('button', get_string('insertviewlink', 'local_omeroembed'), [
+            'type' => 'button', 'id' => 'omero-insert-link-btn', 'class' => 'btn btn-secondary',
+        ]);
+    }
+    echo html_writer::tag('button', get_string('setopeningview', 'local_omeroembed'), [
+        'type' => 'button', 'id' => 'omero-set-opening-btn', 'class' => 'btn btn-info',
     ]);
-
-    echo html_writer::start_div('omero-split-pane', [
-        'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($layout === 'slideright' ? ' flex-direction:row-reverse;' : ''),
-    ]);
-
-    $iframe = html_writer::tag('iframe', '', [
-        'id' => 'omero-live-preview',
-        'name' => $iframename,
-        'src' => $proxyurl->out(false),
-        'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
-        'allowfullscreen' => 'allowfullscreen',
-    ]);
-    echo html_writer::div($iframe, '', ['style' => 'flex:1; min-width:0;']);
-
-    echo html_writer::div('', '', [
-        'id' => 'omero-writeup',
-        'contenteditable' => 'true',
-        'style' => 'flex:1; min-width:0; height:' . s($height) . '; border:1px solid #ccc; padding:0.5rem;'
-            . ' box-sizing:border-box; overflow:auto;',
-    ]);
-
     echo html_writer::end_div();
+
+    if ($imageonly) {
+        echo html_writer::tag('iframe', '', [
+            'id' => 'omero-live-preview',
+            'name' => $iframename,
+            'src' => $proxyurl->out(false),
+            'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
+            'allowfullscreen' => 'allowfullscreen',
+        ]);
+    } else {
+        echo html_writer::start_div('omero-split-pane', [
+            'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($layout === 'slideright' ? ' flex-direction:row-reverse;' : ''),
+        ]);
+
+        $iframe = html_writer::tag('iframe', '', [
+            'id' => 'omero-live-preview',
+            'name' => $iframename,
+            'src' => $proxyurl->out(false),
+            'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
+            'allowfullscreen' => 'allowfullscreen',
+        ]);
+        echo html_writer::div($iframe, '', ['style' => 'flex:1; min-width:0;']);
+
+        echo html_writer::div('', '', [
+            'id' => 'omero-writeup',
+            'contenteditable' => 'true',
+            'style' => 'flex:1; min-width:0; height:' . s($height) . '; border:1px solid #ccc; padding:0.5rem;'
+                . ' box-sizing:border-box; overflow:auto;',
+        ]);
+
+        echo html_writer::end_div();
+    }
 
     echo html_writer::tag('button', get_string('generateembed', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-generate-btn', 'class' => 'btn btn-primary', 'style' => 'margin-top:1rem;',

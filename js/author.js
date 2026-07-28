@@ -114,20 +114,51 @@
         selection.removeAllRanges();
     }
 
+    /**
+     * Reads the current pan/zoom position and bakes it into the live iframe's own
+     * src, so it becomes the position the embed opens on - independent of, and in
+     * addition to, any view-links inserted in the write-up text. Since
+     * generateEmbed() below reads the iframe's *current* src attribute verbatim,
+     * this is the only piece of state needed - no separate "opening view" tracked
+     * on the side.
+     */
+    function setOpeningView() {
+        var view = readCurrentView();
+        if (!view) {
+            window.alert(config.strings.previewnotready);
+            return;
+        }
+
+        var iframe = document.getElementById(config.iframeId);
+        iframe.src = buildViewUrl(view);
+
+        var button = document.getElementById('omero-set-opening-btn');
+        var original = button.textContent;
+        button.textContent = config.strings.openingviewset;
+        window.setTimeout(function() {
+            button.textContent = original;
+        }, 1500);
+    }
+
     function generateEmbed() {
         var iframe = document.getElementById(config.iframeId);
-        var writeup = document.getElementById(config.writeupId);
 
         var iframeHtml = '<iframe style="width: 100%; height: ' + iframe.style.height + ';" src="' +
             iframe.getAttribute('src') + '" name="' + config.iframeName + '"></iframe>';
 
-        var slideCell = '<td>' + iframeHtml + '</td>';
-        var writeupCell = '<td style="width: 50%; text-align: left;">' + writeup.innerHTML + '</td>';
-        var cells = config.layout === 'slideright' ? (writeupCell + '\n      ' + slideCell)
-            : (slideCell + '\n      ' + writeupCell);
+        var html;
+        if (config.imageOnly) {
+            html = iframeHtml;
+        } else {
+            var writeup = document.getElementById(config.writeupId);
+            var slideCell = '<td>' + iframeHtml + '</td>';
+            var writeupCell = '<td style="width: 50%; text-align: left;">' + writeup.innerHTML + '</td>';
+            var cells = config.layout === 'slideright' ? (writeupCell + '\n      ' + slideCell)
+                : (slideCell + '\n      ' + writeupCell);
 
-        var html = '<table style="width: 100%; height: ' + iframe.style.height + ';" cellspacing="1" cellpadding="10">\n' +
-            '  <tbody>\n    <tr>\n      ' + cells + '\n    </tr>\n  </tbody>\n</table>';
+            html = '<table style="width: 100%; height: ' + iframe.style.height + ';" cellspacing="1" cellpadding="10">\n' +
+                '  <tbody>\n    <tr>\n      ' + cells + '\n    </tr>\n  </tbody>\n</table>';
+        }
 
         var output = document.getElementById('omero-output');
         output.value = html;
@@ -158,7 +189,13 @@
         }
     }
 
-    document.getElementById('omero-insert-link-btn').addEventListener('click', insertViewLink);
+    // "Insert view link" doesn't exist in image-only mode (no write-up text to
+    // link from) - guard it rather than assume it's always on the page.
+    var insertLinkBtn = document.getElementById('omero-insert-link-btn');
+    if (insertLinkBtn) {
+        insertLinkBtn.addEventListener('click', insertViewLink);
+    }
+    document.getElementById('omero-set-opening-btn').addEventListener('click', setOpeningView);
     document.getElementById('omero-generate-btn').addEventListener('click', generateEmbed);
     document.getElementById('omero-copy-btn').addEventListener('click', copyEmbed);
 }());
