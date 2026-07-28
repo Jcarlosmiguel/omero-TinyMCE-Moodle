@@ -17,14 +17,14 @@
 /**
  * Version details.
  *
- * @package    filter_omeroembed
+ * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026072800;         // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2026072801;         // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
-$plugin->component = 'filter_omeroembed'; // Full name of the plugin (used for diagnostics).
+$plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
 $plugin->maturity  = MATURITY_ALPHA;

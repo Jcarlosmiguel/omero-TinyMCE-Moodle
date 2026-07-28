@@ -17,7 +17,7 @@
 /**
  * Cache definitions.
  *
- * @package    filter_omeroembed
+ * @package    local_omeroembed
  * @category   cache
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace filter_omeroembed;
+namespace local_omeroembed;
 
 /**
  * Establishes and caches an OMERO.web session (as a subject service account), so
@@ -29,7 +29,7 @@ namespace filter_omeroembed;
  * yet) only means changing what get_credentials_for_subject() returns; the
  * login/caching/proxying mechanics below stay the same either way.
  *
- * @package    filter_omeroembed
+ * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -50,7 +50,7 @@ class omero_session {
      * @throws \moodle_exception If the subject key is unknown, or login fails.
      */
     public static function get_session(string $subject): array {
-        $cache = \cache::make('filter_omeroembed', 'sessions');
+        $cache = \cache::make('local_omeroembed', 'sessions');
         $cached = $cache->get($subject);
 
         if ($cached && (time() - $cached['established']) < self::SESSION_TTL_SECONDS) {
@@ -68,6 +68,29 @@ class omero_session {
     }
 
     /**
+     * Lists every configured subject key (never their credentials) - used to populate
+     * the subject dropdown on author.php. Public and safe to call from a page that
+     * only needs to know which subjects exist, not authenticate as one.
+     *
+     * @return string[]
+     */
+    public static function get_subject_keys(): array {
+        $raw = (string) get_config('local_omeroembed', 'subjects');
+        $keys = [];
+        foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $parts = explode('|', $line, 3);
+            if (count($parts) === 3) {
+                $keys[] = trim($parts[0]);
+            }
+        }
+        return $keys;
+    }
+
+    /**
      * Looks up a subject's OMERO username/password from the admin settings textarea
      * (one "subject_key|username|password" line per subject - see settings.php).
      *
@@ -76,7 +99,7 @@ class omero_session {
      * @throws \moodle_exception If the subject key isn't configured.
      */
     protected static function get_credentials_for_subject(string $subject): array {
-        $raw = (string) get_config('filter_omeroembed', 'subjects');
+        $raw = (string) get_config('local_omeroembed', 'subjects');
         foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
             $line = trim($line);
             if ($line === '') {
@@ -87,7 +110,7 @@ class omero_session {
                 return ['username' => trim($parts[1]), 'password' => trim($parts[2])];
             }
         }
-        throw new \moodle_exception('unknownsubject', 'filter_omeroembed', '', $subject);
+        throw new \moodle_exception('unknownsubject', 'local_omeroembed', '', $subject);
     }
 
     /**
@@ -104,14 +127,14 @@ class omero_session {
      */
     protected static function login(string $subject): array {
         $credentials = self::get_credentials_for_subject($subject);
-        $baseurl = rtrim((string) get_config('filter_omeroembed', 'omerobaseurl'), '/');
+        $baseurl = rtrim((string) get_config('local_omeroembed', 'omerobaseurl'), '/');
         $loginurl = $baseurl . '/webclient/login/';
 
         // Step 1: GET the login page to obtain an initial csrftoken cookie.
         $getresult = self::curl_request($loginurl, 'GET');
         $csrftoken = $getresult['cookies']['csrftoken'] ?? null;
         if (!$csrftoken) {
-            throw new \moodle_exception('omerologinfailed', 'filter_omeroembed', '', $subject,
+            throw new \moodle_exception('omerologinfailed', 'local_omeroembed', '', $subject,
                 'No csrftoken cookie received from ' . $loginurl);
         }
 
@@ -138,7 +161,7 @@ class omero_session {
 
         $sessionid = $postresult['cookies']['sessionid'] ?? null;
         if (!$sessionid) {
-            throw new \moodle_exception('omerologinfailed', 'filter_omeroembed', '', $subject,
+            throw new \moodle_exception('omerologinfailed', 'local_omeroembed', '', $subject,
                 'Login POST did not return a sessionid cookie - check the configured '
                 . 'credentials for this subject.');
         }
@@ -189,7 +212,7 @@ class omero_session {
         if ($body === false) {
             $error = curl_error($ch);
             curl_close($ch);
-            throw new \moodle_exception('omeroconnectionfailed', 'filter_omeroembed', '', null, $error);
+            throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $error);
         }
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);

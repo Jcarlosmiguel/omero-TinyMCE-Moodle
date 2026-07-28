@@ -15,14 +15,14 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Privacy Subsystem implementation for filter_omeroembed.
+ * Privacy Subsystem implementation for local_omeroembed.
  *
- * @package    filter_omeroembed
+ * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace filter_omeroembed\privacy;
+namespace local_omeroembed\privacy;
 
 defined('MOODLE_INTERNAL') || die();
 
