@@ -100,10 +100,39 @@ const readExistingEmbed = (node) => {
     return {params, writeupHtml};
 };
 
+/**
+ * A fresh insert lands exactly at the cursor - if that happens to be inside
+ * a table cell (an old, unmarked omero embed predating data-omero-embed, or
+ * any other table entirely), inserting our own multi-part table+iframe
+ * there would nest it inside that cell instead of landing as a normal block
+ * on the page - confirmed live, this is exactly what happened with a real
+ * pre-existing embed. Moves the insertion point to just after the
+ * outermost enclosing table instead, so a fresh insert always lands as a
+ * sibling, never nested - a no-op when the cursor isn't in a table at all,
+ * which is the common case.
+ *
+ * @param {Editor} editor
+ */
+const escapeEnclosingTable = (editor) => {
+    let outerTable = null;
+    let table = editor.selection.getNode().closest('table');
+    while (table) {
+        outerTable = table;
+        table = table.parentNode ? table.parentNode.closest('table') : null;
+    }
+    if (outerTable) {
+        editor.selection.select(outerTable);
+        editor.selection.collapse(false);
+    }
+};
+
 export const handleAction = async(editor) => {
     const contextId = getContextId(editor);
     const existingNode = editor.selection.getNode().closest('[data-omero-embed]');
     const existing = existingNode ? readExistingEmbed(existingNode) : null;
+    if (!existingNode) {
+        escapeEnclosingTable(editor);
+    }
 
     let iframeUrl = Config.wwwroot + '/local/omeroembed/author.php?contextid=' + contextId + '&embedded=1';
     if (existing) {
