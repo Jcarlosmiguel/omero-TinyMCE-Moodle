@@ -32,7 +32,24 @@ require(__DIR__ . '/../../config.php');
 
 use local_omeroembed\omero_session;
 
-$courseid = required_param('courseid', PARAM_INT);
+$courseid = optional_param('courseid', 0, PARAM_INT);
+$contextid = optional_param('contextid', 0, PARAM_INT);
+$embedded = optional_param('embedded', false, PARAM_BOOL);
+
+// The tiny_omeroembed TinyMCE plugin only knows the editor's own contextid
+// (from editor_tiny/options' getContextId()), not a courseid directly - this
+// page is what resolves one from the other, same as any content editor field
+// would need to. Direct courseid links (e.g. the course nav entry added by
+// lib.php) keep working unchanged.
+if (!$courseid && $contextid) {
+    $context = context::instance_by_id($contextid);
+    $coursecontext = $context->get_course_context();
+    $courseid = $coursecontext->instanceid;
+}
+if (!$courseid) {
+    throw new moodle_exception('missingparam', 'error', '', 'courseid');
+}
+
 $course = get_course($courseid);
 $context = context_course::instance($courseid);
 
@@ -59,11 +76,21 @@ $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
 $width = optional_param('width', '800px', PARAM_TEXT);
 $height = optional_param('height', '500px', PARAM_TEXT);
 
-$pageurl = new moodle_url('/local/omeroembed/author.php', ['courseid' => $courseid]);
+$pageurlparams = ['courseid' => $courseid];
+if ($embedded) {
+    // Preserved across the setup form's own GET resubmission (picking a
+    // different subject/image/dataset) so staying "embedded" - and therefore
+    // popup layout + the postMessage handoff below - survives that reload too.
+    $pageurlparams['embedded'] = 1;
+}
+$pageurl = new moodle_url('/local/omeroembed/author.php', $pageurlparams);
 
 $PAGE->set_url($pageurl);
 $PAGE->set_context($context);
-$PAGE->set_pagelayout('course');
+// Embedded inside the tiny_omeroembed modal iframe - avoid rendering full
+// course chrome/nav a second time inside the editor's own page. Matches
+// tiny_media's own manage.php, which does the same for the same reason.
+$PAGE->set_pagelayout($embedded ? 'popup' : 'course');
 $PAGE->set_title(get_string('authortitle', 'local_omeroembed'));
 $PAGE->set_heading($course->fullname);
 
@@ -104,6 +131,7 @@ if ($hasslide) {
         'layout' => $layout,
         'imageOnly' => $imageonly,
         'maxWidth' => $width,
+        'embedded' => $embedded,
         'strings' => [
             'previewnotready' => get_string('previewnotready', 'local_omeroembed'),
             'selecttextfirst' => get_string('selecttextfirst', 'local_omeroembed'),
@@ -244,19 +272,26 @@ if ($hasslide) {
 
     echo html_writer::end_div();
 
-    echo html_writer::tag('button', get_string('generateembed', 'local_omeroembed'), [
+    echo html_writer::tag('button', get_string($embedded ? 'insertintopage' : 'generateembed', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-generate-btn', 'class' => 'btn btn-primary', 'style' => 'margin-top:1rem;',
     ]);
 
-    echo html_writer::start_div('', ['id' => 'omero-output-wrap', 'style' => 'display:none; margin-top:1rem;']);
-    echo html_writer::tag('textarea', '', [
-        'id' => 'omero-output', 'rows' => 8, 'readonly' => 'readonly',
-        'style' => 'width:100%; font-family:monospace; font-size:0.85rem;',
-    ]);
-    echo html_writer::tag('button', get_string('copyembed', 'local_omeroembed'), [
-        'type' => 'button', 'id' => 'omero-copy-btn', 'class' => 'btn btn-secondary', 'style' => 'margin-top:0.5rem;',
-    ]);
-    echo html_writer::end_div();
+    if (!$embedded) {
+        // In embedded mode (opened from the tiny_omeroembed TinyMCE plugin),
+        // the generated HTML is postMessage'd straight to the parent editor
+        // and the modal closes - there's nothing here for the teacher to
+        // copy/paste, so this whole box stays hidden. See js/author.js's
+        // generateEmbed() for the embedded-vs-standalone branch.
+        echo html_writer::start_div('', ['id' => 'omero-output-wrap', 'style' => 'display:none; margin-top:1rem;']);
+        echo html_writer::tag('textarea', '', [
+            'id' => 'omero-output', 'rows' => 8, 'readonly' => 'readonly',
+            'style' => 'width:100%; font-family:monospace; font-size:0.85rem;',
+        ]);
+        echo html_writer::tag('button', get_string('copyembed', 'local_omeroembed'), [
+            'type' => 'button', 'id' => 'omero-copy-btn', 'class' => 'btn btn-secondary', 'style' => 'margin-top:0.5rem;',
+        ]);
+        echo html_writer::end_div();
+    }
     echo html_writer::end_div();
 }
 

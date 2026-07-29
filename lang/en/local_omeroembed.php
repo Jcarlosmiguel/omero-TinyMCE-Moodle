@@ -75,6 +75,7 @@ $string['setopeningview'] = 'Set as opening view';
 $string['openingviewset'] = 'Opening view set!';
 $string['generateembed'] = 'Generate embed HTML';
 $string['copyembed'] = 'Copy to clipboard';
+$string['insertintopage'] = 'Insert into page';
 $string['copied'] = 'Copied!';
 $string['previewnotready'] = 'Could not read the slide\'s current position - wait for it to finish loading, then pan or zoom before trying again.';
 $string['selecttextfirst'] = 'Select some text in the write-up box first, then click Insert view link.';

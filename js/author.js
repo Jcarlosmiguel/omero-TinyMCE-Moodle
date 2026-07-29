@@ -216,6 +216,16 @@
         // same mismatch this whole constraint exists to avoid.
         var html = '<div style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
 
+        if (config.embedded) {
+            // Handed off to the tiny_omeroembed TinyMCE plugin's modal (see
+            // its amd/src/ui.js), which inserts this into the editor and
+            // closes the modal - author.php's own copy-paste textarea isn't
+            // rendered in embedded mode (see author.php), nothing more to do
+            // here.
+            window.parent.postMessage({type: 'omero-embed-html', html: html}, window.location.origin);
+            return;
+        }
+
         var output = document.getElementById('omero-output');
         output.value = html;
         document.getElementById('omero-output-wrap').style.display = 'block';
@@ -248,7 +258,12 @@
     document.getElementById('omero-insert-link-btn').addEventListener('click', insertViewLink);
     document.getElementById('omero-set-opening-btn').addEventListener('click', setOpeningView);
     document.getElementById('omero-generate-btn').addEventListener('click', generateEmbed);
-    document.getElementById('omero-copy-btn').addEventListener('click', copyEmbed);
+    // Not rendered in embedded mode (see author.php) - generateEmbed()
+    // posts the HTML to the parent editor instead of showing it here.
+    var copyBtn = document.getElementById('omero-copy-btn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyEmbed);
+    }
 
     // Layout radios live inside the setup form (so the initial choice survives
     // a bookmark/reload), but changing them here must never submit that form -
