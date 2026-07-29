@@ -214,7 +214,10 @@
         // to (see author.php's #omero-preview-wrap and $width's own comment) -
         // otherwise the embed would render full-width wherever it's pasted,
         // same mismatch this whole constraint exists to avoid.
-        var html = '<div style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
+        // data-omero-embed marks this wrapper so tiny_omeroembed's own ui.js
+        // can find and re-edit it later (see that file's handleAction()) -
+        // only present on embeds generated from here on, not older ones.
+        var html = '<div data-omero-embed="1" style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
 
         if (config.embedded) {
             // Handed off to the tiny_omeroembed TinyMCE plugin's modal (see
@@ -275,5 +278,29 @@
         layoutRadios[i].addEventListener('change', function(e) {
             applyLayout(e.target.value);
         });
+    }
+
+    if (config.embedded) {
+        // If tiny_omeroembed's ui.js found an existing embed under/near the
+        // cursor, it already pulled subject/images/dataset/layout/width/height
+        // out of that embed's own DOM and passed them as ordinary GET params
+        // (the setup form above is already pre-filled from those, same as any
+        // bookmark/reload). The write-up text can't travel that way - it's
+        // arbitrary rich HTML, not a handful of short values - so it comes
+        // back separately over postMessage instead, once we signal we're
+        // ready to receive it.
+        window.addEventListener('message', function(event) {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+            if (!event.data || event.data.type !== 'omero-embed-existing-writeup') {
+                return;
+            }
+            var writeup = document.getElementById(config.writeupId);
+            if (writeup) {
+                writeup.innerHTML = event.data.html;
+            }
+        });
+        window.parent.postMessage({type: 'omero-embed-ready'}, window.location.origin);
     }
 }());
