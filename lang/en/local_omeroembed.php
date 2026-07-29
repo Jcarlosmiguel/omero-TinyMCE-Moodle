@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 $string['pluginname'] = 'OMERO slide embed';
 
 $string['omerobaseurl'] = 'OMERO base URL';
-$string['omerobaseurl_desc'] = 'The OMERO.web server this plugin proxies content from, e.g. https://omero.mvls.gla.ac.uk. Never shown to students - all requests go through this plugin\'s own proxy.';
+$string['omerobaseurl_desc'] = 'The OMERO.web server this plugin proxies content from, e.g. https://your-omero-server.example.org. Never shown to students - all requests go through this plugin\'s own proxy.';
 
 $string['subjects'] = 'Subject accounts';
 $string['subjects_desc'] = 'One subject per line, in the form <code>subject_key|username|password</code>. The subject_key is what teachers pick from the dropdown on the "Embed an OMERO slide" tool. These are OMERO service-account credentials, used server-side only - never sent to students\' browsers.';

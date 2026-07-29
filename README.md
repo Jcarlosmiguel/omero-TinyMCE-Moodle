@@ -96,7 +96,7 @@ also linked from the site's main navigation for anyone with that
 capability.
 
 - **OMERO base URL** - the real OMERO.web server, e.g.
-  `https://omero.mvls.gla.ac.uk`.
+  `https://your-omero-server.example.org`.
 - **Subject accounts** - one per line, `subject_key|username|password`.
   These are OMERO service-account credentials, used server-side only -
   never sent to students' browsers.

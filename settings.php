@@ -37,7 +37,7 @@ if ($hassiteconfig) {
         'local_omeroembed/omerobaseurl',
         get_string('omerobaseurl', 'local_omeroembed'),
         get_string('omerobaseurl_desc', 'local_omeroembed'),
-        'https://omero.mvls.gla.ac.uk',
+        'https://your-omero-server.example.org',
         PARAM_URL
     ));
 
