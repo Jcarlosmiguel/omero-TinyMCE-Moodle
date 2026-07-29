@@ -144,19 +144,11 @@ on *why* each step matters. Quick version:
 
 ## Known limitations
 
-- A cached-but-actually-expired OMERO session self-heals via one automatic
-  retry (see "Self-healing OMERO sessions" above) - but the *first* request
-  after a long idle period still pays the cost of that extra round trip.
-  Raising OMERO's own `omero.sessions.timeout` reduces how often this is
-  hit at all, but isn't required for correctness.
-- New admin settings (including `local/omeroembed:managesettings`'s
-  defaults) only take effect once someone with access saves the settings
-  page at least once - Moodle's `get_config()` only reads what's actually
-  in the database, not an `admin_setting`'s declared default.
-- No way to give a duplicated/re-used slide a different display name at
-  embed time beyond what's typed in the write-up - not a limitation of
-  this plugin specifically, just not a feature it adds on top of OMERO's
-  own naming.
+See [ADMIN.md](ADMIN.md) for the full list with explanations and what to
+do about each one - briefly: a stale OMERO session costs one extra request
+on self-heal rather than failing outright, new settings need a first save
+before their defaults take effect, and there's no way to give a
+duplicated/re-used slide a different display name beyond OMERO's own.
 
 ## License
 
