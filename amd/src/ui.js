@@ -85,6 +85,15 @@ const readExistingEmbed = (node) => {
         if (writeupCell) {
             writeupHtml = writeupCell.innerHTML;
         }
+    } else if (node.querySelector('button')) {
+        // No table, but a reset button is only ever generated for the
+        // textbelow layout (see author.js's generateEmbed()) - the write-up
+        // is the other <div> child, alongside the iframe and the button.
+        layout = 'textbelow';
+        const writeupDiv = Array.from(node.children).find((child) => child.tagName === 'DIV');
+        if (writeupDiv) {
+            writeupHtml = writeupDiv.innerHTML;
+        }
     }
 
     const params = {
