@@ -34,8 +34,18 @@ namespace local_omeroembed;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class omero_session {
-    /** @var int How long a cached OMERO.web session is trusted before re-logging in. */
-    const SESSION_TTL_SECONDS = 20 * 60;
+    /**
+     * @var int How long a cached OMERO.web session is trusted before re-logging in
+     * *without being asked to* (i.e. purely from having sat in cache this long).
+     * Deliberately shorter than OMERO's own real idle timeout (confirmed ~10 min via
+     * the CLI's own "Idle timeout: 10 min" message) rather than trying to match it
+     * exactly - this is just a soft ceiling on how often a healthy session gets
+     * re-established anyway; it is NOT what makes staleness handling correct. That's
+     * $forcerefresh below and proxy.php's retry-once-on-apparent-staleness logic,
+     * which self-heals regardless of whether this constant undercuts OMERO's real
+     * timeout on any given day.
+     */
+    const SESSION_TTL_SECONDS = 8 * 60;
 
     /**
      * Returns a "Cookie:" header value (sessionid + csrftoken) authenticated as the
@@ -44,14 +54,21 @@ class omero_session {
      *
      * @param string $subject Subject key, as used in {omero:ID:SUBJECT} and the
      *                         admin settings textarea.
+     * @param bool $forcerefresh Skip the cache entirely and log in fresh, even if a
+     *                            cached session would otherwise still look valid by
+     *                            SESSION_TTL_SECONDS alone. Used by proxy.php to
+     *                            recover from a session that's cached-but-actually-
+     *                            already-dead on OMERO's side (its real idle timeout
+     *                            can outpace our TTL guess) - see proxy.php's
+     *                            looks_like_stale_session() for how that's detected.
      * @return array{cookie: string, csrftoken: string} Cookie header value and the
      *         csrftoken value on its own (proxy.php needs the latter separately for
      *         any state-changing OMERO request, per Django's CSRF requirements).
      * @throws \moodle_exception If the subject key is unknown, or login fails.
      */
-    public static function get_session(string $subject): array {
+    public static function get_session(string $subject, bool $forcerefresh = false): array {
         $cache = \cache::make('local_omeroembed', 'sessions');
-        $cached = $cache->get($subject);
+        $cached = $forcerefresh ? false : $cache->get($subject);
 
         if ($cached && (time() - $cached['established']) < self::SESSION_TTL_SECONDS) {
             return ['cookie' => $cached['cookie'], 'csrftoken' => $cached['csrftoken']];

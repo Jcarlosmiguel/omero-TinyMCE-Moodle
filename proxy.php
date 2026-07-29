@@ -117,7 +117,77 @@ function in_array_prefix(string $path, array $prefixes): bool {
     return false;
 }
 
-$session = omero_session::get_session($subject);
+/**
+ * Makes the actual request to OMERO with the given session's cookie, returning
+ * just the raw pieces needed to decide what to do next (retry-on-staleness check,
+ * then the existing redirect/body-rewrite handling) - no side effects, doesn't
+ * touch $_SERVER output itself, so it's safe to call twice in a row.
+ *
+ * CURLOPT_FOLLOWLOCATION is deliberately off - OMERO's own redirects (e.g. iviewer
+ * normalising a URL, or a session bounce to its login page) must come back through
+ * this proxy too, not be followed server-side, otherwise the browser's address
+ * bar/history would never reflect them and any relative paths in the *final*
+ * response could resolve wrong.
+ *
+ * @param string $url
+ * @param array{cookie: string, csrftoken: string} $session
+ * @return array{status: int, contenttype: ?string, body: string, location: ?string}
+ * @throws \moodle_exception On a curl-level failure (network/DNS/TLS).
+ */
+function fetch_from_omero(string $url, array $session): array {
+    $locationheader = null;
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cookie: ' . $session['cookie']]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curlhandle, $headerline) use (&$locationheader) {
+        if (preg_match('/^Location:\s*(.+)$/i', trim($headerline), $m)) {
+            $locationheader = trim($m[1]);
+        }
+        return strlen($headerline);
+    });
+    $body = curl_exec($ch);
+    if ($body === false) {
+        $error = curl_error($ch);
+        curl_close($ch);
+        throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $error);
+    }
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contenttype = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
+
+    return ['status' => $status, 'contenttype' => $contenttype, 'body' => $body, 'location' => $locationheader];
+}
+
+/**
+ * Whether an OMERO response looks like it failed because the cached session had
+ * already gone stale on OMERO's own side, rather than a genuine error - see
+ * omero_session::SESSION_TTL_SECONDS's own docblock for the underlying gap
+ * (OMERO's real idle timeout can outpace our cache TTL guess). Three signals,
+ * confirmed against real behaviour rather than guessed:
+ *
+ * - A redirect to a path NOT in PROXY_PATH_PREFIXES - almost always OMERO
+ *   bouncing an unauthenticated request to its own /webclient/login/, the
+ *   clearest possible signal.
+ * - A bare 403 - unambiguous.
+ * - A bare 404 - genuinely ambiguous (a truly-missing image also 404s), but
+ *   confirmed via real testing that a stale session hitting a JSON API endpoint
+ *   like /iviewer/image_data/<id>/ *also* surfaces as a plain 404 with an
+ *   `{"error": "Image not found"}` body indistinguishable from the real thing at
+ *   this level. Included anyway because retrying is safe regardless: it's a GET,
+ *   and a genuinely-missing image just 404s again on the retry, at the cost of
+ *   one extra request only on a path that was already failing.
+ *
+ * @param array{status: int, location: ?string} $result
+ * @return bool
+ */
+function looks_like_stale_session(array $result): bool {
+    if ($result['location'] && !in_array_prefix($result['location'], PROXY_PATH_PREFIXES)) {
+        return true;
+    }
+    return in_array($result['status'], [403, 404], true);
+}
+
 $baseurl = rtrim((string) get_config('local_omeroembed', 'omerobaseurl'), '/');
 $proxybase = (new \moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$subject}"))->out(false);
 
@@ -193,30 +263,20 @@ if ($path === '/iviewer/') {
 
 $targeturl = $baseurl . $path . $querystring;
 
-// CURLOPT_FOLLOWLOCATION is deliberately off (see below) - OMERO's own redirects
-// (e.g. iviewer normalising a URL) must come back through this proxy too, not be
-// followed server-side, otherwise the browser's address bar/history would never
-// reflect them and any relative paths in the *final* response could resolve wrong.
-$locationheader = null;
-$ch = curl_init($targeturl);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cookie: ' . $session['cookie']]);
-curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curlhandle, $headerline) use (&$locationheader) {
-    if (preg_match('/^Location:\s*(.+)$/i', trim($headerline), $m)) {
-        $locationheader = trim($m[1]);
-    }
-    return strlen($headerline);
-});
-$responsebody = curl_exec($ch);
-if ($responsebody === false) {
-    $error = curl_error($ch);
-    curl_close($ch);
-    throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $error);
+$session = omero_session::get_session($subject);
+$result = fetch_from_omero($targeturl, $session);
+if (looks_like_stale_session($result)) {
+    // Force a fresh login and retry exactly once - cheaper than it sounds, since
+    // it only costs anything on the already-failing path, not the common case
+    // (a still-genuinely-valid cached session). Self-heals a session that's
+    // cached-but-actually-dead on OMERO's side for *any* reason (its real idle
+    // timeout outpacing SESSION_TTL_SECONDS being the one confirmed via real
+    // testing, but this doesn't depend on that specific cause) - see
+    // omero_session::get_session()'s own docblock for the $forcerefresh contract.
+    $session = omero_session::get_session($subject, true);
+    $result = fetch_from_omero($targeturl, $session);
 }
-$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$contenttype = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-curl_close($ch);
+['status' => $status, 'contenttype' => $contenttype, 'body' => $responsebody, 'location' => $locationheader] = $result;
 
 http_response_code($status);
 if ($contenttype) {
