@@ -60,4 +60,54 @@ if ($hassiteconfig) {
         '',
         PARAM_RAW
     ));
+
+    // iviewer's own UI controls, individually hideable - see proxy.php's
+    // inject_overlay_hide_css() for how these are actually applied (a single
+    // combined CSS override injected into the proxied /iviewer/ response,
+    // covering both the authoring tool's live preview and the final
+    // student-facing embed, since both load through this same proxy). Class
+    // names are OpenLayers' own standard control classes, found by inspecting
+    // the live viewer in a browser - not anything OMERO-specific.
+    $settings->add(new admin_setting_heading(
+        'local_omeroembed/overlaysheading',
+        get_string('overlaysheading', 'local_omeroembed'),
+        get_string('overlaysheading_desc', 'local_omeroembed')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hideoverview',
+        get_string('hideoverview', 'local_omeroembed'),
+        get_string('hideoverview_desc', 'local_omeroembed'),
+        1
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hiderotate',
+        get_string('hiderotate', 'local_omeroembed'),
+        get_string('hiderotate_desc', 'local_omeroembed'),
+        1
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hideintensity',
+        get_string('hideintensity', 'local_omeroembed'),
+        get_string('hideintensity_desc', 'local_omeroembed'),
+        1
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hidefullscreen',
+        get_string('hidefullscreen', 'local_omeroembed'),
+        get_string('hidefullscreen_desc', 'local_omeroembed'),
+        0
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hidescaleline',
+        get_string('hidescaleline', 'local_omeroembed'),
+        get_string('hidescaleline_desc', 'local_omeroembed'),
+        0
+    ));
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hidezoom',
+        get_string('hidezoom', 'local_omeroembed'),
+        get_string('hidezoom_desc', 'local_omeroembed'),
+        0
+    ));
 }

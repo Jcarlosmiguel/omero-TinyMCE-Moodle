@@ -250,7 +250,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
     $rewritten = rewrite_response_urls($responsebody, $proxybase);
     if ($path === '/iviewer/' && str_contains($contenttype, 'text/html')) {
         $rewritten = inject_server_workaround($rewritten, $proxybase);
-        $rewritten = inject_hide_overview_css($rewritten);
+        $rewritten = inject_overlay_hide_css($rewritten);
     }
     echo $rewritten;
 } else {
@@ -364,18 +364,39 @@ function inject_server_workaround(string $body, string $proxybase): string {
 }
 
 /**
- * Hides iviewer's built-in "overview map" (OpenLayers' standard
- * .ol-overviewmap control - a small inset thumbnail of the whole image with a
- * box showing the current viewport) for both the authoring tool's live preview
- * and the final student-facing embed, since both load through this same proxy.
- * Purely cosmetic, no functional effect on pan/zoom/view-links - a plain CSS
- * override is enough, no JS needed.
+ * Hides whichever of iviewer's own on-image UI controls are configured to be
+ * hidden (Site administration > Plugins > Local plugins > OMERO slide embed >
+ * "Embedded viewer overlays") - for both the authoring tool's live preview and
+ * the final student-facing embed, since both load through this same proxy.
+ * Class names are OpenLayers' own standard control classes, not anything
+ * OMERO-specific - found by inspecting the live viewer in a browser. Purely
+ * cosmetic in every case except "hide zoom controls" (see its own setting
+ * description) - a single combined CSS override is enough, no JS needed.
  *
  * @param string $body
  * @return string
  */
-function inject_hide_overview_css(string $body): string {
-    $style = '<style>.ol-overviewmap { display: none !important; }</style>';
+function inject_overlay_hide_css(string $body): string {
+    $classesbysetting = [
+        'hideoverview' => '.ol-overviewmap',
+        'hiderotate' => '.ol-rotate',
+        'hideintensity' => '.ol-intensity',
+        'hidefullscreen' => '.ol-full-screen',
+        'hidescaleline' => '.ol-scale-line',
+        'hidezoom' => '.ol-zoom',
+    ];
+
+    $selectors = [];
+    foreach ($classesbysetting as $setting => $selector) {
+        if (get_config('local_omeroembed', $setting)) {
+            $selectors[] = $selector;
+        }
+    }
+    if (!$selectors) {
+        return $body;
+    }
+
+    $style = '<style>' . implode(', ', $selectors) . ' { display: none !important; }</style>';
     $withstyle = preg_replace('#(</head>)#i', $style . '$1', $body, 1);
     return $withstyle !== null ? $withstyle : ($body . $style);
 }
