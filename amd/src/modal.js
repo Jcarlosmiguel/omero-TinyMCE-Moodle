@@ -33,6 +33,17 @@ export default class OmeroEmbedModal extends Modal {
         modalConfig.removeOnClose = true;
 
         super.configure(modalConfig);
+
+        // "large" only gets us Bootstrap's modal-lg, capped at 800px - the
+        // same as this tool's own default embed Width, and less once the
+        // modal's own padding/border are subtracted. That squeezes the live
+        // preview narrower than the teacher's configured Width, so a
+        // pan/zoom position saved while authoring doesn't frame the slide
+        // the same way once the real embed renders at its full (wider)
+        // size elsewhere - confirmed as the actual cause of a reported
+        // "positioning is a bit off" issue. Widen well past any typical
+        // configured width rather than hard-coding one specific pixel value.
+        this.getModal().css('max-width', '95vw');
     }
 }
 
