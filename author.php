@@ -151,6 +151,16 @@ echo html_writer::tag('p', get_string('authorintro', 'local_omeroembed'), ['clas
 // reloading/bookmarking the page with a slide already loaded works naturally. ---
 echo html_writer::start_tag('form', ['method' => 'get', 'action' => $pageurl->out(false), 'id' => 'omero-setup-form']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
+if ($embedded) {
+    // A GET form submission is built entirely from its own <input> fields -
+    // the action URL's own querystring (where $pageurl already carries
+    // embedded=1) is discarded by the browser, not merged. Without this
+    // hidden field, resubmitting the setup form (picking a different
+    // subject/image) silently drops back to non-embedded mode: full course
+    // layout instead of popup, and the copy-paste textarea instead of the
+    // direct insert - exactly the bug this fixes.
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'embedded', 'value' => 1]);
+}
 echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-bottom: 1rem;']);
 
 $subjectoptions = ['' => get_string('choosesubject', 'local_omeroembed')];
