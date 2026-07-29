@@ -107,9 +107,25 @@
             insertBtn.style.display = 'none';
             iframeWrap.style.flex = '1 1 100%';
             pane.style.flexDirection = 'row';
+        } else if (layout === 'textbelow') {
+            // Stacked, not side-by-side - a short question under the image,
+            // not a full-height write-up pane next to it.
+            writeup.style.display = '';
+            insertBtn.style.display = '';
+            writeup.style.flex = '0 0 auto';
+            writeup.style.width = '100%';
+            writeup.style.height = 'auto';
+            writeup.style.minHeight = '3em';
+            iframeWrap.style.flex = '0 0 auto';
+            iframeWrap.style.width = '100%';
+            pane.style.flexDirection = 'column';
         } else {
             writeup.style.display = '';
             insertBtn.style.display = '';
+            writeup.style.flex = '1';
+            writeup.style.width = '';
+            writeup.style.height = document.getElementById(config.iframeId).style.height;
+            writeup.style.minHeight = '';
             iframeWrap.style.flex = '1';
             iframeWrap.style.minWidth = '0';
             pane.style.flexDirection = layout === 'slideright' ? 'row-reverse' : 'row';
@@ -193,12 +209,40 @@
         // point the embed is actually generated.
         var iframeSrc = openingView ? buildViewUrl(openingView) : config.baseProxyUrl;
 
-        var iframeHtml = '<iframe style="width: 100%; height: ' + iframe.style.height + ';" src="' +
+        // id (in addition to the existing name) gives the reset button in
+        // the textbelow layout below a stable, unique target to reload -
+        // important once a page/question has more than one embed.
+        var iframeHtml = '<iframe id="' + config.iframeName + '" style="width: 100%; height: ' + iframe.style.height + ';" src="' +
             iframeSrc + '" name="' + config.iframeName + '"></iframe>';
 
         var inner;
         if (layout === 'imageonly') {
             inner = iframeHtml;
+        } else if (layout === 'textbelow') {
+            var textBelowWriteup = document.getElementById(config.writeupId);
+            var resetBtnId = 'omero-reset-' + config.iframeName;
+            // A plain onclick attribute gets silently stripped by TinyMCE's
+            // own client-side schema on insert - confirmed live, it never
+            // even reaches the server, regardless of how permissive Moodle's
+            // own save/render sanitization is (mod_page and quiz question
+            // text both skip HTMLPurifier entirely, but that's irrelevant if
+            // the attribute is already gone before insertContent() returns).
+            // A <script> tag survives instead (this site's own default
+            // extended_valid_elements already includes script[*] - also
+            // confirmed live), so the handler is attached that way, via
+            // addEventListener rather than an inline attribute.
+            // "Clear then restore src" - reassigning to the same value isn't
+            // guaranteed to force a reload in every browser. Resets back to
+            // iframeSrc, the same opening-view URL computed above - exactly
+            // "the original position", regardless of how the viewer has since
+            // panned/zoomed inside the live iviewer.
+            var resetHtml = '<button type="button" id="' + resetBtnId + '" style="margin-top: 0.5rem;">'
+                + config.strings.resetview + '</button>\n  <script>'
+                + 'document.getElementById("' + resetBtnId + '").addEventListener("click", function() {'
+                + 'var f = document.getElementById("' + config.iframeName + '"); var s = f.src; f.src = ""; f.src = s;'
+                + '});</script>';
+            inner = iframeHtml + '\n  ' + resetHtml +
+                '\n  <div style="margin-top: 0.5rem; text-align: left;">' + textBelowWriteup.innerHTML + '</div>';
         } else {
             var writeup = document.getElementById(config.writeupId);
             var slideCell = '<td>' + iframeHtml + '</td>';

@@ -122,6 +122,36 @@ if ($hasslide) {
     $iframename = 'omero-embed-' . preg_replace('/[^A-Za-z0-9]/', '', (string) $idfragment);
 
     $imageonly = ($layout === 'imageonly');
+    $textbelow = ($layout === 'textbelow');
+
+    // Initial split-pane arrangement, so the page doesn't flash the wrong
+    // layout before author.js's applyLayout() attaches (same reasoning as
+    // the existing style branches below - these three need to stay in sync
+    // with applyLayout()'s own client-side logic).
+    $panedirection = '';
+    if ($layout === 'slideright') {
+        $panedirection = 'row-reverse';
+    } else if ($textbelow) {
+        $panedirection = 'column';
+    }
+
+    if ($imageonly) {
+        $iframewrapstyle = 'flex:1 1 100%;';
+    } else if ($textbelow) {
+        $iframewrapstyle = 'flex:0 0 auto; width:100%;';
+    } else {
+        $iframewrapstyle = 'flex:1; min-width:0;';
+    }
+
+    if ($imageonly) {
+        $writeupextrastyle = ' display:none;';
+    } else if ($textbelow) {
+        // A short question, not a full-height write-up pane - overrides the
+        // shared height:Xpx set below (later wins, same inline style).
+        $writeupextrastyle = ' flex:0 0 auto; width:100%; height:auto; min-height:3em;';
+    } else {
+        $writeupextrastyle = '';
+    }
 
     $jsconfig = [
         'iframeId' => 'omero-live-preview',
@@ -138,6 +168,7 @@ if ($hasslide) {
             'selectinsidewriteup' => get_string('selectinsidewriteup', 'local_omeroembed'),
             'copied' => get_string('copied', 'local_omeroembed'),
             'openingviewset' => get_string('openingviewset', 'local_omeroembed'),
+            'resetview' => get_string('resetview', 'local_omeroembed'),
         ],
     ];
     $PAGE->requires->js(new moodle_url('/local/omeroembed/js/author.js'));
@@ -185,7 +216,13 @@ echo html_writer::end_div();
 
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('layoutlabel', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-foreach (['slideleft' => 'layoutslideleft', 'slideright' => 'layoutslideright', 'imageonly' => 'layoutimageonly'] as $value => $stringkey) {
+$layoutoptions = [
+    'slideleft' => 'layoutslideleft',
+    'slideright' => 'layoutslideright',
+    'imageonly' => 'layoutimageonly',
+    'textbelow' => 'layouttextbelow',
+];
+foreach ($layoutoptions as $value => $stringkey) {
     $attrs = ['type' => 'radio', 'name' => 'layout', 'value' => $value];
     if ($layout === $value) {
         $attrs['checked'] = 'checked';
@@ -244,7 +281,7 @@ if ($hasslide) {
     echo html_writer::start_div('', ['style' => 'display:flex; gap:0.5rem; margin-bottom:0.5rem;']);
     echo html_writer::tag('button', get_string('insertviewlink', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-insert-link-btn', 'class' => 'btn btn-secondary',
-        'style' => $imageonly ? 'display:none;' : '',
+        'style' => $imageonly ? 'display:none;' : '', // Stays visible for textbelow - it's still a rich write-up box.
     ]);
     echo html_writer::tag('button', get_string('setopeningview', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-set-opening-btn', 'class' => 'btn btn-info',
@@ -259,7 +296,7 @@ if ($hasslide) {
     // flash of the wrong arrangement before author.js finishes attaching.
     echo html_writer::start_div('', [
         'id' => 'omero-split-pane',
-        'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($layout === 'slideright' ? ' flex-direction:row-reverse;' : ''),
+        'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($panedirection ? " flex-direction:{$panedirection};" : ''),
     ]);
 
     $iframe = html_writer::tag('iframe', '', [
@@ -270,14 +307,14 @@ if ($hasslide) {
         'allowfullscreen' => 'allowfullscreen',
     ]);
     echo html_writer::div($iframe, '', [
-        'id' => 'omero-iframe-wrap', 'style' => $imageonly ? 'flex:1 1 100%;' : 'flex:1; min-width:0;',
+        'id' => 'omero-iframe-wrap', 'style' => $iframewrapstyle,
     ]);
 
     echo html_writer::div('', '', [
         'id' => 'omero-writeup',
         'contenteditable' => 'true',
         'style' => 'flex:1; min-width:0; height:' . s($height) . '; border:1px solid #ccc; padding:0.5rem;'
-            . ' box-sizing:border-box; overflow:auto;' . ($imageonly ? ' display:none;' : ''),
+            . ' box-sizing:border-box; overflow:auto;' . $writeupextrastyle,
     ]);
 
     echo html_writer::end_div();
