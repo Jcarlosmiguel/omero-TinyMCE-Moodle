@@ -92,8 +92,8 @@ Then configure the OMERO server, subject accounts, and viewer overlay
 settings, either as a Site administrator (Site administration > Plugins >
 Local plugins > OMERO slide embed) or - once granted
 `local/omeroembed:managesettings` - via **local/omeroembed/manage.php**,
-also linked from the site's main navigation for anyone with that
-capability.
+linked as "OMERO slide embed settings" in the site's top navigation bar's
+**"More"** menu (and the drawer menu) for anyone with that capability.
 
 - **OMERO base URL** - the real OMERO.web server, e.g.
   `https://your-omero-server.example.org`.
@@ -122,8 +122,13 @@ capability at system context specifically.
 
 ## Usage
 
-1. Open **"Embed an OMERO slide"** from a course's own navigation (or
-   `local/omeroembed/author.php?courseid=<id>` directly).
+See [USAGE.md](USAGE.md) for a teacher-facing walkthrough with more context
+on *why* each step matters. Quick version:
+
+1. In any course you can edit, open the secondary navigation's **"More"**
+   dropdown and click **"Embed an OMERO slide"** (or go directly to
+   `local/omeroembed/author.php?courseid=<id>`). Only visible to accounts
+   with edit rights in that course - students never see this link.
 2. Pick a subject account and an image ID and/or dataset ID, choose a
    layout, and click **Load slide**.
 3. Pan/zoom the live preview to a view worth calling out, select the
