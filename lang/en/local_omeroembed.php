@@ -49,7 +49,7 @@ $string['hidezoom_desc'] = 'The zoom in/out buttons, "1:1" reset, and zoom perce
 
 $string['privacy:metadata'] = 'This plugin does not store any personal data about students. It stores OMERO service-account credentials (configured by an administrator) and short-lived server-side session caches, neither of which are personal data belonging to any individual user of this site.';
 
-$string['unknownsubject'] = 'No OMERO subject account is configured for "{$a}" - check Site administration > Plugins > Local plugins > OMERO slide embed.';
+$string['unknownsubject'] = 'No OMERO subject account is configured for "{$a}" - ask a Manager to check it under "OMERO slide embed settings" (or a Site administrator, under Site administration > Plugins > Local plugins > OMERO slide embed).';
 $string['omerologinfailed'] = 'Could not log in to OMERO as subject "{$a}" - check the configured username/password for this subject.';
 $string['omeroconnectionfailed'] = 'Could not reach the configured OMERO server.';
 $string['invalidproxypath'] = 'Refusing to proxy path "{$a}" - not in the allowed list.';
