@@ -79,3 +79,9 @@ $string['copied'] = 'Copied!';
 $string['previewnotready'] = 'Could not read the slide\'s current position - wait for it to finish loading, then pan or zoom before trying again.';
 $string['selecttextfirst'] = 'Select some text in the write-up box first, then click Insert view link.';
 $string['selectinsidewriteup'] = 'Select text inside the write-up box (not the slide or anything else on the page).';
+
+$string['omeroembed:managesettings'] = 'Manage OMERO slide embed settings (base URL, subject accounts, viewer overlays)';
+$string['managetitle'] = 'OMERO slide embed settings';
+$string['manageintro'] = 'The OMERO server, subject accounts, and embedded viewer appearance used across every course\'s "Embed an OMERO slide" tool - not specific to any one course.';
+$string['savechanges'] = 'Save changes';
+$string['settingssaved'] = 'Settings saved.';
