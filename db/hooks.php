@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details.
+ * Hook callback registrations.
  *
  * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
@@ -24,7 +24,10 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026072902;         // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
-$plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->maturity  = MATURITY_ALPHA;
+$callbacks = [
+    [
+        'hook' => \core\hook\navigation\primary_extend::class,
+        'callback' => [\local_omeroembed\hook_callbacks::class, 'extend_primary_navigation'],
+        'priority' => 0,
+    ],
+];
