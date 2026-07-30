@@ -236,11 +236,18 @@
         var placeBtn = document.createElement('button');
         placeBtn.type = 'button';
         placeBtn.textContent = config.strings.placepin;
-        placeBtn.style.cssText = 'cursor:pointer;';
+        placeBtn.style.cssText = 'cursor:pointer; border:1px solid #ffffff; border-radius:3px; padding:0.2rem 0.5rem;';
+
+        function updatePlaceBtn() {
+            placeBtn.style.background = placing ? '#2ecc71' : 'transparent';
+            placeBtn.style.color = placing ? '#000000' : '#ffffff';
+            placeBtn.style.fontWeight = placing ? 'bold' : 'normal';
+        }
+        updatePlaceBtn();
+
         placeBtn.addEventListener('click', function() {
             placing = !placing;
-            placeBtn.style.fontWeight = placing ? 'bold' : 'normal';
-            placeBtn.style.outline = placing ? '2px solid #fff' : 'none';
+            updatePlaceBtn();
         });
         toolbar.appendChild(placeBtn);
 
