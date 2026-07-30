@@ -38,9 +38,33 @@
     }
 
     /**
-     * Reads the live iviewer iframe's current x/y (from .intensity-display's text)
-     * and zm (from .ol-zoom-display's value). Returns null if either element isn't
-     * found yet (iviewer still loading) or the text doesn't parse.
+     * Reads the live iviewer iframe's actual pan/zoom state via its own
+     * <ol3-viewer> Aurelia component, calling the same Viewer instance the
+     * app itself uses (viewer.getViewParameters(), an internal-but-public
+     * method on ome/ol3-viewer's Viewer class - element.au.controller.
+     * viewModel.viewer is Aurelia's own convention for reaching a custom
+     * element's live view-model, not something this plugin invented).
+     * getViewParameters() returns {center: [x, y], resolution, ...}; OL's
+     * map uses a Y-up coordinate system while image pixels are Y-down, so
+     * center[1] needs negating, and resolution converts to the same "zoom
+     * percentage" iviewer's own .ol-zoom-display shows via
+     * round(1 / resolution * 100) (lifted from displayResolutionInPercent()
+     * in the built iviewer JS - kept unrounded here for precision).
+     *
+     * Two things were tried and rejected before this, both confirmed wrong
+     * via live testing: (1) .intensity-display's text - iviewer's
+     * mouse-hover pixel/value readout, not the pan position, so it only
+     * ever reflected wherever the cursor last sat (blank with no hover at
+     * all); (2) the iframe's own contentWindow.location.href - iviewer
+     * does NOT keep its address in sync with pan/zoom as you interact
+     * (confirmed live: zoom changed for real, address stayed static).
+     * Both were the actual cause of a reported "saved position doesn't
+     * match" bug - captured x/y were never the real pan state.
+     *
+     * Returns null if the iframe hasn't loaded a real view yet, or if
+     * iviewer's internal structure doesn't match what's expected here
+     * (e.g. after an iviewer upgrade) - degrades to the existing "wait for
+     * it to finish loading" prompt rather than throwing.
      */
     function readCurrentView() {
         var iframe = document.getElementById(config.iframeId);
@@ -54,18 +78,27 @@
             return null;
         }
 
-        var intensityEl = doc.querySelector('.intensity-display');
-        var zoomEl = doc.querySelector('.ol-zoom-display');
-        if (!intensityEl || !zoomEl) {
+        var viewerEl = doc.querySelector('ol3-viewer');
+        if (!viewerEl || !viewerEl.au || !viewerEl.au.controller) {
             return null;
         }
 
-        var match = /X:\s*(\d+)\s*Y:\s*(\d+)/.exec(intensityEl.textContent || '');
-        if (!match) {
+        var viewer = viewerEl.au.controller.viewModel.viewer;
+        var params;
+        try {
+            params = viewer.getViewParameters();
+        } catch (e) {
+            return null;
+        }
+        if (!params || !params.center || !params.resolution) {
             return null;
         }
 
-        return {x: match[1], y: match[2], zm: zoomEl.value};
+        return {
+            x: Math.round(params.center[0]),
+            y: Math.round(-params.center[1]),
+            zm: (1 / params.resolution * 100)
+        };
     }
 
     function buildViewUrl(view) {
