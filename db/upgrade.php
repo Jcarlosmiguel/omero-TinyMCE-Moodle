@@ -61,5 +61,18 @@ function xmldb_local_omeroembed_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026073002, 'local', 'omeroembed');
     }
 
+    if ($oldversion < 2026073004) {
+        // Optional short student-entered note, shown when a pin is clicked -
+        // see db/install.xml's own COMMENT on this field.
+        $table = new xmldb_table('local_omeroembed_annotations');
+        $field = new xmldb_field('label', XMLDB_TYPE_TEXT, null, null, null, null, null, 'colour');
+
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_plugin_savepoint(true, 2026073004, 'local', 'omeroembed');
+    }
+
     return true;
 }

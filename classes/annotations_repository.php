@@ -62,6 +62,7 @@ class annotations_repository {
      * @param array $geometry Shape-specific coordinates, e.g. ['x' => .., 'y' => ..]
      *                        for TYPE_POINT - in real OMERO image-pixel coordinates.
      * @param string $colour Hex string, e.g. '#ff0000'.
+     * @param string $label Optional short note shown when the annotation is clicked - '' for none.
      * @return \stdClass The newly-created row, geometry re-decoded back to an array
      *                   for the caller's convenience (ajax.php echoes it straight
      *                   back as part of its JSON response).
@@ -72,7 +73,8 @@ class annotations_repository {
         string $embedid,
         string $type,
         array $geometry,
-        string $colour
+        string $colour,
+        string $label = ''
     ): \stdClass {
         global $DB;
 
@@ -84,6 +86,7 @@ class annotations_repository {
             'type' => $type,
             'geometry' => json_encode($geometry),
             'colour' => $colour,
+            'label' => $label,
             'timecreated' => $now,
             'timemodified' => $now,
         ];

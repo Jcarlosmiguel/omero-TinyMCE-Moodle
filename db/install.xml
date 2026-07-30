@@ -13,6 +13,7 @@
         <FIELD NAME="type" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="point" SEQUENCE="false" COMMENT="Annotation shape - only 'point' is supported so far"/>
         <FIELD NAME="geometry" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON, in real OMERO image-pixel coordinates - e.g. point: {x,y}"/>
         <FIELD NAME="colour" TYPE="char" LENGTH="7" NOTNULL="true" DEFAULT="#ff0000" SEQUENCE="false" COMMENT="Hex colour string, e.g. #ff0000"/>
+        <FIELD NAME="label" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Optional short student-entered note shown when the annotation is clicked"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>

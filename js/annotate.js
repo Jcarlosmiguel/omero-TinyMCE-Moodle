@@ -125,6 +125,7 @@
         var ctx = overlayCanvas.getContext('2d');
         ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
+        var selectedPx = null;
         annotations.forEach(function(a) {
             var px = olmap.getPixelFromCoordinate([a.geometry.x, -a.geometry.y]);
             if (!px) {
@@ -138,8 +139,35 @@
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = '#ffffff';
                 ctx.stroke();
+                selectedPx = px;
             }
         });
+
+        updateLabel(selectedPx);
+    }
+
+    /**
+     * Positions the label tooltip just above the selected pin's current
+     * screen position - called every redraw() (i.e. every postrender), so
+     * it tracks pan/zoom exactly like the pin itself rather than only being
+     * placed once at selection time.
+     *
+     * @param {Array|null} px [screenX, screenY] of the selected pin, or null
+     *                        if nothing's selected/it has no label to show.
+     */
+    function updateLabel(px) {
+        var label = document.getElementById('omero-annotate-label');
+        var selected = annotations.find(function(a) {
+            return a.id === selectedId;
+        });
+        if (!px || !selected || !selected.label) {
+            label.style.display = 'none';
+            return;
+        }
+        label.textContent = selected.label;
+        label.style.display = 'block';
+        label.style.left = px[0] + 'px';
+        label.style.top = (px[1] - PIN_RADIUS - 8) + 'px';
     }
 
     function annotationAtPixel(px) {
@@ -174,12 +202,22 @@
             return;
         }
 
+        // A blank/cancelled prompt is still a valid pin - not every mark
+        // needs a note - only the AJAX call itself is skipped if the user
+        // explicitly cancels (prompt() returns null), matching the usual
+        // "cancel means stop" expectation for a native prompt.
+        var label = window.prompt(config.strings.labelprompt, '');
+        if (label === null) {
+            return;
+        }
+
         var coord = olmap.getCoordinateFromPixel(px);
         ajax('create', {
             type: 'point',
             x: coord[0],
             y: -coord[1],
             colour: currentColour,
+            label: label,
         }, 'POST').then(function(created) {
             annotations.push(created);
             redraw();
@@ -189,6 +227,8 @@
     function updateDeleteButton() {
         var btn = document.getElementById('omero-annotate-delete');
         btn.style.display = selectedId ? 'inline-block' : 'none';
+        btn.style.background = selectedId ? '#e74c3c' : 'transparent';
+        btn.style.fontWeight = selectedId ? 'bold' : 'normal';
     }
 
     function deleteSelected() {
@@ -274,7 +314,8 @@
         deleteBtn.type = 'button';
         deleteBtn.id = 'omero-annotate-delete';
         deleteBtn.textContent = config.strings['delete'];
-        deleteBtn.style.cssText = 'cursor:pointer; display:none;';
+        deleteBtn.style.cssText = 'cursor:pointer; display:none; border:1px solid #ffffff; '
+            + 'border-radius:3px; padding:0.2rem 0.5rem; color:#ffffff;';
         deleteBtn.addEventListener('click', deleteSelected);
         toolbar.appendChild(deleteBtn);
 
@@ -310,6 +351,14 @@
             viewportEl.style.position = 'relative';
         }
         viewportEl.appendChild(overlayCanvas);
+
+        var labelEl = document.createElement('div');
+        labelEl.id = 'omero-annotate-label';
+        labelEl.style.cssText = 'position:absolute; display:none; z-index:1001; '
+            + 'transform:translate(-50%, -100%); white-space:nowrap; '
+            + 'background:rgba(0,0,0,0.85); color:#ffffff; padding:0.2rem 0.5rem; '
+            + 'border-radius:3px; font-size:0.85rem; pointer-events:none;';
+        viewportEl.appendChild(labelEl);
 
         // Clicks reach this listener even though overlayCanvas sits visually
         // on top - pointer-events:none makes it pass every pointer event

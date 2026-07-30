@@ -72,6 +72,7 @@ class provider implements
                 'embedid' => 'privacy:metadata:local_omeroembed_annotations:embedid',
                 'geometry' => 'privacy:metadata:local_omeroembed_annotations:geometry',
                 'colour' => 'privacy:metadata:local_omeroembed_annotations:colour',
+                'label' => 'privacy:metadata:local_omeroembed_annotations:label',
                 'timecreated' => 'privacy:metadata:local_omeroembed_annotations:timecreated',
             ],
             'privacy:metadata:local_omeroembed_annotations'
@@ -149,6 +150,7 @@ class provider implements
                     'type' => $annotation->type,
                     'geometry' => $annotation->geometry,
                     'colour' => $annotation->colour,
+                    'label' => $annotation->label,
                     'timecreated' => \core_privacy\local\request\transform::datetime($annotation->timecreated),
                 ];
             }, array_values($annotations));

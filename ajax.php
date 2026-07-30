@@ -54,6 +54,7 @@ if ($action === 'list') {
             'type' => $record->type,
             'geometry' => json_decode($record->geometry, true),
             'colour' => $record->colour,
+            'label' => $record->label,
         ];
     }, $annotations));
     exit;
@@ -68,6 +69,7 @@ if ($action === 'create') {
     $x = required_param('x', PARAM_FLOAT);
     $y = required_param('y', PARAM_FLOAT);
     $colour = required_param('colour', PARAM_RAW);
+    $label = optional_param('label', '', PARAM_TEXT);
     if (!preg_match('/^#[0-9a-fA-F]{6}$/', $colour)) {
         throw new \moodle_exception('invalidcolour', 'local_omeroembed', '', $colour);
     }
@@ -78,12 +80,13 @@ if ($action === 'create') {
         throw new \moodle_exception('invalidannotationtype', 'local_omeroembed', '', $type);
     }
 
-    $record = annotations_repository::create($courseid, $USER->id, $embedid, $type, ['x' => $x, 'y' => $y], $colour);
+    $record = annotations_repository::create($courseid, $USER->id, $embedid, $type, ['x' => $x, 'y' => $y], $colour, $label);
     echo json_encode([
         'id' => (int) $record->id,
         'type' => $record->type,
         'geometry' => $record->geometry,
         'colour' => $record->colour,
+        'label' => $record->label,
     ]);
     exit;
 }

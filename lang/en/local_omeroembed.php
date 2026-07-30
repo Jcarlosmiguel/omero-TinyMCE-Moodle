@@ -58,6 +58,7 @@ $string['privacy:metadata:local_omeroembed_annotations:courseid'] = 'The course 
 $string['privacy:metadata:local_omeroembed_annotations:embedid'] = 'The specific embed placement the annotation was drawn on.';
 $string['privacy:metadata:local_omeroembed_annotations:geometry'] = 'The position on the slide the student marked.';
 $string['privacy:metadata:local_omeroembed_annotations:colour'] = 'The colour the student chose for this annotation.';
+$string['privacy:metadata:local_omeroembed_annotations:label'] = 'An optional short note the student entered for this annotation.';
 $string['privacy:metadata:local_omeroembed_annotations:timecreated'] = 'The time the annotation was created.';
 
 $string['unknownsubject'] = 'No OMERO subject account is configured for "{$a}" - ask a Manager to check it under "OMERO slide embed settings" (or a Site administrator, under Site administration > Plugins > Local plugins > OMERO slide embed).';
@@ -104,6 +105,7 @@ $string['invalidaction'] = 'Invalid action "{$a}".';
 $string['annotatetoolbar_point'] = 'Place a pin';
 $string['annotatetoolbar_snapshot'] = 'Snapshot';
 $string['annotatetoolbar_delete'] = 'Delete';
+$string['annotatetoolbar_labelprompt'] = 'Add a short note for this pin (optional):';
 $string['managetitle'] = 'OMERO slide embed settings';
 $string['manageintro'] = 'The OMERO server, subject accounts, and embedded viewer appearance used across every course\'s "Embed an OMERO slide" tool - not specific to any one course.';
 $string['savechanges'] = 'Save changes';

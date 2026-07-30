@@ -545,6 +545,7 @@ function inject_annotation_script(string $body, int $courseid, string $embedid):
             'placepin' => get_string('annotatetoolbar_point', 'local_omeroembed'),
             'snapshot' => get_string('annotatetoolbar_snapshot', 'local_omeroembed'),
             'delete' => get_string('annotatetoolbar_delete', 'local_omeroembed'),
+            'labelprompt' => get_string('annotatetoolbar_labelprompt', 'local_omeroembed'),
         ],
     ];
     $configscript = '<script id="omero-annotate-config" type="application/json">'
