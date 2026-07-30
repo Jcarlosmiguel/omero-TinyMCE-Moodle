@@ -39,13 +39,18 @@ $string['hideoverview_desc'] = 'The small inset thumbnail of the whole image wit
 $string['hiderotate'] = 'Hide rotate control';
 $string['hiderotate_desc'] = 'The "reset rotation" arrow icon - rarely relevant for a flat slide image.';
 $string['hideintensity'] = 'Hide coordinate/zoom readout';
-$string['hideintensity_desc'] = 'A small diagnostic display of the current pixel coordinates and zoom percentage. Safe to hide - the authoring tool\'s "Insert view link" and "Set as opening view" read this value directly, not by displaying it on screen.';
+$string['hideintensity_desc'] = 'A small mouse-hover display of the pixel coordinate and value under the cursor, plus the current zoom percentage. Safe to hide - the authoring tool\'s "Insert view link" and "Set as opening view" read the actual view position directly from the viewer itself, not from this on-screen display.';
 $string['hidefullscreen'] = 'Hide full-screen button';
 $string['hidefullscreen_desc'] = 'Lets students expand the slide to fill the screen - hide only if that\'s not wanted for this deployment.';
 $string['hidescaleline'] = 'Hide scale bar';
 $string['hidescaleline_desc'] = 'Shows a real-world size reference (e.g. "5 mm"). Consider leaving this visible - it\'s often pedagogically useful for judging magnification.';
 $string['hidezoom'] = 'Hide zoom controls';
 $string['hidezoom_desc'] = 'The zoom in/out buttons, "1:1" reset, and zoom percentage input. Hiding this removes the ability to zoom interactively, not just a cosmetic change - only enable if the embed is meant to show a single fixed view with no student interaction.';
+
+$string['annotationsheading'] = 'Student annotations';
+$string['annotationsheading_desc'] = 'A separate annotation layer (in development) let students mark up the slide themselves - independent of, and not visible in, OMERO\'s own ROI system.';
+$string['enableannotations'] = 'Enable student annotations';
+$string['enableannotations_desc'] = 'Turns on the annotation layer for the final student-facing embed only - never on the authoring tool\'s own live preview. While this is off (the default), embeds behave exactly as before, including OMERO.iviewer\'s own right-click ROI menu.';
 
 $string['privacy:metadata'] = 'This plugin does not store any personal data about students. It stores OMERO service-account credentials (configured by an administrator) and short-lived server-side session caches, neither of which are personal data belonging to any individual user of this site.';
 

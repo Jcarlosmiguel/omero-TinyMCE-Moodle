@@ -96,6 +96,14 @@ if (!$courseid || $subject === '') {
 
 $path = optional_param('path', '/iviewer/', PARAM_PATH);
 
+// Set only on the authoring tool's own live preview iframe src (see author.php) -
+// never present on a generated embed's src, since that's built by author.js's
+// buildViewUrl()/generateEmbed() from the *unmodified* base proxy URL. Lets
+// inject_contextmenu_blocker() (and future annotation-mode features) tell "the
+// teacher is previewing this" apart from "a student is viewing the real embed"
+// without needing two different proxy scripts.
+$authoring = optional_param('authoring', false, PARAM_BOOL);
+
 $course = get_course($courseid);
 require_login($course);
 
@@ -311,6 +319,9 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
     if ($path === '/iviewer/' && str_contains($contenttype, 'text/html')) {
         $rewritten = inject_server_workaround($rewritten, $proxybase);
         $rewritten = inject_overlay_hide_css($rewritten);
+        if (!$authoring) {
+            $rewritten = inject_contextmenu_blocker($rewritten);
+        }
     }
     echo $rewritten;
 } else {
@@ -459,4 +470,37 @@ function inject_overlay_hide_css(string $body): string {
     $style = '<style>' . implode(', ', $selectors) . ' { display: none !important; }</style>';
     $withstyle = preg_replace('#(</head>)#i', $style . '$1', $body, 1);
     return $withstyle !== null ? $withstyle : ($body . $style);
+}
+
+/**
+ * Suppresses iviewer's own right-click ROI context menu on the final
+ * student-facing embed, gated behind the (currently off-by-default)
+ * "Enable student annotations" setting - prep for a student annotation UI
+ * that will take the right-click gesture over; inert (never called) while
+ * that setting is off, and never applied to the authoring tool's own live
+ * preview regardless (see $authoring in this file's main dispatch), so
+ * teachers keep OMERO's normal ROI menu while building an embed.
+ *
+ * iviewer is built with Aurelia, whose `.trigger`/`.delegate` binding
+ * commands only ever attach bubble-phase listeners (confirmed against the
+ * live app's own `<viewer-context-menu>` component) - so a listener added
+ * here in the *capture* phase on `document` always runs first, and
+ * `stopImmediatePropagation()` stops the event before Aurelia's own
+ * handler ever sees it, regardless of which element actually shows the
+ * menu. Loaded via <script> in <head>, so it's attached well before
+ * iviewer's own app bundle (loaded later, in <body>) finishes initialising.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_contextmenu_blocker(string $body): string {
+    if (!get_config('local_omeroembed', 'enableannotations')) {
+        return $body;
+    }
+
+    $script = '<script>document.addEventListener("contextmenu", function(e) {'
+        . 'e.preventDefault(); e.stopImmediatePropagation();'
+        . '}, true);</script>';
+    $withscript = preg_replace('#(</head>)#i', $script . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $script);
 }

@@ -299,10 +299,19 @@ if ($hasslide) {
         'style' => 'display:flex; align-items:stretch; gap:1rem;' . ($panedirection ? " flex-direction:{$panedirection};" : ''),
     ]);
 
+    // A separate clone, not $proxyurl itself - config.baseProxyUrl (built from
+    // $proxyurl below) is reused verbatim by author.js's buildViewUrl()/
+    // generateEmbed() as the base for the *final* embed's src, so marking
+    // $proxyurl itself as "authoring" here would leak that marker into every
+    // generated embed too. Only this one live-preview iframe's own src should
+    // ever carry it - see proxy.php's $authoring for what it's used for.
+    $previewurl = new moodle_url($proxyurl);
+    $previewurl->param('authoring', 1);
+
     $iframe = html_writer::tag('iframe', '', [
         'id' => 'omero-live-preview',
         'name' => $iframename,
-        'src' => $proxyurl->out(false),
+        'src' => $previewurl->out(false),
         'style' => 'width:100%; height:' . s($height) . '; border:1px solid #ccc; box-sizing:border-box; display:block;',
         'allowfullscreen' => 'allowfullscreen',
     ]);

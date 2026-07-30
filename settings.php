@@ -110,4 +110,22 @@ if ($hassiteconfig) {
         get_string('hidezoom_desc', 'local_omeroembed'),
         0
     ));
+
+    // Off by default - see proxy.php's inject_contextmenu_blocker() for what
+    // this actually does once enabled (suppresses iviewer's own right-click
+    // ROI menu on the final embed only, ready for a student annotation UI to
+    // take that gesture over - not built yet, so leaving this off keeps
+    // current behaviour for everyone until it is).
+    $settings->add(new admin_setting_heading(
+        'local_omeroembed/annotationsheading',
+        get_string('annotationsheading', 'local_omeroembed'),
+        get_string('annotationsheading_desc', 'local_omeroembed')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/enableannotations',
+        get_string('enableannotations', 'local_omeroembed'),
+        get_string('enableannotations_desc', 'local_omeroembed'),
+        0
+    ));
 }
