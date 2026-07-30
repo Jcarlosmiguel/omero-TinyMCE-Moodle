@@ -104,6 +104,11 @@ const readExistingEmbed = (node) => {
         layout,
         width: node.style.maxWidth || '',
         height: iframe.style.height || '',
+        // Read back so re-editing reuses author.js's getOrMintAnnotateId()
+        // token instead of minting a fresh one, which would otherwise
+        // orphan this embed's existing student annotations - see that
+        // file's own comment on embedAnnotateId for the full reasoning.
+        annotateid: node.getAttribute('data-omero-annotate-id') || '',
     };
 
     return {params, writeupHtml};
@@ -152,7 +157,8 @@ export const handleAction = async(editor) => {
             + '&layout=' + encodeURIComponent(p.layout)
             + '&width=' + encodeURIComponent(p.width)
             + '&height=' + encodeURIComponent(p.height)
-            + (p.browsable ? '&browsable=1' : '');
+            + (p.browsable ? '&browsable=1' : '')
+            + (p.annotateid ? '&annotateid=' + encodeURIComponent(p.annotateid) : '');
     }
 
     const modal = await Modal.create({
