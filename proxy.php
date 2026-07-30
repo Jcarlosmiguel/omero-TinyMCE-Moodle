@@ -104,6 +104,14 @@ $path = optional_param('path', '/iviewer/', PARAM_PATH);
 // without needing two different proxy scripts.
 $authoring = optional_param('authoring', false, PARAM_BOOL);
 
+// Per-placement token minted by author.js's generateEmbed() (see
+// js/annotate.js and its own plan doc) - absent on older embeds generated
+// before the annotation feature existed, and always absent on the
+// authoring preview. inject_annotation_script() requires this to be
+// present before injecting anything, since ajax.php needs it to scope
+// which embed placement an annotation belongs to.
+$embedid = optional_param('embedid', '', PARAM_ALPHANUMEXT);
+
 $course = get_course($courseid);
 require_login($course);
 
@@ -321,6 +329,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
         $rewritten = inject_overlay_hide_css($rewritten);
         if (!$authoring) {
             $rewritten = inject_contextmenu_blocker($rewritten);
+            $rewritten = inject_annotation_script($rewritten, $courseid, $embedid);
         }
     }
     echo $rewritten;
@@ -503,4 +512,45 @@ function inject_contextmenu_blocker(string $body): string {
         . '}, true);</script>';
     $withscript = preg_replace('#(</head>)#i', $script . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $script);
+}
+
+/**
+ * Injects js/annotate.js (a real file, not another inline string - this one's
+ * substantial enough to deserve one) into the final student-facing embed,
+ * plus a small inline config block giving it what it needs to call
+ * ajax.php: courseid, embedid, a sesskey, and the ajax.php URL itself.
+ * Requires $embedid to be non-empty - embeds generated before this feature
+ * existed have no token (see author.js's generateEmbed()) and simply don't
+ * get the annotation layer rather than erroring. Gated the same way as
+ * inject_contextmenu_blocker() (see its own docblock for why): behind the
+ * "Enable student annotations" setting, and only ever on the final embed,
+ * never the authoring tool's own live preview.
+ *
+ * @param string $body
+ * @param int $courseid
+ * @param string $embedid
+ * @return string
+ */
+function inject_annotation_script(string $body, int $courseid, string $embedid): string {
+    if (!get_config('local_omeroembed', 'enableannotations') || $embedid === '') {
+        return $body;
+    }
+
+    $config = [
+        'courseid' => $courseid,
+        'embedid' => $embedid,
+        'sesskey' => sesskey(),
+        'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+        'strings' => [
+            'placepin' => get_string('annotatetoolbar_point', 'local_omeroembed'),
+            'snapshot' => get_string('annotatetoolbar_snapshot', 'local_omeroembed'),
+            'delete' => get_string('annotatetoolbar_delete', 'local_omeroembed'),
+        ],
+    ];
+    $configscript = '<script id="omero-annotate-config" type="application/json">'
+        . json_encode($config) . '</script>';
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/annotate.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
 }

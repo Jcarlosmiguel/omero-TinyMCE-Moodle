@@ -43,4 +43,21 @@ $capabilities = [
             'manager' => CAP_ALLOW,
         ],
     ],
+
+    // Lets a user draw/delete their own point annotations on a final embed
+    // (ajax.php) - checked per-course, since an embed can live inside any
+    // course content (a Page, a quiz question, ...) with no course-module
+    // of its own to hang a CONTEXT_MODULE capability off. Same archetype
+    // shape as mod/choice:choose (student/teacher/editingteacher all
+    // allowed by default) - annotating is a normal enrolled-user action,
+    // not a privileged one.
+    'local/omeroembed:annotate' => [
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'student' => CAP_ALLOW,
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        ],
+    ],
 ];

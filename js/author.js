@@ -37,6 +37,43 @@
         return;
     }
 
+    // Per-placement token for the student-annotations feature (see
+    // js/annotate.js and its own plan doc) - identifies this specific embed
+    // *placement* (this quiz question, this Page, ...), independent of the
+    // OMERO image id, since the same image can be embedded in more than one
+    // place with independent annotations. config.embedAnnotateId is set by
+    // author.php only when re-opening an *existing* embed for editing (see
+    // tiny_omeroembed's ui.js reading the wrapper's own data-omero-annotate-id
+    // back) - reusing it there instead of minting a new one is what stops a
+    // teacher's edit from silently orphaning that embed's existing student
+    // annotations. Minted once per authoring session and cached, not
+    // re-minted on every generateEmbed() call.
+    var embedAnnotateId = config.embedAnnotateId || null;
+
+    /**
+     * @return {string} A stable token identifying this specific embed
+     *                   placement - reused from an existing embed being
+     *                   edited if there is one, otherwise minted once and
+     *                   cached for the rest of this authoring session.
+     */
+    function getOrMintAnnotateId() {
+        if (!embedAnnotateId) {
+            if (window.crypto && window.crypto.randomUUID) {
+                embedAnnotateId = window.crypto.randomUUID();
+            } else {
+                // Fallback for older/embedded browser contexts lacking
+                // crypto.randomUUID() - not cryptographically strong, but
+                // this is an opaque grouping key, not a security boundary.
+                embedAnnotateId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0;
+                    var v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+        }
+        return embedAnnotateId;
+    }
+
     /**
      * Reads the live iviewer iframe's actual pan/zoom state via its own
      * <ol3-viewer> Aurelia component, calling the same Viewer instance the
@@ -240,7 +277,12 @@
         // The live preview iframe's own src never changes (see setOpeningView()
         // above) - the opening view, if any, is applied here instead, at the
         // point the embed is actually generated.
-        var iframeSrc = openingView ? buildViewUrl(openingView) : config.baseProxyUrl;
+        var iframeSrcUrl = new URL(openingView ? buildViewUrl(openingView) : config.baseProxyUrl, window.location.href);
+        // Lets proxy.php's inject_annotation_script() (see its own docblock)
+        // know which embed placement this is - see getOrMintAnnotateId()'s
+        // own comment for why this has to be stable across re-edits.
+        iframeSrcUrl.searchParams.set('embedid', getOrMintAnnotateId());
+        var iframeSrc = iframeSrcUrl.toString();
 
         // id (in addition to the existing name) gives the reset button in
         // the textbelow layout below a stable, unique target to reload -
@@ -294,7 +336,11 @@
         // data-omero-embed marks this wrapper so tiny_omeroembed's own ui.js
         // can find and re-edit it later (see that file's handleAction()) -
         // only present on embeds generated from here on, not older ones.
-        var html = '<div data-omero-embed="1" style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
+        // data-omero-annotate-id is read back the same way (see that file's
+        // readExistingEmbed()) so re-editing reuses getOrMintAnnotateId()'s
+        // token instead of minting a fresh one.
+        var html = '<div data-omero-embed="1" data-omero-annotate-id="' + getOrMintAnnotateId()
+            + '" style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
 
         if (config.embedded) {
             // Handed off to the tiny_omeroembed TinyMCE plugin's modal (see

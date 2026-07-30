@@ -75,6 +75,13 @@ $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
 // iframe width - see where it's used below.
 $width = optional_param('width', '800px', PARAM_TEXT);
 $height = optional_param('height', '500px', PARAM_TEXT);
+// Set only when re-opening an *existing* embed for editing (tiny_omeroembed's
+// ui.js reads it back from the wrapper's own data-omero-annotate-id - see
+// that file's readExistingEmbed()) - forwarded into $jsconfig so js/author.js's
+// getOrMintAnnotateId() reuses it instead of minting a fresh token, which
+// would otherwise orphan that embed's existing student annotations on every
+// teacher edit. Blank on a fresh insert; author.js mints one itself in that case.
+$annotateid = optional_param('annotateid', '', PARAM_ALPHANUMEXT);
 
 $pageurlparams = ['courseid' => $courseid];
 if ($embedded) {
@@ -162,6 +169,7 @@ if ($hasslide) {
         'imageOnly' => $imageonly,
         'maxWidth' => $width,
         'embedded' => $embedded,
+        'embedAnnotateId' => $annotateid,
         'strings' => [
             'previewnotready' => get_string('previewnotready', 'local_omeroembed'),
             'selecttextfirst' => get_string('selecttextfirst', 'local_omeroembed'),

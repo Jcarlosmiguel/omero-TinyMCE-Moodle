@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/omeroembed/db" VERSION="20260730" COMMENT="XMLDB file for Moodle local/omeroembed"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_omeroembed_annotations" COMMENT="Student-drawn annotations on an embedded OMERO slide - private to the student who created them (see classes/privacy/provider.php)">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Course the embed belongs to - matches the identity proxy.php already checks"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The student this annotation belongs to"/>
+        <FIELD NAME="embedid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Per-placement token minted by author.js's generateEmbed(), not derived from the OMERO image id - the same image can be embedded in multiple places with independent annotations"/>
+        <FIELD NAME="type" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="point" SEQUENCE="false" COMMENT="Annotation shape - only 'point' is supported so far"/>
+        <FIELD NAME="geometry" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON, in real OMERO image-pixel coordinates - e.g. point: {x,y}"/>
+        <FIELD NAME="colour" TYPE="char" LENGTH="7" NOTNULL="true" DEFAULT="#ff0000" SEQUENCE="false" COMMENT="Hex colour string, e.g. #ff0000"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="embedid" UNIQUE="false" FIELDS="embedid"/>
+        <INDEX NAME="embedid-userid" UNIQUE="false" FIELDS="embedid, userid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

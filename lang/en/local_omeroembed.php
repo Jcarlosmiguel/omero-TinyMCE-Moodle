@@ -52,7 +52,13 @@ $string['annotationsheading_desc'] = 'A separate annotation layer (in developmen
 $string['enableannotations'] = 'Enable student annotations';
 $string['enableannotations_desc'] = 'Turns on the annotation layer for the final student-facing embed only - never on the authoring tool\'s own live preview. While this is off (the default), embeds behave exactly as before, including OMERO.iviewer\'s own right-click ROI menu.';
 
-$string['privacy:metadata'] = 'This plugin does not store any personal data about students. It stores OMERO service-account credentials (configured by an administrator) and short-lived server-side session caches, neither of which are personal data belonging to any individual user of this site.';
+$string['privacy:metadata:local_omeroembed_annotations'] = 'A point the student marked on a specific embedded OMERO slide.';
+$string['privacy:metadata:local_omeroembed_annotations:userid'] = 'The ID of the user who created the annotation.';
+$string['privacy:metadata:local_omeroembed_annotations:courseid'] = 'The course the annotated embed belongs to.';
+$string['privacy:metadata:local_omeroembed_annotations:embedid'] = 'The specific embed placement the annotation was drawn on.';
+$string['privacy:metadata:local_omeroembed_annotations:geometry'] = 'The position on the slide the student marked.';
+$string['privacy:metadata:local_omeroembed_annotations:colour'] = 'The colour the student chose for this annotation.';
+$string['privacy:metadata:local_omeroembed_annotations:timecreated'] = 'The time the annotation was created.';
 
 $string['unknownsubject'] = 'No OMERO subject account is configured for "{$a}" - ask a Manager to check it under "OMERO slide embed settings" (or a Site administrator, under Site administration > Plugins > Local plugins > OMERO slide embed).';
 $string['omerologinfailed'] = 'Could not log in to OMERO as subject "{$a}" - check the configured username/password for this subject.';
@@ -89,6 +95,15 @@ $string['selecttextfirst'] = 'Select some text in the write-up box first, then c
 $string['selectinsidewriteup'] = 'Select text inside the write-up box (not the slide or anything else on the page).';
 
 $string['omeroembed:managesettings'] = 'Manage OMERO slide embed settings (base URL, subject accounts, viewer overlays)';
+$string['omeroembed:annotate'] = 'Draw and delete your own point annotations on an embedded OMERO slide';
+
+$string['invalidcolour'] = 'Invalid annotation colour "{$a}" - expected a hex string like #ff0000.';
+$string['invalidannotationtype'] = 'Invalid annotation type "{$a}".';
+$string['invalidaction'] = 'Invalid action "{$a}".';
+
+$string['annotatetoolbar_point'] = 'Place a pin';
+$string['annotatetoolbar_snapshot'] = 'Snapshot';
+$string['annotatetoolbar_delete'] = 'Delete';
 $string['managetitle'] = 'OMERO slide embed settings';
 $string['manageintro'] = 'The OMERO server, subject accounts, and embedded viewer appearance used across every course\'s "Embed an OMERO slide" tool - not specific to any one course.';
 $string['savechanges'] = 'Save changes';
