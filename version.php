@@ -24,6 +24,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026073000;
+$plugin->version   = 2026073001;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';

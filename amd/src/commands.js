@@ -21,7 +21,7 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {getButtonImage} from 'editor_tiny/utils';
+import {getImagePath} from 'editor_tiny/utils';
 import {handleAction} from './ui';
 import {getString} from 'core/str';
 import {
@@ -30,17 +30,38 @@ import {
     icon,
 } from './common';
 
+/**
+ * Fetches the plugin's icon.svg as raw markup, rather than going through
+ * editor_tiny/utils' getButtonImage() - that helper wraps the icon in
+ * <image href="..."> (see editor_tiny/toolbar_button.mustache), which loads
+ * it as an isolated external resource with no CSS cascade to inherit
+ * "color" from. That's fine for icons with a hardcoded fill, but it means
+ * fill="currentColor" can never pick up the toolbar's actual (light/dark)
+ * text colour the way TinyMCE's own built-in icons do, since those are
+ * registered from literal inline SVG strings. Fetching the raw text and
+ * handing THAT to addIcon() instead makes our icon genuinely inline too,
+ * so it recolours correctly alongside the rest of the toolbar - confirmed
+ * live: this is what fixed a reported "icon shows grey instead of white
+ * in dark mode" issue (the <image href> version could only ever show its
+ * one hardcoded colour, never adapt).
+ */
+const getIconMarkup = async(identifier, iconcomponent) => {
+    const url = await getImagePath(identifier, iconcomponent);
+    const response = await fetch(url);
+    return response.text();
+};
+
 export const getSetup = async() => {
     const [
         buttonText,
-        buttonImage,
+        buttonMarkup,
     ] = await Promise.all([
         getString('buttontitle', component),
-        getButtonImage('icon', component),
+        getIconMarkup('icon', component),
     ]);
 
     return (editor) => {
-        editor.ui.registry.addIcon(icon, buttonImage.html);
+        editor.ui.registry.addIcon(icon, buttonMarkup);
 
         editor.ui.registry.addButton(buttonName, {
             icon,
