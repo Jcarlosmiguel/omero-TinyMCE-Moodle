@@ -100,12 +100,14 @@ $string['omeroembed:annotate'] = 'Draw and delete your own point annotations on 
 
 $string['invalidcolour'] = 'Invalid annotation colour "{$a}" - expected a hex string like #ff0000.';
 $string['invalidannotationtype'] = 'Invalid annotation type "{$a}".';
+$string['invalidradius'] = 'Invalid circle radius "{$a}" - must be greater than zero.';
 $string['invalidaction'] = 'Invalid action "{$a}".';
 
 $string['annotatetoolbar_point'] = 'Place a pin';
+$string['annotatetoolbar_circle'] = 'Draw a circle';
 $string['annotatetoolbar_snapshot'] = 'Snapshot';
 $string['annotatetoolbar_delete'] = 'Delete';
-$string['annotatetoolbar_labelprompt'] = 'Add a short note for this pin (optional):';
+$string['annotatetoolbar_labelprompt'] = 'Add a short note for this annotation (optional):';
 $string['managetitle'] = 'OMERO slide embed settings';
 $string['manageintro'] = 'The OMERO server, subject accounts, and embedded viewer appearance used across every course\'s "Embed an OMERO slide" tool - not specific to any one course.';
 $string['savechanges'] = 'Save changes';

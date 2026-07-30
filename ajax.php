@@ -73,14 +73,22 @@ if ($action === 'create') {
     if (!preg_match('/^#[0-9a-fA-F]{6}$/', $colour)) {
         throw new \moodle_exception('invalidcolour', 'local_omeroembed', '', $colour);
     }
-    if ($type !== annotations_repository::TYPE_POINT) {
-        // Only 'point' is supported so far (see this table's own install.xml
-        // comment) - refuse anything else outright rather than silently
-        // accepting a shape this version can't render back.
+
+    if ($type === annotations_repository::TYPE_POINT) {
+        $geometry = ['x' => $x, 'y' => $y];
+    } else if ($type === annotations_repository::TYPE_CIRCLE) {
+        $radius = required_param('r', PARAM_FLOAT);
+        if ($radius <= 0) {
+            throw new \moodle_exception('invalidradius', 'local_omeroembed', '', $radius);
+        }
+        $geometry = ['x' => $x, 'y' => $y, 'r' => $radius];
+    } else {
+        // Refuse anything else outright rather than silently accepting a
+        // shape this version can't render back.
         throw new \moodle_exception('invalidannotationtype', 'local_omeroembed', '', $type);
     }
 
-    $record = annotations_repository::create($courseid, $USER->id, $embedid, $type, ['x' => $x, 'y' => $y], $colour, $label);
+    $record = annotations_repository::create($courseid, $USER->id, $embedid, $type, $geometry, $colour, $label);
     echo json_encode([
         'id' => (int) $record->id,
         'type' => $record->type,

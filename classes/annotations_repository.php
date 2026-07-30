@@ -30,8 +30,11 @@ namespace local_omeroembed;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class annotations_repository {
-    /** @var string Only shape currently supported - see this table's own install.xml comment. */
+    /** @var string A fixed-screen-size pin, Google Maps style - geometry {x,y}. */
     const TYPE_POINT = 'point';
+
+    /** @var string A real region of the slide, scales with zoom - geometry {x,y,r}, all in image-pixel units. */
+    const TYPE_CIRCLE = 'circle';
 
     /**
      * The current user's own annotations for one specific embed placement -
