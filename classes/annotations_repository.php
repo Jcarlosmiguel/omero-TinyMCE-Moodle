@@ -33,8 +33,13 @@ class annotations_repository {
     /** @var string A fixed-screen-size pin, Google Maps style - geometry {x,y}. */
     const TYPE_POINT = 'point';
 
-    /** @var string A real region of the slide, scales with zoom - geometry {x,y,r}, all in image-pixel units. */
-    const TYPE_CIRCLE = 'circle';
+    /**
+     * @var string A real region of the slide, scales with zoom - geometry
+     * {x,y,rx,ry}, all in image-pixel units. A circle is simply the
+     * rx === ry case (drawn by holding Shift while dragging - see
+     * js/annotate.js) rather than its own separate type.
+     */
+    const TYPE_ELLIPSE = 'ellipse';
 
     /**
      * The current user's own annotations for one specific embed placement -

@@ -543,7 +543,7 @@ function inject_annotation_script(string $body, int $courseid, string $embedid):
         'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
         'strings' => [
             'placepin' => get_string('annotatetoolbar_point', 'local_omeroembed'),
-            'drawcircle' => get_string('annotatetoolbar_circle', 'local_omeroembed'),
+            'drawellipse' => get_string('annotatetoolbar_ellipse', 'local_omeroembed'),
             'snapshot' => get_string('annotatetoolbar_snapshot', 'local_omeroembed'),
             'delete' => get_string('annotatetoolbar_delete', 'local_omeroembed'),
             'labelprompt' => get_string('annotatetoolbar_labelprompt', 'local_omeroembed'),

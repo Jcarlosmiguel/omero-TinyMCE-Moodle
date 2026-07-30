@@ -76,12 +76,13 @@ if ($action === 'create') {
 
     if ($type === annotations_repository::TYPE_POINT) {
         $geometry = ['x' => $x, 'y' => $y];
-    } else if ($type === annotations_repository::TYPE_CIRCLE) {
-        $radius = required_param('r', PARAM_FLOAT);
-        if ($radius <= 0) {
-            throw new \moodle_exception('invalidradius', 'local_omeroembed', '', $radius);
+    } else if ($type === annotations_repository::TYPE_ELLIPSE) {
+        $rx = required_param('rx', PARAM_FLOAT);
+        $ry = required_param('ry', PARAM_FLOAT);
+        if ($rx <= 0 || $ry <= 0) {
+            throw new \moodle_exception('invalidradius', 'local_omeroembed', '', "rx=$rx, ry=$ry");
         }
-        $geometry = ['x' => $x, 'y' => $y, 'r' => $radius];
+        $geometry = ['x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry];
     } else {
         // Refuse anything else outright rather than silently accepting a
         // shape this version can't render back.

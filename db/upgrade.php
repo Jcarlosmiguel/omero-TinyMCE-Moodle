@@ -74,5 +74,28 @@ function xmldb_local_omeroembed_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026073004, 'local', 'omeroembed');
     }
 
+    if ($oldversion < 2026073006) {
+        // 'circle' is superseded by 'ellipse' (a circle is just the rx===ry
+        // case, drawn by holding Shift - see js/annotate.js and
+        // annotations_repository::TYPE_ELLIPSE's own comment) - migrate any
+        // existing rows' type and geometry {x,y,r} -> {x,y,rx,ry} rather
+        // than leaving old data in a shape this version no longer renders.
+        $rs = $DB->get_recordset('local_omeroembed_annotations', ['type' => 'circle']);
+        foreach ($rs as $record) {
+            $geometry = json_decode($record->geometry, true);
+            $record->type = 'ellipse';
+            $record->geometry = json_encode([
+                'x' => $geometry['x'],
+                'y' => $geometry['y'],
+                'rx' => $geometry['r'],
+                'ry' => $geometry['r'],
+            ]);
+            $DB->update_record('local_omeroembed_annotations', $record);
+        }
+        $rs->close();
+
+        upgrade_plugin_savepoint(true, 2026073006, 'local', 'omeroembed');
+    }
+
     return true;
 }

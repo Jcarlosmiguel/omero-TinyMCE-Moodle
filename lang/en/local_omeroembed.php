@@ -100,11 +100,11 @@ $string['omeroembed:annotate'] = 'Draw and delete your own point annotations on 
 
 $string['invalidcolour'] = 'Invalid annotation colour "{$a}" - expected a hex string like #ff0000.';
 $string['invalidannotationtype'] = 'Invalid annotation type "{$a}".';
-$string['invalidradius'] = 'Invalid circle radius "{$a}" - must be greater than zero.';
+$string['invalidradius'] = 'Invalid ellipse radius ({$a}) - both must be greater than zero.';
 $string['invalidaction'] = 'Invalid action "{$a}".';
 
 $string['annotatetoolbar_point'] = 'Place a pin';
-$string['annotatetoolbar_circle'] = 'Draw a circle';
+$string['annotatetoolbar_ellipse'] = 'Draw an ellipse (hold Shift for a circle)';
 $string['annotatetoolbar_snapshot'] = 'Snapshot';
 $string['annotatetoolbar_delete'] = 'Delete';
 $string['annotatetoolbar_labelprompt'] = 'Add a short note for this annotation (optional):';

@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Student point/circle annotations, drawn directly on the live iviewer
+ * Student point/ellipse annotations, drawn directly on the live iviewer
  * view. Loaded only on the final student-facing embed (see proxy.php's
  * inject_annotation_script()), never the authoring tool's own preview.
  *
@@ -30,11 +30,15 @@
  * bundle. Points are drawn at a fixed pixel radius regardless of zoom -
  * Google Maps pin behaviour - which is simply what a constant-radius
  * circle in screen-space naturally does, no special-casing needed.
- * Circles, unlike points, are stored with their radius in real
- * image-pixel units (geometry {x,y,r}), so their on-screen size grows
+ * Ellipses, unlike points, are stored with their radii in real
+ * image-pixel units (geometry {x,y,rx,ry}), so their on-screen size grows
  * and shrinks with zoom like an actual measured region of the slide -
  * the opposite of a pin, and the reason they need their own drag-to-draw
- * gesture (mousedown/mousemove/mouseup) rather than a single click.
+ * gesture (press/move/release) rather than a single click. Free dragging
+ * sets rx/ry independently (a real ellipse); holding Shift while dragging
+ * constrains rx=ry to a circle - the same convention as Illustrator/
+ * PowerPoint/Figma's own shape tools, so a circle is just the equal-radii
+ * case rather than a separate shape/type.
  *
  * @module     local_omeroembed/annotate
  * @copyright  2026 University of Glasgow MVLS
@@ -54,13 +58,13 @@
     var HIT_RADIUS = 12;
     var COLOURS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#000000'];
     var TYPE_POINT = 'point';
-    var TYPE_CIRCLE = 'circle';
+    var TYPE_ELLIPSE = 'ellipse';
 
     var annotations = [];
     var selectedId = null;
     var currentColour = COLOURS[0];
-    var activeTool = null; // null | 'point' | 'circle'
-    var pendingCircle = null; // {x, y, r} in image coords while drag-drawing, else null
+    var activeTool = null; // null | 'point' | 'ellipse'
+    var pendingEllipse = null; // {x, y, rx, ry} in image coords while drag-drawing, else null
     var disabledInteractions = null; // [{interaction, wasActive}] while drag-drawing, else null
 
     var olmap = null;
@@ -70,22 +74,26 @@
 
     /**
      * @param {Array} centre [imageX, imageY]
-     * @param {number} radius In real image-pixel units.
-     * @return {number} The same radius, in *current* screen pixels - uses
-     *                  the map's own exact pixel projection (via a second
-     *                  point offset by the radius) rather than deriving it
-     *                  from resolution by hand, so it stays correct under
-     *                  rotation too, not just plain zoom.
+     * @param {number} rx In real image-pixel units.
+     * @param {number} ry In real image-pixel units.
+     * @return {Array} [screenRx, screenRy] in *current* screen pixels - uses
+     *                  the map's own exact pixel projection (via two points
+     *                  offset from centre, one per axis) rather than
+     *                  deriving it from resolution by hand, so it stays
+     *                  correct under rotation too, not just plain zoom.
      */
-    function screenRadius(centre, radius) {
+    function screenRadii(centre, rx, ry) {
         var centrePx = olmap.getPixelFromCoordinate(centre);
-        var edgePx = olmap.getPixelFromCoordinate([centre[0] + radius, centre[1]]);
-        if (!centrePx || !edgePx) {
-            return 0;
+        var xEdgePx = olmap.getPixelFromCoordinate([centre[0] + rx, centre[1]]);
+        var yEdgePx = olmap.getPixelFromCoordinate([centre[0], centre[1] + ry]);
+        if (!centrePx || !xEdgePx || !yEdgePx) {
+            return [0, 0];
         }
-        var dx = edgePx[0] - centrePx[0];
-        var dy = edgePx[1] - centrePx[1];
-        return Math.sqrt(dx * dx + dy * dy);
+        var dxx = xEdgePx[0] - centrePx[0];
+        var dxy = xEdgePx[1] - centrePx[1];
+        var dyx = yEdgePx[0] - centrePx[0];
+        var dyy = yEdgePx[1] - centrePx[1];
+        return [Math.sqrt(dxx * dxx + dxy * dxy), Math.sqrt(dyx * dyx + dyy * dyy)];
     }
 
     /**
@@ -162,16 +170,16 @@
                 return;
             }
 
-            if (a.type === TYPE_CIRCLE) {
-                var r = screenRadius([a.geometry.x, -a.geometry.y], a.geometry.r);
+            if (a.type === TYPE_ELLIPSE) {
+                var radii = screenRadii([a.geometry.x, -a.geometry.y], a.geometry.rx, a.geometry.ry);
                 ctx.beginPath();
-                ctx.arc(px[0], px[1], r, 0, 2 * Math.PI);
+                ctx.ellipse(px[0], px[1], radii[0], radii[1], 0, 0, 2 * Math.PI);
                 ctx.lineWidth = (a.id === selectedId) ? 3 : 2;
                 ctx.strokeStyle = a.colour;
                 ctx.stroke();
                 if (a.id === selectedId) {
                     selectedPx = px;
-                    selectedTopY = px[1] - r;
+                    selectedTopY = px[1] - radii[1];
                 }
             } else {
                 ctx.beginPath();
@@ -188,12 +196,12 @@
             }
         });
 
-        if (pendingCircle) {
-            var centrePx = olmap.getPixelFromCoordinate([pendingCircle.x, -pendingCircle.y]);
-            var pendingR = screenRadius([pendingCircle.x, -pendingCircle.y], pendingCircle.r);
+        if (pendingEllipse) {
+            var centrePx = olmap.getPixelFromCoordinate([pendingEllipse.x, -pendingEllipse.y]);
+            var pendingRadii = screenRadii([pendingEllipse.x, -pendingEllipse.y], pendingEllipse.rx, pendingEllipse.ry);
             if (centrePx) {
                 ctx.beginPath();
-                ctx.arc(centrePx[0], centrePx[1], pendingR, 0, 2 * Math.PI);
+                ctx.ellipse(centrePx[0], centrePx[1], pendingRadii[0], pendingRadii[1], 0, 0, 2 * Math.PI);
                 ctx.setLineDash([4, 4]);
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = currentColour;
@@ -244,9 +252,17 @@
             var dy = apx[1] - px[1];
             var dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (a.type === TYPE_CIRCLE) {
-                var r = screenRadius([a.geometry.x, -a.geometry.y], a.geometry.r);
-                if (dist <= Math.max(r, HIT_RADIUS)) {
+            if (a.type === TYPE_ELLIPSE) {
+                var radii = screenRadii([a.geometry.x, -a.geometry.y], a.geometry.rx, a.geometry.ry);
+                // Clamp each axis to at least HIT_RADIUS so a thin/tiny
+                // ellipse is still easy to click, same reasoning as a
+                // circle's own Math.max() before it - a proper point-in-
+                // ellipse test rather than a plain circular one, since rx
+                // and ry can now genuinely differ.
+                var rx = Math.max(radii[0], HIT_RADIUS);
+                var ry = Math.max(radii[1], HIT_RADIUS);
+                var normalised = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+                if (normalised <= 1) {
                     return a;
                 }
             } else if (dist <= HIT_RADIUS) {
@@ -346,14 +362,19 @@
     }
 
     /**
-     * Circles are drawn by dragging (press at the centre, drag out to set
-     * the radius, release to finish) rather than a single click, since a
-     * click alone can't express a radius. Built on Pointer Events (not
-     * mouse-specific ones) so this extends to touch/stylus input later
-     * with no rework needed here.
+     * Ellipses are drawn by dragging (press at the centre, drag out to set
+     * rx/ry, release to finish) rather than a single click, since a click
+     * alone can't express a radius. Free dragging sets rx/ry independently
+     * (dx and dy tracked separately, not collapsed into one distance) for a
+     * real ellipse; holding Shift while dragging constrains rx=ry to the
+     * larger of the two, for a circle - checked continuously via the move/
+     * release events' own .shiftKey, so toggling Shift mid-drag updates the
+     * live preview immediately rather than only being read once at the
+     * start. Built on Pointer Events (not mouse-specific ones) so this
+     * extends to touch/stylus input later with no rework needed here.
      */
     function onViewportPointerDown(e) {
-        if (activeTool !== TYPE_CIRCLE) {
+        if (activeTool !== TYPE_ELLIPSE) {
             return;
         }
 
@@ -361,7 +382,7 @@
         var startPx = [e.clientX - rect.left, e.clientY - rect.top];
 
         // Starting a drag directly on an existing annotation is a select,
-        // not a new circle - let the click listener handle it normally.
+        // not a new ellipse - let the click listener handle it normally.
         if (annotationAtPixel(startPx)) {
             return;
         }
@@ -370,27 +391,38 @@
         e.stopPropagation();
         var startCoord = pixelToImageCoord(startPx);
 
-        function onMove(moveEvent) {
+        function computePending(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
             var moveCoord = pixelToImageCoord(movePx);
-            var dx = moveCoord[0] - startCoord[0];
-            var dy = moveCoord[1] - startCoord[1];
-            pendingCircle = {x: startCoord[0], y: startCoord[1], r: Math.sqrt(dx * dx + dy * dy)};
+            var rx = Math.abs(moveCoord[0] - startCoord[0]);
+            var ry = Math.abs(moveCoord[1] - startCoord[1]);
+            if (moveEvent.shiftKey) {
+                rx = ry = Math.max(rx, ry);
+            }
+            return {x: startCoord[0], y: startCoord[1], rx: rx, ry: ry};
+        }
+
+        function onMove(moveEvent) {
+            pendingEllipse = computePending(moveEvent);
             redraw();
         }
 
-        function onUp() {
+        function onUp(upEvent) {
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
 
-            var finished = pendingCircle;
-            pendingCircle = null;
+            var finished = pendingEllipse ? computePending(upEvent) : null;
+            pendingEllipse = null;
             redraw();
 
-            // A drag too small to be a deliberate circle (e.g. a stray
-            // click-and-release with barely any movement) is silently
-            // discarded rather than saved as a near-invisible circle.
-            if (!finished || screenRadius([finished.x, -finished.y], finished.r) < HIT_RADIUS) {
+            // A drag too small to be deliberate (e.g. a stray click-and-
+            // release with barely any movement) is silently discarded
+            // rather than saved as a near-invisible ellipse.
+            if (!finished) {
+                return;
+            }
+            var radii = screenRadii([finished.x, -finished.y], finished.rx, finished.ry);
+            if (Math.max(radii[0], radii[1]) < HIT_RADIUS) {
                 return;
             }
 
@@ -400,10 +432,11 @@
             }
 
             ajax('create', {
-                type: TYPE_CIRCLE,
+                type: TYPE_ELLIPSE,
                 x: finished.x,
                 y: finished.y,
-                r: finished.r,
+                rx: finished.rx,
+                ry: finished.ry,
                 colour: currentColour,
                 label: label,
             }, 'POST').then(function(created) {
@@ -474,7 +507,7 @@
          * only ever mean one thing at a time.
          *
          * @param {string} label
-         * @param {string} tool 'point' or 'circle'
+         * @param {string} tool 'point' or 'ellipse'
          * @return {HTMLButtonElement}
          */
         function makeToolButton(label, tool) {
@@ -492,7 +525,7 @@
 
             btn.addEventListener('click', function() {
                 activeTool = (activeTool === tool) ? null : tool;
-                setMapInteractionsEnabled(activeTool !== TYPE_CIRCLE);
+                setMapInteractionsEnabled(activeTool !== TYPE_ELLIPSE);
                 toolButtons.forEach(function(b) {
                     b.update();
                 });
@@ -505,7 +538,7 @@
         }
 
         toolbar.appendChild(makeToolButton(config.strings.placepin, TYPE_POINT));
-        toolbar.appendChild(makeToolButton(config.strings.drawcircle, TYPE_CIRCLE));
+        toolbar.appendChild(makeToolButton(config.strings.drawellipse, TYPE_ELLIPSE));
 
         COLOURS.forEach(function(colour) {
             var swatch = document.createElement('button');
