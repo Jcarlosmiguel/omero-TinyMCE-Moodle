@@ -76,7 +76,8 @@ if ($action === 'create') {
 
     if ($type === annotations_repository::TYPE_POINT) {
         $geometry = ['x' => $x, 'y' => $y];
-    } else if ($type === annotations_repository::TYPE_ELLIPSE) {
+    } else if ($type === annotations_repository::TYPE_ELLIPSE || $type === annotations_repository::TYPE_RECTANGLE) {
+        // Same geometry shape for both - see TYPE_RECTANGLE's own comment.
         $rx = required_param('rx', PARAM_FLOAT);
         $ry = required_param('ry', PARAM_FLOAT);
         if ($rx <= 0 || $ry <= 0) {

@@ -14,9 +14,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Student point/ellipse annotations, drawn directly on the live iviewer
- * view. Loaded only on the final student-facing embed (see proxy.php's
- * inject_annotation_script()), never the authoring tool's own preview.
+ * Student point/ellipse/rectangle annotations, drawn directly on the live
+ * iviewer view. Loaded only on the final student-facing embed (see
+ * proxy.php's inject_annotation_script()), never the authoring tool's own
+ * preview.
  *
  * iviewer does not expose OpenLayers as a global (window.ol is undefined -
  * it's bundled/minified internally), so this deliberately does NOT try to
@@ -30,15 +31,17 @@
  * bundle. Points are drawn at a fixed pixel radius regardless of zoom -
  * Google Maps pin behaviour - which is simply what a constant-radius
  * circle in screen-space naturally does, no special-casing needed.
- * Ellipses, unlike points, are stored with their radii in real
- * image-pixel units (geometry {x,y,rx,ry}), so their on-screen size grows
- * and shrinks with zoom like an actual measured region of the slide -
- * the opposite of a pin, and the reason they need their own drag-to-draw
- * gesture (press/move/release) rather than a single click. Free dragging
- * sets rx/ry independently (a real ellipse); holding Shift while dragging
- * constrains rx=ry to a circle - the same convention as Illustrator/
- * PowerPoint/Figma's own shape tools, so a circle is just the equal-radii
- * case rather than a separate shape/type.
+ * Ellipses and rectangles, unlike points, are stored with their extents in
+ * real image-pixel units (geometry {x,y,rx,ry,rotation} - identical shape
+ * for both, see isShapeType()), so their on-screen size grows and shrinks
+ * with zoom like an actual measured region of the slide - the opposite of
+ * a pin, and the reason they need their own drag-to-draw gesture (press/
+ * move/release) rather than a single click. Free dragging sets rx/ry
+ * independently; holding Shift while dragging constrains rx=ry to a
+ * circle/square - the same convention as Illustrator/PowerPoint/Figma's
+ * own shape tools, so a circle/square is just the equal-radii case rather
+ * than its own shape/type. A selected ellipse/rectangle also gets a
+ * draggable rotate handle (see tryStartRotateDrag()).
  *
  * @module     local_omeroembed/annotate
  * @copyright  2026 University of Glasgow MVLS
@@ -56,16 +59,30 @@
 
     var PIN_RADIUS = 8;
     var HIT_RADIUS = 12;
-    var HANDLE_OFFSET = 20; // px beyond the ellipse's own edge, along its rotation axis
+    var HANDLE_OFFSET = 20; // px beyond the shape's own edge, along its rotation axis
     var COLOURS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#000000'];
     var TYPE_POINT = 'point';
     var TYPE_ELLIPSE = 'ellipse';
+    var TYPE_RECTANGLE = 'rectangle';
+
+    /**
+     * Ellipse and rectangle share identical geometry {x,y,rx,ry,rotation}
+     * and identical drag-to-draw/rotate-handle mechanics - they only
+     * differ in how they're actually drawn and in their point-in-shape
+     * hit-test, both handled locally wherever this is checked.
+     *
+     * @param {string} type
+     * @return {boolean}
+     */
+    function isShapeType(type) {
+        return type === TYPE_ELLIPSE || type === TYPE_RECTANGLE;
+    }
 
     var annotations = [];
     var selectedId = null;
     var currentColour = COLOURS[0];
-    var activeTool = null; // null | 'point' | 'ellipse'
-    var pendingEllipse = null; // {x, y, rx, ry} in image coords while drag-drawing, else null
+    var activeTool = null; // null | 'point' | 'ellipse' | 'rectangle'
+    var pendingShape = null; // {type, x, y, rx, ry} in image coords while drag-drawing, else null
     var disabledInteractions = null; // [{interaction, wasActive}] while a lock reason applies, else null
 
     var olmap = null;
@@ -98,12 +115,12 @@
     }
 
     /**
-     * Where the rotate handle sits on screen for a selected ellipse: a
-     * point HANDLE_OFFSET beyond the top of the ellipse's own (unrotated)
-     * local frame, then rotated to the ellipse's current angle - matching
-     * PowerPoint/Illustrator's own handle-above-the-shape convention. All
-     * in screen pixels; rotation here is a plain canvas-style angle
-     * (radians, clockwise from the local "up" direction).
+     * Where the rotate handle sits on screen for a selected ellipse/
+     * rectangle: a point HANDLE_OFFSET beyond the top of the shape's own
+     * (unrotated) local frame, then rotated to its current angle -
+     * matching PowerPoint/Illustrator's own handle-above-the-shape
+     * convention. All in screen pixels; rotation here is a plain canvas-
+     * style angle (radians, clockwise from the local "up" direction).
      *
      * @param {Array} centrePx [screenX, screenY]
      * @param {Array} radii [screenRx, screenRy]
@@ -119,12 +136,12 @@
     }
 
     /**
-     * @param {number} px The click x, relative to an ellipse's own centre.
-     * @param {number} py The click y, relative to an ellipse's own centre.
+     * @param {number} px The click x, relative to a shape's own centre.
+     * @param {number} py The click y, relative to a shape's own centre.
      * @param {number} rotation Radians.
-     * @return {Array} [px, py] rotated into the ellipse's own unrotated
+     * @return {Array} [px, py] rotated into the shape's own unrotated
      *                 local frame, so the plain axis-aligned point-in-
-     *                 ellipse formula still applies regardless of rotation.
+     *                 shape formula still applies regardless of rotation.
      */
     function unrotate(px, py, rotation) {
         var cos = Math.cos(rotation);
@@ -193,6 +210,45 @@
         }
     }
 
+    /**
+     * Traces the outline of an ellipse or rectangle into ctx's current
+     * path (caller does beginPath()/stroke()) - the one place drawing and
+     * hit-testing would otherwise diverge, so both shapes render with
+     * exactly the geometry their own point-in-shape test agrees on.
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {string} type TYPE_ELLIPSE or TYPE_RECTANGLE.
+     * @param {number} cx Screen x of the shape's centre.
+     * @param {number} cy Screen y of the shape's centre.
+     * @param {Array} radii [screenRx, screenRy].
+     * @param {number} rotation Radians.
+     */
+    function traceShape(ctx, type, cx, cy, radii, rotation) {
+        if (type === TYPE_ELLIPSE) {
+            ctx.ellipse(cx, cy, radii[0], radii[1], rotation, 0, 2 * Math.PI);
+            return;
+        }
+        // Rectangle: four corners in the shape's own local (unrotated)
+        // frame, each rotated back out to screen space and connected -
+        // ctx.rotate() would work too, but doing it by hand here keeps
+        // this in the same "rotate points, not the canvas" style as
+        // unrotate()/handlePosition(), and avoids having to save/restore
+        // canvas state around it.
+        var corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function(sign) {
+            var lx = sign[0] * radii[0];
+            var ly = sign[1] * radii[1];
+            return [
+                cx + lx * Math.cos(rotation) - ly * Math.sin(rotation),
+                cy + lx * Math.sin(rotation) + ly * Math.cos(rotation),
+            ];
+        });
+        ctx.moveTo(corners[0][0], corners[0][1]);
+        for (var i = 1; i < corners.length; i++) {
+            ctx.lineTo(corners[i][0], corners[i][1]);
+        }
+        ctx.closePath();
+    }
+
     function redraw() {
         resizeOverlay();
         var ctx = overlayCanvas.getContext('2d');
@@ -206,11 +262,11 @@
                 return;
             }
 
-            if (a.type === TYPE_ELLIPSE) {
+            if (isShapeType(a.type)) {
                 var rotation = a.geometry.rotation || 0;
                 var radii = screenRadii([a.geometry.x, -a.geometry.y], a.geometry.rx, a.geometry.ry);
                 ctx.beginPath();
-                ctx.ellipse(px[0], px[1], radii[0], radii[1], rotation, 0, 2 * Math.PI);
+                traceShape(ctx, a.type, px[0], px[1], radii, rotation);
                 ctx.lineWidth = (a.id === selectedId) ? 3 : 2;
                 ctx.strokeStyle = a.colour;
                 ctx.stroke();
@@ -249,12 +305,12 @@
             }
         });
 
-        if (pendingEllipse) {
-            var centrePx = olmap.getPixelFromCoordinate([pendingEllipse.x, -pendingEllipse.y]);
-            var pendingRadii = screenRadii([pendingEllipse.x, -pendingEllipse.y], pendingEllipse.rx, pendingEllipse.ry);
+        if (pendingShape) {
+            var centrePx = olmap.getPixelFromCoordinate([pendingShape.x, -pendingShape.y]);
+            var pendingRadii = screenRadii([pendingShape.x, -pendingShape.y], pendingShape.rx, pendingShape.ry);
             if (centrePx) {
                 ctx.beginPath();
-                ctx.ellipse(centrePx[0], centrePx[1], pendingRadii[0], pendingRadii[1], 0, 0, 2 * Math.PI);
+                traceShape(ctx, pendingShape.type, centrePx[0], centrePx[1], pendingRadii, 0);
                 ctx.setLineDash([4, 4]);
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = currentColour;
@@ -305,21 +361,25 @@
             var dy = apx[1] - px[1];
             var dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (a.type === TYPE_ELLIPSE) {
+            if (isShapeType(a.type)) {
                 var radii = screenRadii([a.geometry.x, -a.geometry.y], a.geometry.rx, a.geometry.ry);
-                // Rotate the click into the ellipse's own unrotated local
-                // frame first, so the plain axis-aligned formula below
-                // still applies regardless of rotation.
+                // Rotate the click into the shape's own unrotated local
+                // frame first, so the plain axis-aligned formulas below
+                // still apply regardless of rotation.
                 var local = unrotate(dx, dy, a.geometry.rotation || 0);
                 // Clamp each axis to at least HIT_RADIUS so a thin/tiny
-                // ellipse is still easy to click, same reasoning as a
+                // shape is still easy to click, same reasoning as a
                 // circle's own Math.max() before it - a proper point-in-
-                // ellipse test rather than a plain circular one, since rx
+                // shape test rather than a plain circular one, since rx
                 // and ry can now genuinely differ.
                 var rx = Math.max(radii[0], HIT_RADIUS);
                 var ry = Math.max(radii[1], HIT_RADIUS);
-                var normalised = (local[0] * local[0]) / (rx * rx) + (local[1] * local[1]) / (ry * ry);
-                if (normalised <= 1) {
+                if (a.type === TYPE_ELLIPSE) {
+                    var normalised = (local[0] * local[0]) / (rx * rx) + (local[1] * local[1]) / (ry * ry);
+                    if (normalised <= 1) {
+                        return a;
+                    }
+                } else if (Math.abs(local[0]) <= rx && Math.abs(local[1]) <= ry) {
                     return a;
                 }
             } else if (dist <= HIT_RADIUS) {
@@ -421,51 +481,51 @@
 
     /**
      * Map interactions need to stay disabled for two separate reasons that
-     * can each start/end independently - the ellipse tool being active
-     * (drawing) and an ellipse being selected (its rotate handle is
+     * can each start/end independently - a shape-drawing tool being active,
+     * or an ellipse/rectangle being selected (its rotate handle is
      * draggable) - so this recomputes the combined lock from both current
      * conditions rather than the two call sites trying to toggle a shared
      * boolean directly and stepping on each other.
      */
     function refreshInteractionLock() {
-        var locked = (activeTool === TYPE_ELLIPSE) || !!selectedEllipse();
+        var locked = isShapeType(activeTool) || !!selectedRotatableShape();
         setMapInteractionsEnabled(!locked);
     }
 
     /**
-     * The selected ellipse, if any - used both to decide whether a rotate
-     * handle exists to grab, and to compute where it currently is.
+     * The selected ellipse/rectangle, if any - used both to decide whether
+     * a rotate handle exists to grab, and to compute where it currently is.
      *
      * @return {object|null}
      */
-    function selectedEllipse() {
+    function selectedRotatableShape() {
         var selected = annotations.find(function(a) {
             return a.id === selectedId;
         });
-        return (selected && selected.type === TYPE_ELLIPSE) ? selected : null;
+        return (selected && isShapeType(selected.type)) ? selected : null;
     }
 
     /**
      * Dragging the rotate handle: pressing it computes the pointer's
-     * current angle around the ellipse's centre and sets that directly as
+     * current angle around the shape's centre and sets that directly as
      * the rotation (rather than an incremental delta), so the shape
      * visually "grabs" wherever the cursor is on the handle and follows it
      * exactly, matching PowerPoint/Illustrator's own rotate-handle feel.
      * Map interactions are locked for the drag's duration via
      * refreshInteractionLock() (called on selection change, not here -
-     * selecting an ellipse already locks panning for as long as it stays
-     * selected, so there's nothing extra to disable/restore just for the
-     * drag itself).
+     * selecting an ellipse/rectangle already locks panning for as long as
+     * it stays selected, so there's nothing extra to disable/restore just
+     * for the drag itself).
      *
      * @param {PointerEvent} e
-     * @param {object} ellipse
+     * @param {object} shape An ellipse or rectangle annotation.
      * @return {boolean} True if the press actually hit the handle.
      */
-    function tryStartRotateDrag(e, ellipse) {
+    function tryStartRotateDrag(e, shape) {
         var rect = viewportEl.getBoundingClientRect();
-        var centrePx = olmap.getPixelFromCoordinate([ellipse.geometry.x, -ellipse.geometry.y]);
-        var radii = screenRadii([ellipse.geometry.x, -ellipse.geometry.y], ellipse.geometry.rx, ellipse.geometry.ry);
-        var rotation = ellipse.geometry.rotation || 0;
+        var centrePx = olmap.getPixelFromCoordinate([shape.geometry.x, -shape.geometry.y]);
+        var radii = screenRadii([shape.geometry.x, -shape.geometry.y], shape.geometry.rx, shape.geometry.ry);
+        var rotation = shape.geometry.rotation || 0;
         var handlePx = handlePosition(centrePx, radii, rotation);
 
         var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
@@ -484,7 +544,7 @@
         }
 
         function onMove(moveEvent) {
-            ellipse.geometry.rotation = angleFor(moveEvent);
+            shape.geometry.rotation = angleFor(moveEvent);
             redraw();
         }
 
@@ -493,10 +553,10 @@
             window.removeEventListener('pointerup', onUp, true);
 
             var finalRotation = angleFor(upEvent);
-            ellipse.geometry.rotation = finalRotation;
+            shape.geometry.rotation = finalRotation;
             redraw();
 
-            ajax('update', {id: ellipse.id, rotation: finalRotation}, 'POST');
+            ajax('update', {id: shape.id, rotation: finalRotation}, 'POST');
         }
 
         window.addEventListener('pointermove', onMove, true);
@@ -505,35 +565,37 @@
     }
 
     /**
-     * Ellipses are drawn by dragging (press at the centre, drag out to set
-     * rx/ry, release to finish) rather than a single click, since a click
-     * alone can't express a radius. Free dragging sets rx/ry independently
-     * (dx and dy tracked separately, not collapsed into one distance) for a
-     * real ellipse; holding Shift while dragging constrains rx=ry to the
-     * larger of the two, for a circle - checked continuously via the move/
-     * release events' own .shiftKey, so toggling Shift mid-drag updates the
-     * live preview immediately rather than only being read once at the
-     * start. Built on Pointer Events (not mouse-specific ones) so this
-     * extends to touch/stylus input later with no rework needed here.
+     * Ellipses/rectangles are drawn by dragging (press at the centre, drag
+     * out to set rx/ry, release to finish) rather than a single click,
+     * since a click alone can't express a radius. Free dragging sets rx/ry
+     * independently (dx and dy tracked separately, not collapsed into one
+     * distance) for a real ellipse/rectangle; holding Shift while dragging
+     * constrains rx=ry to the larger of the two, for a circle/square -
+     * checked continuously via the move/release events' own .shiftKey, so
+     * toggling Shift mid-drag updates the live preview immediately rather
+     * than only being read once at the start. Built on Pointer Events (not
+     * mouse-specific ones) so this extends to touch/stylus input later
+     * with no rework needed here.
      */
     function onViewportPointerDown(e) {
         // Checked regardless of which tool (if any) is currently selected -
-        // rotating an already-drawn ellipse isn't a "tool", it's just what
+        // rotating an already-drawn shape isn't a "tool", it's just what
         // grabbing its handle does whenever one is showing.
-        var selected = selectedEllipse();
+        var selected = selectedRotatableShape();
         if (selected && tryStartRotateDrag(e, selected)) {
             return;
         }
 
-        if (activeTool !== TYPE_ELLIPSE) {
+        if (!isShapeType(activeTool)) {
             return;
         }
+        var drawType = activeTool;
 
         var rect = viewportEl.getBoundingClientRect();
         var startPx = [e.clientX - rect.left, e.clientY - rect.top];
 
         // Starting a drag directly on an existing annotation is a select,
-        // not a new ellipse - let the click listener handle it normally.
+        // not a new shape - let the click listener handle it normally.
         if (annotationAtPixel(startPx)) {
             return;
         }
@@ -550,11 +612,11 @@
             if (moveEvent.shiftKey) {
                 rx = ry = Math.max(rx, ry);
             }
-            return {x: startCoord[0], y: startCoord[1], rx: rx, ry: ry};
+            return {type: drawType, x: startCoord[0], y: startCoord[1], rx: rx, ry: ry};
         }
 
         function onMove(moveEvent) {
-            pendingEllipse = computePending(moveEvent);
+            pendingShape = computePending(moveEvent);
             redraw();
         }
 
@@ -562,13 +624,13 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
 
-            var finished = pendingEllipse ? computePending(upEvent) : null;
-            pendingEllipse = null;
+            var finished = pendingShape ? computePending(upEvent) : null;
+            pendingShape = null;
             redraw();
 
             // A drag too small to be deliberate (e.g. a stray click-and-
             // release with barely any movement) is silently discarded
-            // rather than saved as a near-invisible ellipse.
+            // rather than saved as a near-invisible shape.
             if (!finished) {
                 return;
             }
@@ -583,7 +645,7 @@
             }
 
             ajax('create', {
-                type: TYPE_ELLIPSE,
+                type: drawType,
                 x: finished.x,
                 y: finished.y,
                 rx: finished.rx,
@@ -658,6 +720,8 @@
             + '<circle cx="12" cy="9" r="2.5"/></svg>',
         ellipse: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
             + '<ellipse cx="12" cy="12" rx="9" ry="6"/></svg>',
+        rectangle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+            + '<rect x="3" y="6" width="18" height="12" rx="1"/></svg>',
         deleteIcon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
             + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
             + '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
@@ -688,7 +752,7 @@
          *
          * @param {string} icon SVG markup, from ICONS.
          * @param {string} label Tooltip text.
-         * @param {string} tool 'point' or 'ellipse'
+         * @param {string} tool 'point', 'ellipse', or 'rectangle'
          * @return {HTMLButtonElement}
          */
         function makeToolButton(icon, label, tool) {
@@ -721,6 +785,7 @@
 
         toolbar.appendChild(makeToolButton(ICONS.point, config.strings.placepin, TYPE_POINT));
         toolbar.appendChild(makeToolButton(ICONS.ellipse, config.strings.drawellipse, TYPE_ELLIPSE));
+        toolbar.appendChild(makeToolButton(ICONS.rectangle, config.strings.drawrectangle, TYPE_RECTANGLE));
 
         COLOURS.forEach(function(colour) {
             var swatch = document.createElement('button');

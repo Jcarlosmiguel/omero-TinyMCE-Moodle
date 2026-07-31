@@ -43,6 +43,16 @@ class annotations_repository {
     const TYPE_ELLIPSE = 'ellipse';
 
     /**
+     * @var string Same geometry shape as TYPE_ELLIPSE - {x,y,rx,ry,rotation},
+     * rx/ry are half-width/half-height rather than radii, but otherwise
+     * identical (drawn/rotated/hit-tested the same way, just with square
+     * corners instead of round - see js/annotate.js's isShapeType()). A
+     * square is simply the rx === ry case (Shift while dragging), same as
+     * a circle is for TYPE_ELLIPSE.
+     */
+    const TYPE_RECTANGLE = 'rectangle';
+
+    /**
      * The current user's own annotations for one specific embed placement -
      * never another user's, regardless of who's asking. This is the only
      * read path ajax.php's `list` action uses.
@@ -105,9 +115,9 @@ class annotations_repository {
     }
 
     /**
-     * Updates just the rotation of an existing ellipse (the only thing the
-     * rotate handle can change so far) - but only if it actually belongs
-     * to $userid, same ownership check as delete_owned().
+     * Updates just the rotation of an existing ellipse/rectangle (the only
+     * thing the rotate handle can change so far) - but only if it actually
+     * belongs to $userid, same ownership check as delete_owned().
      *
      * @param int $id
      * @param int $userid

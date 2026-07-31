@@ -105,6 +105,7 @@ $string['invalidaction'] = 'Invalid action "{$a}".';
 
 $string['annotatetoolbar_point'] = 'Place a pin';
 $string['annotatetoolbar_ellipse'] = 'Draw an ellipse (hold Shift for a circle)';
+$string['annotatetoolbar_rectangle'] = 'Draw a rectangle (hold Shift for a square)';
 $string['annotatetoolbar_snapshot'] = 'Snapshot';
 $string['annotatetoolbar_delete'] = 'Delete';
 $string['annotatetoolbar_labelprompt'] = 'Add a short note for this annotation (optional):';
