@@ -56,6 +56,7 @@
 
     var PIN_RADIUS = 8;
     var HIT_RADIUS = 12;
+    var HANDLE_OFFSET = 20; // px beyond the ellipse's own edge, along its rotation axis
     var COLOURS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#000000'];
     var TYPE_POINT = 'point';
     var TYPE_ELLIPSE = 'ellipse';
@@ -65,7 +66,7 @@
     var currentColour = COLOURS[0];
     var activeTool = null; // null | 'point' | 'ellipse'
     var pendingEllipse = null; // {x, y, rx, ry} in image coords while drag-drawing, else null
-    var disabledInteractions = null; // [{interaction, wasActive}] while drag-drawing, else null
+    var disabledInteractions = null; // [{interaction, wasActive}] while a lock reason applies, else null
 
     var olmap = null;
     var viewportEl = null;
@@ -94,6 +95,41 @@
         var dyx = yEdgePx[0] - centrePx[0];
         var dyy = yEdgePx[1] - centrePx[1];
         return [Math.sqrt(dxx * dxx + dxy * dxy), Math.sqrt(dyx * dyx + dyy * dyy)];
+    }
+
+    /**
+     * Where the rotate handle sits on screen for a selected ellipse: a
+     * point HANDLE_OFFSET beyond the top of the ellipse's own (unrotated)
+     * local frame, then rotated to the ellipse's current angle - matching
+     * PowerPoint/Illustrator's own handle-above-the-shape convention. All
+     * in screen pixels; rotation here is a plain canvas-style angle
+     * (radians, clockwise from the local "up" direction).
+     *
+     * @param {Array} centrePx [screenX, screenY]
+     * @param {Array} radii [screenRx, screenRy]
+     * @param {number} rotation Radians.
+     * @return {Array} [screenX, screenY] of the handle.
+     */
+    function handlePosition(centrePx, radii, rotation) {
+        var distance = radii[1] + HANDLE_OFFSET;
+        return [
+            centrePx[0] + distance * Math.sin(rotation),
+            centrePx[1] - distance * Math.cos(rotation),
+        ];
+    }
+
+    /**
+     * @param {number} px The click x, relative to an ellipse's own centre.
+     * @param {number} py The click y, relative to an ellipse's own centre.
+     * @param {number} rotation Radians.
+     * @return {Array} [px, py] rotated into the ellipse's own unrotated
+     *                 local frame, so the plain axis-aligned point-in-
+     *                 ellipse formula still applies regardless of rotation.
+     */
+    function unrotate(px, py, rotation) {
+        var cos = Math.cos(rotation);
+        var sin = Math.sin(rotation);
+        return [px * cos + py * sin, -px * sin + py * cos];
     }
 
     /**
@@ -171,15 +207,32 @@
             }
 
             if (a.type === TYPE_ELLIPSE) {
+                var rotation = a.geometry.rotation || 0;
                 var radii = screenRadii([a.geometry.x, -a.geometry.y], a.geometry.rx, a.geometry.ry);
                 ctx.beginPath();
-                ctx.ellipse(px[0], px[1], radii[0], radii[1], 0, 0, 2 * Math.PI);
+                ctx.ellipse(px[0], px[1], radii[0], radii[1], rotation, 0, 2 * Math.PI);
                 ctx.lineWidth = (a.id === selectedId) ? 3 : 2;
                 ctx.strokeStyle = a.colour;
                 ctx.stroke();
                 if (a.id === selectedId) {
                     selectedPx = px;
                     selectedTopY = px[1] - radii[1];
+
+                    var handlePx = handlePosition(px, radii, rotation);
+                    ctx.beginPath();
+                    ctx.moveTo(px[0], px[1]);
+                    ctx.lineTo(handlePx[0], handlePx[1]);
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(handlePx[0], handlePx[1], 6, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.strokeStyle = a.colour;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 }
             } else {
                 ctx.beginPath();
@@ -254,6 +307,10 @@
 
             if (a.type === TYPE_ELLIPSE) {
                 var radii = screenRadii([a.geometry.x, -a.geometry.y], a.geometry.rx, a.geometry.ry);
+                // Rotate the click into the ellipse's own unrotated local
+                // frame first, so the plain axis-aligned formula below
+                // still applies regardless of rotation.
+                var local = unrotate(dx, dy, a.geometry.rotation || 0);
                 // Clamp each axis to at least HIT_RADIUS so a thin/tiny
                 // ellipse is still easy to click, same reasoning as a
                 // circle's own Math.max() before it - a proper point-in-
@@ -261,7 +318,7 @@
                 // and ry can now genuinely differ.
                 var rx = Math.max(radii[0], HIT_RADIUS);
                 var ry = Math.max(radii[1], HIT_RADIUS);
-                var normalised = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+                var normalised = (local[0] * local[0]) / (rx * rx) + (local[1] * local[1]) / (ry * ry);
                 if (normalised <= 1) {
                     return a;
                 }
@@ -280,6 +337,7 @@
         if (hit) {
             selectedId = (selectedId === hit.id) ? null : hit.id;
             updateDeleteButton();
+            refreshInteractionLock();
             redraw();
             return;
         }
@@ -362,6 +420,91 @@
     }
 
     /**
+     * Map interactions need to stay disabled for two separate reasons that
+     * can each start/end independently - the ellipse tool being active
+     * (drawing) and an ellipse being selected (its rotate handle is
+     * draggable) - so this recomputes the combined lock from both current
+     * conditions rather than the two call sites trying to toggle a shared
+     * boolean directly and stepping on each other.
+     */
+    function refreshInteractionLock() {
+        var locked = (activeTool === TYPE_ELLIPSE) || !!selectedEllipse();
+        setMapInteractionsEnabled(!locked);
+    }
+
+    /**
+     * The selected ellipse, if any - used both to decide whether a rotate
+     * handle exists to grab, and to compute where it currently is.
+     *
+     * @return {object|null}
+     */
+    function selectedEllipse() {
+        var selected = annotations.find(function(a) {
+            return a.id === selectedId;
+        });
+        return (selected && selected.type === TYPE_ELLIPSE) ? selected : null;
+    }
+
+    /**
+     * Dragging the rotate handle: pressing it computes the pointer's
+     * current angle around the ellipse's centre and sets that directly as
+     * the rotation (rather than an incremental delta), so the shape
+     * visually "grabs" wherever the cursor is on the handle and follows it
+     * exactly, matching PowerPoint/Illustrator's own rotate-handle feel.
+     * Map interactions are locked for the drag's duration via
+     * refreshInteractionLock() (called on selection change, not here -
+     * selecting an ellipse already locks panning for as long as it stays
+     * selected, so there's nothing extra to disable/restore just for the
+     * drag itself).
+     *
+     * @param {PointerEvent} e
+     * @param {object} ellipse
+     * @return {boolean} True if the press actually hit the handle.
+     */
+    function tryStartRotateDrag(e, ellipse) {
+        var rect = viewportEl.getBoundingClientRect();
+        var centrePx = olmap.getPixelFromCoordinate([ellipse.geometry.x, -ellipse.geometry.y]);
+        var radii = screenRadii([ellipse.geometry.x, -ellipse.geometry.y], ellipse.geometry.rx, ellipse.geometry.ry);
+        var rotation = ellipse.geometry.rotation || 0;
+        var handlePx = handlePosition(centrePx, radii, rotation);
+
+        var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
+        var hdx = handlePx[0] - pressPx[0];
+        var hdy = handlePx[1] - pressPx[1];
+        if (Math.sqrt(hdx * hdx + hdy * hdy) > HIT_RADIUS) {
+            return false;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        function angleFor(moveEvent) {
+            var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
+            return Math.atan2(movePx[0] - centrePx[0], -(movePx[1] - centrePx[1]));
+        }
+
+        function onMove(moveEvent) {
+            ellipse.geometry.rotation = angleFor(moveEvent);
+            redraw();
+        }
+
+        function onUp(upEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+
+            var finalRotation = angleFor(upEvent);
+            ellipse.geometry.rotation = finalRotation;
+            redraw();
+
+            ajax('update', {id: ellipse.id, rotation: finalRotation}, 'POST');
+        }
+
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        return true;
+    }
+
+    /**
      * Ellipses are drawn by dragging (press at the centre, drag out to set
      * rx/ry, release to finish) rather than a single click, since a click
      * alone can't express a radius. Free dragging sets rx/ry independently
@@ -374,6 +517,14 @@
      * extends to touch/stylus input later with no rework needed here.
      */
     function onViewportPointerDown(e) {
+        // Checked regardless of which tool (if any) is currently selected -
+        // rotating an already-drawn ellipse isn't a "tool", it's just what
+        // grabbing its handle does whenever one is showing.
+        var selected = selectedEllipse();
+        if (selected && tryStartRotateDrag(e, selected)) {
+            return;
+        }
+
         if (activeTool !== TYPE_ELLIPSE) {
             return;
         }
@@ -467,6 +618,7 @@
                 });
                 selectedId = null;
                 updateDeleteButton();
+                refreshInteractionLock();
                 redraw();
             }
         });
@@ -525,7 +677,7 @@
 
             btn.addEventListener('click', function() {
                 activeTool = (activeTool === tool) ? null : tool;
-                setMapInteractionsEnabled(activeTool !== TYPE_ELLIPSE);
+                refreshInteractionLock();
                 toolButtons.forEach(function(b) {
                     b.update();
                 });

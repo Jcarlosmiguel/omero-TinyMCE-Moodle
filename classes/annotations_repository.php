@@ -35,9 +35,10 @@ class annotations_repository {
 
     /**
      * @var string A real region of the slide, scales with zoom - geometry
-     * {x,y,rx,ry}, all in image-pixel units. A circle is simply the
-     * rx === ry case (drawn by holding Shift while dragging - see
-     * js/annotate.js) rather than its own separate type.
+     * {x,y,rx,ry,rotation}, x/y/rx/ry in image-pixel units, rotation in
+     * radians (0 if never rotated - see js/annotate.js's rotate handle).
+     * A circle is simply the rx === ry case (drawn by holding Shift while
+     * dragging) rather than its own separate type.
      */
     const TYPE_ELLIPSE = 'ellipse';
 
@@ -99,6 +100,35 @@ class annotations_repository {
             'timemodified' => $now,
         ];
         $record->id = $DB->insert_record('local_omeroembed_annotations', $record);
+        $record->geometry = $geometry;
+        return $record;
+    }
+
+    /**
+     * Updates just the rotation of an existing ellipse (the only thing the
+     * rotate handle can change so far) - but only if it actually belongs
+     * to $userid, same ownership check as delete_owned().
+     *
+     * @param int $id
+     * @param int $userid
+     * @param float $rotation Radians.
+     * @return \stdClass|null The updated row (geometry decoded back to an
+     *                        array), or null if it doesn't exist/isn't owned.
+     */
+    public static function update_rotation(int $id, int $userid, float $rotation): ?\stdClass {
+        global $DB;
+
+        $record = $DB->get_record('local_omeroembed_annotations', ['id' => $id, 'userid' => $userid]);
+        if (!$record) {
+            return null;
+        }
+
+        $geometry = json_decode($record->geometry, true);
+        $geometry['rotation'] = $rotation;
+        $record->geometry = json_encode($geometry);
+        $record->timemodified = time();
+        $DB->update_record('local_omeroembed_annotations', $record);
+
         $record->geometry = $geometry;
         return $record;
     }

@@ -24,7 +24,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026073006;         // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2026073007;         // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
 $plugin->maturity  = MATURITY_ALPHA;

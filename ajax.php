@@ -82,7 +82,7 @@ if ($action === 'create') {
         if ($rx <= 0 || $ry <= 0) {
             throw new \moodle_exception('invalidradius', 'local_omeroembed', '', "rx=$rx, ry=$ry");
         }
-        $geometry = ['x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry];
+        $geometry = ['x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry, 'rotation' => 0];
     } else {
         // Refuse anything else outright rather than silently accepting a
         // shape this version can't render back.
@@ -96,6 +96,24 @@ if ($action === 'create') {
         'geometry' => $record->geometry,
         'colour' => $record->colour,
         'label' => $record->label,
+    ]);
+    exit;
+}
+
+if ($action === 'update') {
+    // Only rotation can be changed so far - the rotate handle is the only
+    // thing that edits an existing annotation (see js/annotate.js).
+    $id = required_param('id', PARAM_INT);
+    $rotation = required_param('rotation', PARAM_FLOAT);
+    $record = annotations_repository::update_rotation($id, $USER->id, $rotation);
+    if (!$record) {
+        echo json_encode(['updated' => false]);
+        exit;
+    }
+    echo json_encode([
+        'updated' => true,
+        'id' => (int) $record->id,
+        'geometry' => $record->geometry,
     ]);
     exit;
 }
