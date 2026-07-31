@@ -602,9 +602,8 @@
 
     function updateDeleteButton() {
         var btn = document.getElementById('omero-annotate-delete');
-        btn.style.display = selectedId ? 'inline-block' : 'none';
+        btn.style.display = selectedId ? 'flex' : 'none';
         btn.style.background = selectedId ? '#e74c3c' : 'transparent';
-        btn.style.fontWeight = selectedId ? 'bold' : 'normal';
     }
 
     function deleteSelected() {
@@ -643,6 +642,33 @@
         link.remove();
     }
 
+    // Plain inline SVG - deliberately NOT loaded via Moodle's usual pix/
+    // <image href> icon path (see tiny_omeroembed's own commands.js and its
+    // commit fixing exactly this): an <image href> reference is an isolated
+    // external resource with no CSS cascade to inherit "color" from, so
+    // fill/stroke="currentColor" can never work through it. Set directly as
+    // a button's innerHTML instead, so it's genuinely inline markup in the
+    // live DOM and currentColor correctly follows the button's own colour
+    // (already toggled light/dark by the same style rules as the button
+    // text always was).
+    var ICONS = {
+        point: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/>'
+            + '<circle cx="12" cy="9" r="2.5"/></svg>',
+        ellipse: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+            + '<ellipse cx="12" cy="12" rx="9" ry="6"/></svg>',
+        deleteIcon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+            + '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
+            + '<path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+        snapshot: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>'
+            + '<circle cx="12" cy="13" r="4"/></svg>',
+    };
+
     function buildToolbar() {
         var toolbar = document.createElement('div');
         toolbar.id = 'omero-annotate-toolbar';
@@ -656,23 +682,27 @@
          * Both tool buttons share this: a plain border by default, solid
          * green when that tool is the active one - and picking one
          * deactivates the other, since a drag/click on the viewport can
-         * only ever mean one thing at a time.
+         * only ever mean one thing at a time. The full text label becomes
+         * the tooltip (title) rather than visible text, once there's an
+         * icon to carry the meaning instead.
          *
-         * @param {string} label
+         * @param {string} icon SVG markup, from ICONS.
+         * @param {string} label Tooltip text.
          * @param {string} tool 'point' or 'ellipse'
          * @return {HTMLButtonElement}
          */
-        function makeToolButton(label, tool) {
+        function makeToolButton(icon, label, tool) {
             var btn = document.createElement('button');
             btn.type = 'button';
-            btn.textContent = label;
-            btn.style.cssText = 'cursor:pointer; border:1px solid #ffffff; border-radius:3px; padding:0.2rem 0.5rem;';
+            btn.innerHTML = icon;
+            btn.title = label;
+            btn.style.cssText = 'cursor:pointer; display:flex; border:1px solid #ffffff; '
+                + 'border-radius:3px; padding:0.3rem;';
 
             function update() {
                 var isActive = activeTool === tool;
                 btn.style.background = isActive ? '#2ecc71' : 'transparent';
                 btn.style.color = isActive ? '#000000' : '#ffffff';
-                btn.style.fontWeight = isActive ? 'bold' : 'normal';
             }
 
             btn.addEventListener('click', function() {
@@ -689,13 +719,14 @@
             return btn;
         }
 
-        toolbar.appendChild(makeToolButton(config.strings.placepin, TYPE_POINT));
-        toolbar.appendChild(makeToolButton(config.strings.drawellipse, TYPE_ELLIPSE));
+        toolbar.appendChild(makeToolButton(ICONS.point, config.strings.placepin, TYPE_POINT));
+        toolbar.appendChild(makeToolButton(ICONS.ellipse, config.strings.drawellipse, TYPE_ELLIPSE));
 
         COLOURS.forEach(function(colour) {
             var swatch = document.createElement('button');
             swatch.type = 'button';
             swatch.title = colour;
+            swatch.dataset.swatch = '1';
             swatch.style.cssText = 'width:1.2rem; height:1.2rem; border-radius:50%; padding:0; '
                 + 'cursor:pointer; background:' + colour + '; border:2px solid transparent;';
             if (colour === currentColour) {
@@ -703,7 +734,7 @@
             }
             swatch.addEventListener('click', function() {
                 currentColour = colour;
-                toolbar.querySelectorAll('button[title]').forEach(function(b) {
+                toolbar.querySelectorAll('button[data-swatch]').forEach(function(b) {
                     b.style.borderColor = 'transparent';
                 });
                 swatch.style.borderColor = '#ffffff';
@@ -714,16 +745,19 @@
         var deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.id = 'omero-annotate-delete';
-        deleteBtn.textContent = config.strings['delete'];
+        deleteBtn.innerHTML = ICONS.deleteIcon;
+        deleteBtn.title = config.strings['delete'];
         deleteBtn.style.cssText = 'cursor:pointer; display:none; border:1px solid #ffffff; '
-            + 'border-radius:3px; padding:0.2rem 0.5rem; color:#ffffff;';
+            + 'border-radius:3px; padding:0.3rem; color:#ffffff;';
         deleteBtn.addEventListener('click', deleteSelected);
         toolbar.appendChild(deleteBtn);
 
         var snapshotBtn = document.createElement('button');
         snapshotBtn.type = 'button';
-        snapshotBtn.textContent = config.strings.snapshot;
-        snapshotBtn.style.cssText = 'cursor:pointer;';
+        snapshotBtn.innerHTML = ICONS.snapshot;
+        snapshotBtn.title = config.strings.snapshot;
+        snapshotBtn.style.cssText = 'cursor:pointer; display:flex; border:1px solid #ffffff; '
+            + 'border-radius:3px; padding:0.3rem; color:#ffffff;';
         snapshotBtn.addEventListener('click', takeSnapshot);
         toolbar.appendChild(snapshotBtn);
 
