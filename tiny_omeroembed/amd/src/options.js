@@ -1,0 +1,31 @@
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Tiny OMERO Embed options.
+ *
+ * No plugin-specific options are needed - the course context is already
+ * available via editor_tiny/options' own getContextId(), used directly in
+ * ui.js. This module only exists because every tiny plugin's plugin.js
+ * calls Options.register(editor) as standard boilerplate.
+ *
+ * @module      tiny_omeroembed/options
+ * @copyright   2026 University of Glasgow MVLS
+ * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+export const register = () => {
+    // Nothing to register.
+};
