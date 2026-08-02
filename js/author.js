@@ -163,6 +163,7 @@
     // needs to read whatever the teacher currently has checked).
     var OVERLAY_KEYS = [
         'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
+        'enablehotspot',
     ];
 
     /**
@@ -481,6 +482,36 @@
     for (var i = 0; i < layoutRadios.length; i++) {
         layoutRadios[i].addEventListener('change', function(e) {
             applyLayout(e.target.value);
+        });
+    }
+
+    // Every other overlay checkbox only ever affects the *final generated*
+    // embed - generateEmbed() re-reads them live at insert time (see its
+    // own comment), the live preview iframe itself never needs to know.
+    // This one is different: drawing the hidden hotspot region has to
+    // happen inside the preview iframe itself, which means proxy.php needs
+    // to see authoring=1&enablehotspot=1&embedid=<this placement's own
+    // token> on *that* iframe's own src before it will inject
+    // inject_hotspot_author_script() - so checking this box reloads the
+    // preview into that mode. getOrMintAnnotateId() is reused as-is
+    // (already idempotent/cached for the session) - the same token
+    // generateEmbed() would mint anyway, just needed earlier than usual so
+    // the region gets saved against the right placement from the start.
+    var hotspotCheckbox = document.querySelector('input[type="checkbox"][name="enablehotspot"]');
+    if (hotspotCheckbox) {
+        hotspotCheckbox.addEventListener('change', function() {
+            if (!hotspotCheckbox.checked) {
+                return;
+            }
+            var previewIframe = document.getElementById(config.iframeId);
+            if (!previewIframe) {
+                return;
+            }
+            var url = new URL(config.baseProxyUrl, window.location.href);
+            url.searchParams.set('authoring', '1');
+            url.searchParams.set('enablehotspot', '1');
+            url.searchParams.set('embedid', getOrMintAnnotateId());
+            previewIframe.src = url.toString();
         });
     }
 

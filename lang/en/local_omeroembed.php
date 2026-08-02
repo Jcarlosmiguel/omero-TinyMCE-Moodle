@@ -49,6 +49,17 @@ $string['annotationsheading_desc'] = 'A separate annotation layer (in developmen
 $string['enableannotations'] = 'Enable student annotations';
 $string['enableannotations_desc'] = 'Turns on the annotation layer for the final student-facing embed only - never on the authoring tool\'s own live preview. While this is off (the default), embeds behave exactly as before, including OMERO.iviewer\'s own right-click ROI menu.';
 
+$string['hotspotheading'] = 'Click-to-answer hotspot question';
+$string['hotspotheading_desc'] = 'Lets a teacher mark a hidden region on the slide as the correct answer to a question (e.g. "Where is Meckel\'s cartilage?") - a student answers by clicking directly on the image, and is told right away whether they found it. The region itself is drawn separately, live in the authoring tool\'s own preview, and is never sent to a student\'s browser before they click.';
+$string['enablehotspot'] = 'Enable hotspot question';
+$string['enablehotspot_desc'] = 'Turns on the click-to-answer hotspot feature for this embed. Checking this in the authoring tool reveals a small drawing toolbar on the live preview for marking the correct region - see the authoring tool for details.';
+$string['hotspottoolbar_ellipse'] = 'Mark the correct answer as an ellipse (hold Shift, or use the lock button, for a circle)';
+$string['hotspottoolbar_rectangle'] = 'Mark the correct answer as a rectangle (hold Shift, or use the lock button, for a square)';
+$string['hotspottoolbar_clear'] = 'Clear';
+$string['hotspot_saved'] = 'Saved';
+$string['hotspot_correct'] = 'Correct!';
+$string['hotspot_incorrect'] = 'Not quite - try again';
+
 $string['annotationcolours'] = 'Annotation colours';
 $string['annotationcolours_desc'] = 'Which colours appear on the annotation toolbar\'s colour picker - choose up to {$a} in total. A teacher can choose a different set of up to {$a} for an individual embed in the authoring tool; this is just the default for embeds where they haven\'t.';
 $string['colour_e6194b'] = 'Red';
@@ -124,6 +135,7 @@ $string['selectinsidewriteup'] = 'Select text inside the write-up box (not the s
 $string['omeroembed:managesettings'] = 'Manage OMERO slide embed settings (base URL, subject accounts, viewer overlays)';
 $string['omeroembed:annotate'] = 'Draw and delete your own point annotations on an embedded OMERO slide';
 $string['omeroembed:viewheatmap'] = 'Configure viewport tracking and view the resulting heatmap on an embedded OMERO slide';
+$string['omeroembed:hotspotauthor'] = 'Define the hidden correct-answer region for a click-to-answer hotspot question on an embedded OMERO slide';
 
 $string['invalidcolour'] = 'Invalid annotation colour "{$a}" - expected a hex string like #ff0000.';
 $string['invalidannotationtype'] = 'Invalid annotation type "{$a}".';
@@ -194,3 +206,12 @@ $string['privacy:metadata:local_omeroembed_view_samples:x'] = 'The horizontal im
 $string['privacy:metadata:local_omeroembed_view_samples:y'] = 'The vertical image-pixel position the student\'s view was centred on.';
 $string['privacy:metadata:local_omeroembed_view_samples:zoompercent'] = 'The zoom level the student was viewing at.';
 $string['privacy:metadata:local_omeroembed_view_samples:timecreated'] = 'The time the sample was recorded.';
+
+$string['privacy:metadata:local_omeroembed_hotspot_attempts'] = 'One attempt (right or wrong) at a click-to-answer hotspot question on an embedded OMERO slide.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:userid'] = 'The ID of the user who made this attempt.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:courseid'] = 'The course the hotspot question belongs to.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:embedid'] = 'The specific embed placement this attempt was made on.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:x'] = 'The horizontal image-pixel position the student clicked.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:y'] = 'The vertical image-pixel position the student clicked.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:correct'] = 'Whether this attempt was correct.';
+$string['privacy:metadata:local_omeroembed_hotspot_attempts:timecreated'] = 'The time the attempt was made.';

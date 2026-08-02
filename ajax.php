@@ -15,26 +15,30 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * AJAX endpoint for both the student annotations feature (list/create/
- * update/delete a user's own point/ellipse/rectangle annotations) and the
- * teacher heatmap feature (sample records one viewport sample, heatmap
- * fetches the gathered samples for heatmap.php's density render).
- * Configuring tracking itself - on/off, gather-hours, delete, export - is
- * plain server-rendered PHP on heatmap.php now, not this endpoint (moved
- * off author.php's old JS-driven tracking panel - confirmed with the
- * user). Loaded from inside the proxied iviewer page (js/annotate.js,
- * js/track.js, js/heatmap-view.js), same-origin through proxy.php, so this
+ * AJAX endpoint for the student annotations feature (list/create/update/
+ * delete a user's own point/ellipse/rectangle annotations), the teacher
+ * heatmap feature (sample records one viewport sample, heatmap fetches the
+ * gathered samples for heatmap.php's density render), and the
+ * click-to-answer hotspot feature (hotspot_get/hotspot_save/hotspot_clear
+ * for a teacher authoring the hidden answer region, hotspot_attempt for a
+ * student's click). Configuring tracking itself - on/off, gather-hours,
+ * delete, export - is plain server-rendered PHP on heatmap.php now, not
+ * this endpoint (moved off author.php's old JS-driven tracking panel -
+ * confirmed with the user). Loaded from inside the proxied iviewer page
+ * (js/annotate.js, js/track.js, js/heatmap-view.js, js/hotspot-author.js,
+ * js/hotspot-attempt.js), same-origin through proxy.php, so this
  * re-derives the real session and re-checks access every request exactly
  * like proxy.php itself does - never trusts anything the client sends
  * beyond what require_login()/require_capability() confirm.
  *
- * The two feature groups need different capabilities
- * (local/omeroembed:annotate vs local/omeroembed:viewheatmap - see
- * db/access.php for why they're deliberately not the same), so unlike a
- * single upfront require_capability() call, the check here is chosen per
- * action group. The one exception is action=sample: any enrolled viewer can
- * generate a sample (that's the whole point), not just capability holders -
- * see its own branch below for the actual gate that applies instead.
+ * The three feature groups need different capabilities
+ * (local/omeroembed:annotate vs local/omeroembed:viewheatmap vs
+ * local/omeroembed:hotspotauthor - see db/access.php for why they're
+ * deliberately not the same), so unlike a single upfront
+ * require_capability() call, the check here is chosen per action group.
+ * The one exception is action=sample: any enrolled viewer can generate a
+ * sample (that's the whole point), not just capability holders - see its
+ * own branch below for the actual gate that applies instead.
  *
  * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
@@ -47,6 +51,7 @@ require(__DIR__ . '/../../config.php');
 
 use local_omeroembed\annotations_repository;
 use local_omeroembed\tracking_repository;
+use local_omeroembed\hotspot_repository;
 
 $courseid = required_param('courseid', PARAM_INT);
 $embedid = required_param('embedid', PARAM_ALPHANUMEXT);
@@ -64,7 +69,12 @@ require_login($course);
 
 $context = context_course::instance($courseid);
 
-$annotateactions = ['list', 'create', 'update', 'delete'];
+// hotspot_attempt sits alongside list/create/update/delete on purpose -
+// "any enrolled viewer may do this" is exactly what local/omeroembed:annotate
+// already means in this plugin, and attempting a hotspot question is a
+// normal student action, not a privileged one (defining the *answer* is -
+// see $hotspotauthoractions below, a genuinely different capability).
+$annotateactions = ['list', 'create', 'update', 'delete', 'hotspot_attempt'];
 // tracking_get/tracking_set used to live here too, when author.php had its
 // own JS-driven tracking panel - that panel has since moved entirely onto
 // heatmap.php as a plain server-rendered form (confirmed with the user),
@@ -72,11 +82,21 @@ $annotateactions = ['list', 'create', 'update', 'delete'];
 // through this endpoint, so those two actions were removed rather than
 // left unused.
 $heatmapactions = ['heatmap'];
+// The one place in this plugin that reads/writes the actual secret a
+// student is being asked to find - deliberately its own capability, not
+// :annotate (students hold that) or :viewheatmap (a different privileged
+// action entirely). hotspot_get is a GET but still gated here, not treated
+// like list/heatmap's "any enrolled viewer" shape - unlike those, this
+// response contains the hidden geometry itself, so it needs the same
+// authoring-only gate as the two writes.
+$hotspotauthoractions = ['hotspot_get', 'hotspot_save', 'hotspot_clear'];
 
 if (in_array($action, $annotateactions, true)) {
     require_capability('local/omeroembed:annotate', $context);
 } else if (in_array($action, $heatmapactions, true)) {
     require_capability('local/omeroembed:viewheatmap', $context);
+} else if (in_array($action, $hotspotauthoractions, true)) {
+    require_capability('local/omeroembed:hotspotauthor', $context);
 } else if ($action !== 'sample') {
     throw new \moodle_exception('invalidaction', 'local_omeroembed', '', $action);
 }
@@ -113,6 +133,16 @@ if ($action === 'heatmap') {
             'zoompercent' => (float) $record->zoompercent,
         ];
     }, $samples));
+    exit;
+}
+
+if ($action === 'hotspot_get') {
+    // Authoring-only (see $hotspotauthoractions above) - the one response
+    // in this whole endpoint that's allowed to contain the hidden
+    // geometry, so the authoring UI can show a teacher their own existing
+    // region as a reference outline when reopening it.
+    $geometry = hotspot_repository::get_geometry($embedid);
+    echo json_encode(['geometry' => $geometry]);
     exit;
 }
 
@@ -200,6 +230,46 @@ if ($action === 'delete') {
     $id = required_param('id', PARAM_INT);
     $deleted = annotations_repository::delete_owned($id, $USER->id);
     echo json_encode(['deleted' => $deleted]);
+    exit;
+}
+
+if ($action === 'hotspot_save') {
+    // Same ellipse/rectangle geometry validation as 'create' above (see
+    // that branch's own comment) - no colour/label needed, this shape is
+    // never rendered to anyone, only tested against.
+    $type = required_param('type', PARAM_ALPHA);
+    if ($type !== annotations_repository::TYPE_ELLIPSE && $type !== annotations_repository::TYPE_RECTANGLE) {
+        throw new \moodle_exception('invalidannotationtype', 'local_omeroembed', '', $type);
+    }
+    $x = required_param('x', PARAM_FLOAT);
+    $y = required_param('y', PARAM_FLOAT);
+    $rx = required_param('rx', PARAM_FLOAT);
+    $ry = required_param('ry', PARAM_FLOAT);
+    if ($rx <= 0 || $ry <= 0) {
+        throw new \moodle_exception('invalidradius', 'local_omeroembed', '', "rx=$rx, ry=$ry");
+    }
+    $geometry = ['type' => $type, 'x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry, 'rotation' => 0];
+
+    $record = hotspot_repository::save($courseid, $embedid, $USER->id, $geometry);
+    echo json_encode(['geometry' => $record->geometry]);
+    exit;
+}
+
+if ($action === 'hotspot_clear') {
+    $cleared = hotspot_repository::clear($embedid);
+    echo json_encode(['cleared' => $cleared]);
+    exit;
+}
+
+if ($action === 'hotspot_attempt') {
+    $x = required_param('x', PARAM_FLOAT);
+    $y = required_param('y', PARAM_FLOAT);
+
+    // The only thing this response - or any code path reachable from a
+    // student session - is ever allowed to reveal about the hidden region.
+    $correct = hotspot_repository::check_attempt($embedid, $x, $y);
+    hotspot_repository::record_attempt($courseid, $embedid, $USER->id, $x, $y, $correct);
+    echo json_encode(['correct' => $correct]);
     exit;
 }
 

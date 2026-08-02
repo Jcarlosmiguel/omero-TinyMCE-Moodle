@@ -74,4 +74,23 @@ $capabilities = [
             'editingteacher' => CAP_ALLOW,
         ],
     ],
+
+    // Lets a teacher define (or clear) the hidden correct-answer region for
+    // the click-to-answer hotspot feature (author.php's live preview, plus
+    // ajax.php's hotspot_save/hotspot_clear/hotspot_get actions) -
+    // deliberately NOT given to students, unlike :annotate above: this is
+    // the one action in the whole plugin that reads/writes the actual
+    // secret a student is being asked to find, so it gets its own
+    // capability rather than reusing :annotate (which students hold) or
+    // :viewheatmap (a different privileged action entirely). Checked per-
+    // course, same reasoning as :annotate/:viewheatmap for why
+    // CONTEXT_COURSE rather than CONTEXT_MODULE.
+    'local/omeroembed:hotspotauthor' => [
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        ],
+    ],
 ];

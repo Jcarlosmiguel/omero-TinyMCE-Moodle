@@ -147,6 +147,26 @@ if ($hassiteconfig) {
         annotations_repository::get_colour_choices()
     ));
 
+    // Off by default - see proxy.php's inject_hotspot_attempt_script() and
+    // classes/hotspot_repository.php for what this actually turns on: a
+    // teacher-defined hidden region a student answers by clicking, never
+    // exposed to the browser before they do. The region itself is authored
+    // separately, drawn live in author.php's own preview (see that page's
+    // own comment) - this setting only controls whether the feature is
+    // available on an embed at all.
+    $settings->add(new admin_setting_heading(
+        'local_omeroembed/hotspotheading',
+        get_string('hotspotheading', 'local_omeroembed'),
+        get_string('hotspotheading_desc', 'local_omeroembed')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/enablehotspot',
+        get_string('enablehotspot', 'local_omeroembed'),
+        get_string('enablehotspot_desc', 'local_omeroembed'),
+        0
+    ));
+
     // Applies to the heatmap feature's local_omeroembed_view_samples table
     // only - regardless of any individual embed's own gather-hours window
     // (see author.php's tracking panel) or a teacher manually deleting data

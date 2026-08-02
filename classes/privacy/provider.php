@@ -34,23 +34,31 @@ use core_privacy\local\request\writer;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * This plugin stores two kinds of personal data: a student's own point
+ * This plugin stores three kinds of personal data: a student's own point
  * annotations on an embedded OMERO slide (local_omeroembed_annotations),
- * and - for the teacher heatmap feature - periodic samples of a student's
- * own viewport position while viewing a tracked embed
- * (local_omeroembed_view_samples). Everything else this plugin stores -
+ * periodic samples of a student's own viewport position while viewing a
+ * tracked embed for the teacher heatmap feature
+ * (local_omeroembed_view_samples), and every student's own attempt (click
+ * position + right/wrong) at a click-to-answer hotspot question
+ * (local_omeroembed_hotspot_attempts). Everything else this plugin stores -
  * OMERO subject-account credentials (admin-configured plugin settings),
- * the short-lived OMERO session cache (classes/omero_session.php), and
+ * the short-lived OMERO session cache (classes/omero_session.php),
  * local_omeroembed_embed_tracking (a teacher's on/off + gather-window
- * setting, keyed only by embedid - no userid) - is not personal data and
- * is intentionally not covered here.
+ * setting, keyed only by embedid - no userid), and
+ * local_omeroembed_hotspots (the hidden answer region itself, plus which
+ * teacher defined it - treated the same as authorship on any other piece
+ * of course content, e.g. a Page's own author, not as a personal data
+ * trail about that teacher; deleting it on a data-removal request would
+ * also destroy the actual quiz content for every student, which is never
+ * the right outcome) - is not personal data and is intentionally not
+ * covered here.
  *
- * Both tables are scoped to CONTEXT_COURSE, not CONTEXT_MODULE - an embed
- * lives inside arbitrary course content (a Page, a quiz question, ...)
- * with no course-module of its own, so the course itself is the only
- * meaningful context to hang this on (matches how both
- * local/omeroembed:annotate and local/omeroembed:viewheatmap are also
- * checked at course context).
+ * All three tables are scoped to CONTEXT_COURSE, not CONTEXT_MODULE - an
+ * embed lives inside arbitrary course content (a Page, a quiz question,
+ * ...) with no course-module of its own, so the course itself is the only
+ * meaningful context to hang this on (matches how
+ * local/omeroembed:annotate, local/omeroembed:viewheatmap, and
+ * local/omeroembed:hotspotauthor are also all checked at course context).
  */
 class provider implements
         // This plugin stores personal data.
@@ -97,6 +105,20 @@ class provider implements
             'privacy:metadata:local_omeroembed_view_samples'
         );
 
+        $items->add_database_table(
+            'local_omeroembed_hotspot_attempts',
+            [
+                'courseid' => 'privacy:metadata:local_omeroembed_hotspot_attempts:courseid',
+                'userid' => 'privacy:metadata:local_omeroembed_hotspot_attempts:userid',
+                'embedid' => 'privacy:metadata:local_omeroembed_hotspot_attempts:embedid',
+                'x' => 'privacy:metadata:local_omeroembed_hotspot_attempts:x',
+                'y' => 'privacy:metadata:local_omeroembed_hotspot_attempts:y',
+                'correct' => 'privacy:metadata:local_omeroembed_hotspot_attempts:correct',
+                'timecreated' => 'privacy:metadata:local_omeroembed_hotspot_attempts:timecreated',
+            ],
+            'privacy:metadata:local_omeroembed_hotspot_attempts'
+        );
+
         return $items;
     }
 
@@ -127,6 +149,15 @@ class provider implements
             ['contextlevel2' => CONTEXT_COURSE, 'userid2' => $userid]
         );
 
+        $contextlist->add_from_sql(
+            "SELECT c.id
+               FROM {context} c
+         INNER JOIN {local_omeroembed_hotspot_attempts} h
+                 ON h.courseid = c.instanceid AND c.contextlevel = :contextlevel3
+              WHERE h.userid = :userid3",
+            ['contextlevel3' => CONTEXT_COURSE, 'userid3' => $userid]
+        );
+
         return $contextlist;
     }
 
@@ -146,6 +177,9 @@ class provider implements
             'courseid' => $context->instanceid,
         ]);
         $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_view_samples} WHERE courseid = :courseid', [
+            'courseid' => $context->instanceid,
+        ]);
+        $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_hotspot_attempts} WHERE courseid = :courseid', [
             'courseid' => $context->instanceid,
         ]);
     }
@@ -211,6 +245,27 @@ class provider implements
                     (object) ['viewsamples' => $data]
                 );
             }
+
+            $attempts = $DB->get_records('local_omeroembed_hotspot_attempts', [
+                'courseid' => $context->instanceid,
+                'userid' => $user->id,
+            ]);
+            if ($attempts) {
+                $data = array_map(function ($attempt) {
+                    return [
+                        'embedid' => $attempt->embedid,
+                        'x' => $attempt->x,
+                        'y' => $attempt->y,
+                        'correct' => (bool) $attempt->correct,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($attempt->timecreated),
+                    ];
+                }, array_values($attempts));
+
+                writer::with_context($context)->export_data(
+                    [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - hotspot attempts'],
+                    (object) ['hotspotattempts' => $data]
+                );
+            }
         }
     }
 
@@ -228,6 +283,7 @@ class provider implements
 
         $DB->delete_records('local_omeroembed_annotations', ['courseid' => $context->instanceid]);
         $DB->delete_records('local_omeroembed_view_samples', ['courseid' => $context->instanceid]);
+        $DB->delete_records('local_omeroembed_hotspot_attempts', ['courseid' => $context->instanceid]);
     }
 
     /**
@@ -249,6 +305,7 @@ class provider implements
             }
             $DB->delete_records('local_omeroembed_annotations', ['courseid' => $context->instanceid, 'userid' => $userid]);
             $DB->delete_records('local_omeroembed_view_samples', ['courseid' => $context->instanceid, 'userid' => $userid]);
+            $DB->delete_records('local_omeroembed_hotspot_attempts', ['courseid' => $context->instanceid, 'userid' => $userid]);
         }
     }
 
@@ -272,5 +329,6 @@ class provider implements
         $params = ['courseid' => $context->instanceid] + $userparams;
         $DB->delete_records_select('local_omeroembed_annotations', $select, $params);
         $DB->delete_records_select('local_omeroembed_view_samples', $select, $params);
+        $DB->delete_records_select('local_omeroembed_hotspot_attempts', $select, $params);
     }
 }

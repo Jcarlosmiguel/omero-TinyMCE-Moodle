@@ -395,6 +395,29 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
         $enableannotations = resolve_overlay_setting('enableannotations');
         $annotationcolours = resolve_annotation_colours();
         $showomerorois = resolve_overlay_setting('showomerorois');
+        $enablehotspot = resolve_overlay_setting('enablehotspot');
+
+        // A hotspot question wants a clean, distraction-free view - every
+        // one of iviewer's own on-image overlay controls hidden, regardless
+        // of this embed's individual overlay settings, AND the separate
+        // student-annotation layer suppressed too (its own toolbar -
+        // colour swatches, shape tools, lock/help buttons - competes for
+        // the same screen space and the same clicks a hotspot question
+        // needs, confirmed with the user after a live trial: the
+        // annotation toolbar was still showing on a hotspot embed). Only
+        // forced on the final student-facing embed: never during the
+        // authoring tool's own preview (even with hotspot mode on there
+        // too), since the teacher still needs a working zoom/pan to
+        // precisely mark the region, and never on the heatmap view either
+        // (a different mode entirely). Hotspot mode always wins over
+        // enableannotations when both happen to be on for the same embed -
+        // there's no sensible way to want both active on the same click at
+        // once.
+        $hotspotoverridesstudentview = $enablehotspot && !$authoring && !$heatmap;
+        if ($hotspotoverridesstudentview) {
+            $hideflags = array_fill_keys(array_keys($hideflags), true);
+            $enableannotations = false;
+        }
 
         $rewritten = inject_overlay_hide_css($rewritten, $hideflags);
         $rewritten = inject_disable_rotate_interaction($rewritten);
@@ -414,6 +437,23 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
             if ($showomerorois) {
                 $rewritten = inject_show_rois_script($rewritten);
             }
+            // Existence-checked, not just flag-checked - a teacher who
+            // turned this on but never actually drew a region has nothing
+            // for a student to click on yet; "simply not injected" is the
+            // same convention inject_annotation_script() already uses for
+            // an empty $embedid.
+            if ($enablehotspot && $embedid !== '' && \local_omeroembed\hotspot_repository::exists($embedid)) {
+                $rewritten = inject_hotspot_attempt_script($rewritten, $courseid, $embedid);
+            }
+        } else if ($enablehotspot && $embedid !== ''
+                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
+            // The authoring preview's own mode - drawing the hidden region
+            // itself, never combined with any of the student-facing
+            // scripts above. Capability-checked here too, not just relied
+            // on as "author.php would never show this checkbox to a
+            // student" - the same lesson the $authoring capability fix
+            // itself already taught (see $authoring's own comment above).
+            $rewritten = inject_hotspot_author_script($rewritten, $courseid, $embedid);
         }
     }
     echo $rewritten;
@@ -1072,4 +1112,85 @@ JS;
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $script . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $script);
+}
+
+/**
+ * Injects js/hotspot-author.js into the authoring tool's own live preview
+ * iframe - the small drag-to-draw UI a teacher uses to mark the hidden
+ * correct-answer region for the click-to-answer hotspot feature. Never
+ * injected on the final student-facing embed (see
+ * inject_hotspot_attempt_script() for that side) - the caller already
+ * re-checks local/omeroembed:hotspotauthor before calling this, same
+ * belt-and-braces reasoning as every other capability-gated inject
+ * function in this file.
+ *
+ * Deliberately mirrors js/annotate.js's own config-script + src-script
+ * pattern (inject_annotation_script(), just above) rather than reusing
+ * that file wholesale - annotate.js is a large, security-irrelevant
+ * (public, multi-shape) student-facing module; conflating it with a small,
+ * privileged, single-secret-shape authoring tool would couple two features
+ * with very different security postures for no real benefit.
+ *
+ * @param string $body
+ * @param int $courseid
+ * @param string $embedid
+ * @return string
+ */
+function inject_hotspot_author_script(string $body, int $courseid, string $embedid): string {
+    $config = [
+        'courseid' => $courseid,
+        'embedid' => $embedid,
+        'sesskey' => sesskey(),
+        'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+        'strings' => [
+            'drawellipse' => get_string('hotspottoolbar_ellipse', 'local_omeroembed'),
+            'drawrectangle' => get_string('hotspottoolbar_rectangle', 'local_omeroembed'),
+            'constrainshape' => get_string('annotatetoolbar_constrain', 'local_omeroembed'),
+            'clear' => get_string('hotspottoolbar_clear', 'local_omeroembed'),
+            'saved' => get_string('hotspot_saved', 'local_omeroembed'),
+        ],
+    ];
+    $configscript = '<script id="omero-hotspot-author-config" type="application/json">'
+        . json_encode($config) . '</script>';
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-author.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
+}
+
+/**
+ * Injects js/hotspot-attempt.js into the final student-facing embed - a
+ * click listener that posts the clicked image-pixel coordinates to
+ * ajax.php's hotspot_attempt action and shows the bare correct/incorrect
+ * verdict it gets back. The hidden region's own geometry never reaches
+ * this script, or any script - see hotspot_repository::check_attempt()'s
+ * own docblock for where that's actually enforced.
+ *
+ * Only ever called once the caller has already confirmed a region exists
+ * (see this file's own dispatch, above) - "simply not injected" is the
+ * same convention inject_annotation_script() already uses for an embed
+ * with nothing to show.
+ *
+ * @param string $body
+ * @param int $courseid
+ * @param string $embedid
+ * @return string
+ */
+function inject_hotspot_attempt_script(string $body, int $courseid, string $embedid): string {
+    $config = [
+        'courseid' => $courseid,
+        'embedid' => $embedid,
+        'sesskey' => sesskey(),
+        'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+        'strings' => [
+            'correct' => get_string('hotspot_correct', 'local_omeroembed'),
+            'incorrect' => get_string('hotspot_incorrect', 'local_omeroembed'),
+        ],
+    ];
+    $configscript = '<script id="omero-hotspot-attempt-config" type="application/json">'
+        . json_encode($config) . '</script>';
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-attempt.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
 }
