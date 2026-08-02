@@ -45,6 +45,14 @@ const MESSAGE_TYPE = 'omero-embed-html';
 const READY_MESSAGE_TYPE = 'omero-embed-ready';
 const WRITEUP_MESSAGE_TYPE = 'omero-embed-existing-writeup';
 
+// Matches author.php's own $overlaysettings key list (proxy.php's
+// resolve_overlay_setting() is the actual precedence logic - this file
+// only needs to round-trip whatever an existing embed already has).
+const OVERLAY_PARAM_KEYS = [
+    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
+    'enablehotspot',
+];
+
 /**
  * Reads an existing embed's settings and write-up text straight out of the
  * DOM - no server round trip needed, everything generateEmbed() put there is
@@ -111,6 +119,27 @@ const readExistingEmbed = (node) => {
         annotateid: node.getAttribute('data-omero-annotate-id') || '',
     };
 
+    // Per-embed overlay/annotation overrides (see author.php's own
+    // $overlaysettings comment) - only added when actually present in the
+    // existing embed's src, which an embed generated before this feature
+    // existed never has. Left absent rather than guessed at, so
+    // author.php's own optional_param($key, null, ...) correctly falls
+    // back to the current site default for those - same "explicit value
+    // always wins, absence means no opinion" rule proxy.php's
+    // resolve_overlay_setting() already applies when actually rendering.
+    OVERLAY_PARAM_KEYS.forEach((key) => {
+        if (url.searchParams.has(key)) {
+            params[key] = url.searchParams.get(key) === '1';
+        }
+    });
+
+    // Same "only forwarded when actually present" reasoning as the overlay
+    // keys above - a comma-separated hex list rather than a single '1'/'0',
+    // so it's read separately.
+    if (url.searchParams.has('annotationcolours')) {
+        params.annotationcolours = url.searchParams.get('annotationcolours');
+    }
+
     return {params, writeupHtml};
 };
 
@@ -159,6 +188,18 @@ export const handleAction = async(editor) => {
             + '&height=' + encodeURIComponent(p.height)
             + (p.browsable ? '&browsable=1' : '')
             + (p.annotateid ? '&annotateid=' + encodeURIComponent(p.annotateid) : '');
+        // Only forwarded when readExistingEmbed() actually found them (an
+        // embed from before this feature existed won't have any) - see
+        // that function's own comment on why absence is left as absence,
+        // not guessed at.
+        OVERLAY_PARAM_KEYS.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(p, key)) {
+                iframeUrl += '&' + key + '=' + (p[key] ? '1' : '0');
+            }
+        });
+        if (Object.prototype.hasOwnProperty.call(p, 'annotationcolours')) {
+            iframeUrl += '&annotationcolours=' + encodeURIComponent(p.annotationcolours);
+        }
     }
 
     const modal = await Modal.create({

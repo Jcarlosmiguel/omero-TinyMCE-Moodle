@@ -61,6 +61,23 @@ export const getSetup = async() => {
     ]);
 
     return (editor) => {
+        // Moodle's add_intro_editor() (core_form\...\editor.php) names every
+        // activity/resource's "Description" field under General literally
+        // "introeditor" - a small summary/blurb field, not a real content
+        // area - confirmed live (id="id_introeditor" on mod_page's own edit
+        // form, distinct from "id_page", its actual content field).
+        // is_enabled() (see classes/plugininfo.php) can't distinguish these:
+        // Moodle's core editor_tiny\editor::use_editor() never forwards the
+        // element id into the $options array that reaches is_enabled(), only
+        // TinyMCE's own per-instance setup callback (here) genuinely has it,
+        // via the real editor object - so the exclusion has to live here,
+        // not server-side. Reported directly by the user: showing the
+        // button on a field that was never meant to hold a whole slide
+        // embed was just confusing, not a real, usable option there.
+        if (editor.id === 'id_introeditor' || editor.id.endsWith('_introeditor')) {
+            return;
+        }
+
         editor.ui.registry.addIcon(icon, buttonMarkup);
 
         editor.ui.registry.addButton(buttonName, {
