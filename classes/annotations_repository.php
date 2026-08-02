@@ -30,6 +30,26 @@ namespace local_omeroembed;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class annotations_repository {
+    /**
+     * @var string[] The fixed set of colours a teacher can choose the
+     * active annotation palette from - both settings.php's/manage.php's
+     * site-wide default and author.php's per-embed override pick a subset
+     * of (at most 4) these, never an arbitrary hex value. Keeping the
+     * *set* fixed and only letting the *selection* vary avoids ever
+     * ending up with a colour that's unreadable against the slide or
+     * clashes with another selected one.
+     */
+    const COLOUR_PALETTE = [
+        '#e6194B', '#3cb44b', '#4363d8', '#f58231',
+        '#911eb4', '#000000', '#ffe119', '#42d4f4',
+    ];
+
+    /** @var string[] The site's own out-of-the-box default, before any admin/teacher has chosen otherwise. */
+    const DEFAULT_COLOURS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231'];
+
+    /** @var int The maximum number of colours offered on the annotation toolbar at once. */
+    const MAX_COLOURS = 4;
+
     /** @var string A fixed-screen-size pin, Google Maps style - geometry {x,y}. */
     const TYPE_POINT = 'point';
 
@@ -51,6 +71,57 @@ class annotations_repository {
      * a circle is for TYPE_ELLIPSE.
      */
     const TYPE_RECTANGLE = 'rectangle';
+
+    /**
+     * @var string A free-form region, for anything an ellipse/rectangle
+     * can't represent well - geometry {points: [[x1,y1], [x2,y2], ...]},
+     * absolute image-pixel coordinates, at least 3 points. Unlike
+     * TYPE_ELLIPSE/TYPE_RECTANGLE's centre+radius shape, there's no
+     * rotation field - each point is independently correct under pan/zoom/
+     * view rotation once projected (see js/annotate.js's redraw()), and
+     * this first pass doesn't support rotating or reshaping a polygon
+     * after it's drawn (see this plugin's own plan doc for why that's a
+     * deliberate scope line, not an oversight).
+     */
+    const TYPE_POLYGON = 'polygon';
+
+    /**
+     * Parses and validates a comma-separated colour list - as submitted by
+     * any of settings.php/manage.php/author.php's own forms, or read back
+     * via get_config() - shared here rather than duplicated in all four
+     * places. Anything not actually in COLOUR_PALETTE is silently dropped
+     * (never trusted as an arbitrary hex value), and the result is capped
+     * at MAX_COLOURS. Falls back to DEFAULT_COLOURS if nothing valid
+     * survives, so callers never have to separately handle ending up with
+     * an empty list.
+     *
+     * @param string $raw Comma-separated hex colours, e.g. "#e6194B,#3cb44b".
+     * @return string[]
+     */
+    public static function parse_colours(string $raw): array {
+        $colours = array_values(array_intersect(
+            array_map('trim', explode(',', $raw)),
+            self::COLOUR_PALETTE
+        ));
+        $colours = array_slice(array_unique($colours), 0, self::MAX_COLOURS);
+        return $colours ?: self::DEFAULT_COLOURS;
+    }
+
+    /**
+     * COLOUR_PALETTE as a hex => human-readable-name map, for building the
+     * checkbox lists in settings.php/manage.php/author.php - one place
+     * this mapping is defined, rather than three.
+     *
+     * @return array<string, string>
+     */
+    public static function get_colour_choices(): array {
+        $choices = [];
+        foreach (self::COLOUR_PALETTE as $hex) {
+            $key = 'colour_' . strtolower(ltrim($hex, '#'));
+            $choices[$hex] = get_string($key, 'local_omeroembed');
+        }
+        return $choices;
+    }
 
     /**
      * The current user's own annotations for one specific embed placement -

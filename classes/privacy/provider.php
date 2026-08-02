@@ -34,18 +34,23 @@ use core_privacy\local\request\writer;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * This plugin stores one kind of personal data: a student's own point
- * annotations on an embedded OMERO slide (local_omeroembed_annotations).
- * Everything else this plugin stores - OMERO subject-account credentials
- * (admin-configured plugin settings) and the short-lived OMERO session
- * cache (classes/omero_session.php) - belongs to shared service accounts,
- * not to any individual user, and is intentionally not covered here.
+ * This plugin stores two kinds of personal data: a student's own point
+ * annotations on an embedded OMERO slide (local_omeroembed_annotations),
+ * and - for the teacher heatmap feature - periodic samples of a student's
+ * own viewport position while viewing a tracked embed
+ * (local_omeroembed_view_samples). Everything else this plugin stores -
+ * OMERO subject-account credentials (admin-configured plugin settings),
+ * the short-lived OMERO session cache (classes/omero_session.php), and
+ * local_omeroembed_embed_tracking (a teacher's on/off + gather-window
+ * setting, keyed only by embedid - no userid) - is not personal data and
+ * is intentionally not covered here.
  *
- * Annotations are scoped to CONTEXT_COURSE, not CONTEXT_MODULE - an embed
+ * Both tables are scoped to CONTEXT_COURSE, not CONTEXT_MODULE - an embed
  * lives inside arbitrary course content (a Page, a quiz question, ...)
  * with no course-module of its own, so the course itself is the only
- * meaningful context to hang this on (matches how
- * local/omeroembed:annotate is also checked at course context).
+ * meaningful context to hang this on (matches how both
+ * local/omeroembed:annotate and local/omeroembed:viewheatmap are also
+ * checked at course context).
  */
 class provider implements
         // This plugin stores personal data.
@@ -78,6 +83,20 @@ class provider implements
             'privacy:metadata:local_omeroembed_annotations'
         );
 
+        $items->add_database_table(
+            'local_omeroembed_view_samples',
+            [
+                'courseid' => 'privacy:metadata:local_omeroembed_view_samples:courseid',
+                'userid' => 'privacy:metadata:local_omeroembed_view_samples:userid',
+                'embedid' => 'privacy:metadata:local_omeroembed_view_samples:embedid',
+                'x' => 'privacy:metadata:local_omeroembed_view_samples:x',
+                'y' => 'privacy:metadata:local_omeroembed_view_samples:y',
+                'zoompercent' => 'privacy:metadata:local_omeroembed_view_samples:zoompercent',
+                'timecreated' => 'privacy:metadata:local_omeroembed_view_samples:timecreated',
+            ],
+            'privacy:metadata:local_omeroembed_view_samples'
+        );
+
         return $items;
     }
 
@@ -88,14 +107,25 @@ class provider implements
      * @return contextlist the list of contexts containing user info for the user.
      */
     public static function get_contexts_for_userid(int $userid): contextlist {
-        $sql = "SELECT c.id
-                  FROM {context} c
-            INNER JOIN {local_omeroembed_annotations} a
-                    ON a.courseid = c.instanceid AND c.contextlevel = :contextlevel
-                 WHERE a.userid = :userid";
-
         $contextlist = new contextlist();
-        $contextlist->add_from_sql($sql, ['contextlevel' => CONTEXT_COURSE, 'userid' => $userid]);
+
+        $contextlist->add_from_sql(
+            "SELECT c.id
+               FROM {context} c
+         INNER JOIN {local_omeroembed_annotations} a
+                 ON a.courseid = c.instanceid AND c.contextlevel = :contextlevel1
+              WHERE a.userid = :userid1",
+            ['contextlevel1' => CONTEXT_COURSE, 'userid1' => $userid]
+        );
+
+        $contextlist->add_from_sql(
+            "SELECT c.id
+               FROM {context} c
+         INNER JOIN {local_omeroembed_view_samples} s
+                 ON s.courseid = c.instanceid AND c.contextlevel = :contextlevel2
+              WHERE s.userid = :userid2",
+            ['contextlevel2' => CONTEXT_COURSE, 'userid2' => $userid]
+        );
 
         return $contextlist;
     }
@@ -113,6 +143,9 @@ class provider implements
         }
 
         $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_annotations} WHERE courseid = :courseid', [
+            'courseid' => $context->instanceid,
+        ]);
+        $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_view_samples} WHERE courseid = :courseid', [
             'courseid' => $context->instanceid,
         ]);
     }
@@ -140,25 +173,44 @@ class provider implements
                 'courseid' => $context->instanceid,
                 'userid' => $user->id,
             ]);
-            if (!$annotations) {
-                continue;
+            if ($annotations) {
+                $data = array_map(function ($annotation) {
+                    return [
+                        'embedid' => $annotation->embedid,
+                        'type' => $annotation->type,
+                        'geometry' => $annotation->geometry,
+                        'colour' => $annotation->colour,
+                        'label' => $annotation->label,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($annotation->timecreated),
+                    ];
+                }, array_values($annotations));
+
+                writer::with_context($context)->export_data(
+                    [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - annotations'],
+                    (object) ['annotations' => $data]
+                );
             }
 
-            $data = array_map(function ($annotation) {
-                return [
-                    'embedid' => $annotation->embedid,
-                    'type' => $annotation->type,
-                    'geometry' => $annotation->geometry,
-                    'colour' => $annotation->colour,
-                    'label' => $annotation->label,
-                    'timecreated' => \core_privacy\local\request\transform::datetime($annotation->timecreated),
-                ];
-            }, array_values($annotations));
+            $samples = $DB->get_records('local_omeroembed_view_samples', [
+                'courseid' => $context->instanceid,
+                'userid' => $user->id,
+            ]);
+            if ($samples) {
+                $data = array_map(function ($sample) {
+                    return [
+                        'embedid' => $sample->embedid,
+                        'x' => $sample->x,
+                        'y' => $sample->y,
+                        'zoompercent' => $sample->zoompercent,
+                        'timecreated' => \core_privacy\local\request\transform::datetime($sample->timecreated),
+                    ];
+                }, array_values($samples));
 
-            writer::with_context($context)->export_data(
-                [get_string('pluginname', 'local_omeroembed')],
-                (object) ['annotations' => $data]
-            );
+                writer::with_context($context)->export_data(
+                    [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - heatmap samples'],
+                    (object) ['viewsamples' => $data]
+                );
+            }
         }
     }
 
@@ -175,6 +227,7 @@ class provider implements
         }
 
         $DB->delete_records('local_omeroembed_annotations', ['courseid' => $context->instanceid]);
+        $DB->delete_records('local_omeroembed_view_samples', ['courseid' => $context->instanceid]);
     }
 
     /**
@@ -195,6 +248,7 @@ class provider implements
                 continue;
             }
             $DB->delete_records('local_omeroembed_annotations', ['courseid' => $context->instanceid, 'userid' => $userid]);
+            $DB->delete_records('local_omeroembed_view_samples', ['courseid' => $context->instanceid, 'userid' => $userid]);
         }
     }
 
@@ -217,5 +271,6 @@ class provider implements
         $select = "courseid = :courseid AND userid $usersql";
         $params = ['courseid' => $context->instanceid] + $userparams;
         $DB->delete_records_select('local_omeroembed_annotations', $select, $params);
+        $DB->delete_records_select('local_omeroembed_view_samples', $select, $params);
     }
 }

@@ -29,15 +29,10 @@ $string['pluginname'] = 'OMERO slide embed';
 $string['omerobaseurl'] = 'OMERO base URL';
 $string['omerobaseurl_desc'] = 'The OMERO.web server this plugin proxies content from, e.g. https://your-omero-server.example.org. Never shown to students - all requests go through this plugin\'s own proxy.';
 
-$string['subjects'] = 'Subject accounts';
-$string['subjects_desc'] = 'One subject per line, in the form <code>subject_key|username|password</code>. The subject_key is what teachers pick from the dropdown on the "Embed an OMERO slide" tool. These are OMERO service-account credentials, used server-side only - never sent to students\' browsers.';
-
 $string['overlaysheading'] = 'Embedded viewer overlays';
 $string['overlaysheading_desc'] = 'OMERO.iviewer\'s own on-image controls, individually hideable to reduce clutter for students. Purely cosmetic - hiding a control here never affects pan/zoom, view-links, or the opening view. Applies to both the authoring tool\'s live preview and the final student-facing embed.';
 $string['hideoverview'] = 'Hide overview map';
 $string['hideoverview_desc'] = 'The small inset thumbnail of the whole image with a box showing the current viewport.';
-$string['hiderotate'] = 'Hide rotate control';
-$string['hiderotate_desc'] = 'The "reset rotation" arrow icon - rarely relevant for a flat slide image.';
 $string['hideintensity'] = 'Hide coordinate/zoom readout';
 $string['hideintensity_desc'] = 'A small mouse-hover display of the pixel coordinate and value under the cursor, plus the current zoom percentage. Safe to hide - the authoring tool\'s "Insert view link" and "Set as opening view" read the actual view position directly from the viewer itself, not from this on-screen display.';
 $string['hidefullscreen'] = 'Hide full-screen button';
@@ -46,11 +41,24 @@ $string['hidescaleline'] = 'Hide scale bar';
 $string['hidescaleline_desc'] = 'Shows a real-world size reference (e.g. "5 mm"). Consider leaving this visible - it\'s often pedagogically useful for judging magnification.';
 $string['hidezoom'] = 'Hide zoom controls';
 $string['hidezoom_desc'] = 'The zoom in/out buttons, "1:1" reset, and zoom percentage input. Hiding this removes the ability to zoom interactively, not just a cosmetic change - only enable if the embed is meant to show a single fixed view with no student interaction.';
+$string['showomerorois'] = 'Show OMERO ROIs by default';
+$string['showomerorois_desc'] = 'Automatically expands the right-hand panel and switches to its "ROIs" tab when a student opens the embed, so OMERO.iviewer\'s own Regions of Interest are visible immediately instead of hidden behind a collapsed panel. Purely a starting state - students can still collapse the panel or switch tabs themselves afterwards.';
 
 $string['annotationsheading'] = 'Student annotations';
 $string['annotationsheading_desc'] = 'A separate annotation layer (in development) let students mark up the slide themselves - independent of, and not visible in, OMERO\'s own ROI system.';
 $string['enableannotations'] = 'Enable student annotations';
 $string['enableannotations_desc'] = 'Turns on the annotation layer for the final student-facing embed only - never on the authoring tool\'s own live preview. While this is off (the default), embeds behave exactly as before, including OMERO.iviewer\'s own right-click ROI menu.';
+
+$string['annotationcolours'] = 'Annotation colours';
+$string['annotationcolours_desc'] = 'Which colours appear on the annotation toolbar\'s colour picker - choose up to {$a} in total. A teacher can choose a different set of up to {$a} for an individual embed in the authoring tool; this is just the default for embeds where they haven\'t.';
+$string['colour_e6194b'] = 'Red';
+$string['colour_3cb44b'] = 'Green';
+$string['colour_4363d8'] = 'Blue';
+$string['colour_f58231'] = 'Orange';
+$string['colour_911eb4'] = 'Purple';
+$string['colour_000000'] = 'Black';
+$string['colour_ffe119'] = 'Yellow';
+$string['colour_42d4f4'] = 'Cyan';
 
 $string['privacy:metadata:local_omeroembed_annotations'] = 'A point the student marked on a specific embedded OMERO slide.';
 $string['privacy:metadata:local_omeroembed_annotations:userid'] = 'The ID of the user who created the annotation.';
@@ -61,7 +69,7 @@ $string['privacy:metadata:local_omeroembed_annotations:colour'] = 'The colour th
 $string['privacy:metadata:local_omeroembed_annotations:label'] = 'An optional short note the student entered for this annotation.';
 $string['privacy:metadata:local_omeroembed_annotations:timecreated'] = 'The time the annotation was created.';
 
-$string['unknownsubject'] = 'No OMERO subject account is configured for "{$a}" - ask a Manager to check it under "OMERO slide embed settings" (or a Site administrator, under Site administration > Plugins > Local plugins > OMERO slide embed).';
+$string['unknownsubject'] = 'This embed\'s OMERO connection ("{$a}") no longer exists - it may have been deleted, or belong to a teacher who no longer has it. Whoever set up this embed will need to recreate it with a valid connection from "Manage your OMERO connections".';
 $string['omerologinfailed'] = 'Could not log in to OMERO as subject "{$a}" - check the configured username/password for this subject.';
 $string['omeroconnectionfailed'] = 'Could not reach the configured OMERO server.';
 $string['invalidproxypath'] = 'Refusing to proxy path "{$a}" - not in the allowed list.';
@@ -71,6 +79,24 @@ $string['authortitle'] = 'Embed an OMERO slide';
 $string['authorintro'] = 'Load a slide, write your text alongside it, and turn selected words into links that jump the slide to a specific saved view - no HTML or URLs to type by hand.';
 $string['choosesubject'] = 'Choose a subject account...';
 $string['subjectlabel'] = 'Subject account';
+$string['managesubjectslink'] = 'Manage your OMERO connections';
+
+$string['mysubjectstitle'] = 'My OMERO connections';
+$string['mysubjectsintro'] = 'These are your own OMERO service-account connections - only you can see or use them. Pick one from the "Subject account" dropdown when embedding a slide.';
+$string['nosubjectsyet'] = 'You haven\'t set up any OMERO connections yet - add one below.';
+$string['subjectnamelabel'] = 'Name';
+$string['subjectusernamelabel'] = 'OMERO username';
+$string['subjectpasswordlabel'] = 'OMERO password';
+$string['subjectpasswordlabeledit'] = 'OMERO password (leave blank to keep the current one)';
+$string['addsubjectheading'] = 'Add a connection';
+$string['editsubjectheading'] = 'Edit connection';
+$string['addsubject'] = 'Add connection';
+$string['savesubject'] = 'Save changes';
+$string['confirmdeletesubject'] = 'Delete this OMERO connection? Any embeds using it will stop working. This cannot be undone.';
+$string['subjectsaved'] = 'Connection saved.';
+$string['subjectdeleted'] = 'Connection deleted.';
+$string['backtoauthoring'] = 'Back to the authoring tool';
+$string['invalidsubjectform'] = 'A name, OMERO username, and (for a new connection) password are all required.';
 $string['imageidlabel'] = 'Image ID';
 $string['datasetidlabel'] = 'Dataset ID (optional)';
 $string['browsablelabel'] = 'Let students browse other images in this dataset';
@@ -97,19 +123,74 @@ $string['selectinsidewriteup'] = 'Select text inside the write-up box (not the s
 
 $string['omeroembed:managesettings'] = 'Manage OMERO slide embed settings (base URL, subject accounts, viewer overlays)';
 $string['omeroembed:annotate'] = 'Draw and delete your own point annotations on an embedded OMERO slide';
+$string['omeroembed:viewheatmap'] = 'Configure viewport tracking and view the resulting heatmap on an embedded OMERO slide';
 
 $string['invalidcolour'] = 'Invalid annotation colour "{$a}" - expected a hex string like #ff0000.';
 $string['invalidannotationtype'] = 'Invalid annotation type "{$a}".';
 $string['invalidradius'] = 'Invalid ellipse radius ({$a}) - both must be greater than zero.';
+$string['invalidpolygon'] = 'Invalid polygon points ({$a}) - expected a JSON array of at least 3 [x,y] pairs.';
 $string['invalidaction'] = 'Invalid action "{$a}".';
+$string['invalidgatherminutes'] = 'Invalid gather window ({$a}) - must be at least 1 minute.';
 
 $string['annotatetoolbar_point'] = 'Place a pin';
-$string['annotatetoolbar_ellipse'] = 'Draw an ellipse (hold Shift for a circle)';
-$string['annotatetoolbar_rectangle'] = 'Draw a rectangle (hold Shift for a square)';
+$string['annotatetoolbar_ellipse'] = 'Draw an ellipse (hold Shift, or use the lock button, for a circle)';
+$string['annotatetoolbar_rectangle'] = 'Draw a rectangle (hold Shift, or use the lock button, for a square)';
+$string['annotatetoolbar_polygon'] = 'Draw a free-form shape (click to place each point, click the first point again to finish, Esc or Cancel to stop)';
+$string['annotatetoolbar_constrain'] = 'Constrain to a circle/square';
+$string['annotatetoolbar_cancelpolygon'] = 'Cancel this shape';
 $string['annotatetoolbar_snapshot'] = 'Snapshot';
 $string['annotatetoolbar_delete'] = 'Delete';
 $string['annotatetoolbar_labelprompt'] = 'Add a short note for this annotation (optional):';
+$string['annotatetoolbar_help'] = 'Help with these tools';
+$string['annotatetoolbar_helptitle'] = 'Annotation tools';
+$string['annotatetoolbar_helpclose'] = 'Close';
 $string['managetitle'] = 'OMERO slide embed settings';
 $string['manageintro'] = 'The OMERO server, subject accounts, and embedded viewer appearance used across every course\'s "Embed an OMERO slide" tool - not specific to any one course.';
 $string['savechanges'] = 'Save changes';
 $string['settingssaved'] = 'Settings saved.';
+
+$string['trackingheading'] = 'Track student viewing (for heatmap)';
+$string['trackingheading_desc'] = 'Periodically records where each student\'s view is centred while they look at the final embed, so you can see an aggregate heatmap of what was actually looked at. Students see a small on-slide notice while this is on. Continues even if you navigate away from or close this page - it\'s driven entirely by this embed\'s own setting below, not by keeping this page open.';
+$string['gatherminuteslabel'] = 'Gather data for (minutes)';
+$string['starttracking'] = 'Start tracking';
+$string['stoptracking'] = 'Stop tracking';
+$string['trackingremaining'] = 'Tracking active - {$a} minute(s) remaining.';
+$string['trackingstarted'] = 'Tracking started.';
+$string['trackingstopped'] = 'Tracking stopped.';
+$string['viewheatmaplink'] = 'View heatmap';
+$string['trackingnotice'] = 'This view is recorded for teaching analytics.';
+
+$string['heatmaptitle'] = 'Student viewing heatmap';
+$string['heatmapnodata'] = 'This embed hasn\'t been opened via a "View heatmap" link yet, so there\'s nothing to configure here - follow that link either from the embed itself on a course page, or from the embed\'s authoring page.';
+$string['heatmaptrackingoff'] = 'Tracking is currently switched off for this embed - the heatmap below reflects only data gathered while it was previously on.';
+$string['heatmapgatheringended'] = 'Data gathering ended on {$a}.';
+$string['heatmapgatheringuntil'] = 'Currently gathering data until {$a}.';
+$string['downloaddata'] = 'Download data (CSV)';
+$string['downloadvideo'] = 'Frame-by-frame session generator';
+$string['framecount'] = '{$a} frame(s) of the session captured so far (a new one is added roughly every 5 minutes while tracking is active).';
+$string['deletedata'] = 'Delete gathered data';
+$string['confirmdeletedata'] = 'Delete all gathered viewing data for this embed? This also turns tracking off for it - start tracking again above if you want to gather fresh data later. This cannot be undone; download the data first if you still need it.';
+$string['datadeleted'] = '{$a} sample(s) deleted. Tracking has been turned off for this embed.';
+$string['retentionreminder'] = 'Gathered data older than {$a} is automatically deleted daily - download a copy above if you need to keep it longer.';
+$string['novideoframes'] = 'No video frames have been captured for this embed yet - they\'re only captured while tracking is active (roughly every 5 minutes), so check back once tracking has been running a little while.';
+$string['invalidgifframe'] = 'A captured video frame is corrupted and could not be processed.';
+$string['availableafterend'] = 'Available once tracking has ended - stop tracking above (or let it run out) to enable these.';
+$string['nodatarecorded'] = 'No data has been gathered for this embed yet, so there\'s nothing to download or delete.';
+$string['cannotdeletewhiletracking'] = 'Can\'t delete gathered data while tracking is still active - stop tracking above (or let it run out) first.';
+
+$string['retentionheading'] = 'Data retention';
+$string['retentionheading_desc'] = 'Applies to every embed\'s gathered heatmap viewing data, site-wide - regardless of any individual embed\'s own gather-window setting or a teacher manually deleting data early, samples older than this are automatically deleted by a daily scheduled task (Site administration > Server > Scheduled tasks > "{$a}"). Teachers should download any data they still need before it ages out.';
+$string['retentionperiod'] = 'Delete gathered data after';
+$string['retentionperiod_desc'] = 'How long a viewing sample is kept before the retention task deletes it.';
+
+$string['task_purgeviewsamples'] = 'Purge old heatmap viewing data';
+$string['task_captureheatmapframes'] = 'Capture heatmap video frames';
+
+$string['privacy:metadata:local_omeroembed_view_samples'] = 'One periodic sample of a student\'s viewport position on a tracked embedded OMERO slide, for the teacher heatmap feature.';
+$string['privacy:metadata:local_omeroembed_view_samples:userid'] = 'The ID of the user this sample belongs to.';
+$string['privacy:metadata:local_omeroembed_view_samples:courseid'] = 'The course the tracked embed belongs to.';
+$string['privacy:metadata:local_omeroembed_view_samples:embedid'] = 'The specific embed placement this sample was taken from.';
+$string['privacy:metadata:local_omeroembed_view_samples:x'] = 'The horizontal image-pixel position the student\'s view was centred on.';
+$string['privacy:metadata:local_omeroembed_view_samples:y'] = 'The vertical image-pixel position the student\'s view was centred on.';
+$string['privacy:metadata:local_omeroembed_view_samples:zoompercent'] = 'The zoom level the student was viewing at.';
+$string['privacy:metadata:local_omeroembed_view_samples:timecreated'] = 'The time the sample was recorded.';

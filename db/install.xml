@@ -27,5 +27,78 @@
         <INDEX NAME="embedid-userid" UNIQUE="false" FIELDS="embedid, userid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_omeroembed_embed_tracking" COMMENT="One row per embed placement that a teacher has configured viewport tracking (for the heatmap feature) on - see classes/tracking_repository.php. Stores no personal data itself (no userid) - the actual samples live in local_omeroembed_view_samples.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Course the embed belongs to"/>
+        <FIELD NAME="embedid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Per-placement token, same one local_omeroembed_annotations keys on"/>
+        <FIELD NAME="enabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Teacher's current on/off switch"/>
+        <FIELD NAME="trackinguntil" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Unix timestamp - samples only get recorded while enabled=1 AND time() is before this. Recomputed as time-of-save + gatherdays*86400 every time the teacher saves the tracking panel with tracking enabled."/>
+        <FIELD NAME="sourceurl" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="config.baseProxyUrl at the time tracking was last saved (see author.js) - the same base proxy.php URL (courseid/subject path plus images/dataset/browsable params) the real embed's own iframe src is built from. Nothing else records which OMERO subject/image an embedid points to (annotate.js/track.js run inside an already-loaded iviewer and never needed to), so heatmap.php needs this to build its own iframe."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="embedid" UNIQUE="true" FIELDS="embedid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_omeroembed_view_samples" COMMENT="Periodic viewport-position samples for the teacher heatmap feature - real personal data (see classes/privacy/provider.php). Only recorded while local_omeroembed_embed_tracking says tracking is enabled/not expired for that embedid, and never for a viewer with moodle/course:manageactivities (teachers/managers are excluded so their own browsing doesn't pollute the heatmap they're reading).">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="embedid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Whose viewport this sample is - the whole point of the heatmap, and why this table needs real privacy-API coverage"/>
+        <FIELD NAME="x" TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" SEQUENCE="false" COMMENT="Image-pixel x of the viewport centre - same coordinate convention as annotations.geometry"/>
+        <FIELD NAME="y" TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="zoompercent" TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" SEQUENCE="false" COMMENT="1/resolution*100, same formula author.js's readCurrentView() already uses"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="embedid-timecreated" UNIQUE="false" FIELDS="embedid, timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_omeroembed_heatmap_frames" COMMENT="Periodic server-side snapshots of the aggregate heatmap for one embed placement, captured by classes/task/capture_heatmap_frames.php while tracking is active - assembled into a downloadable animated GIF by video.php. A derived aggregate image with no userid column and no way to attribute any region to a specific student, so (like local_omeroembed_embed_tracking) this needs no privacy-provider coverage of its own.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="embedid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="framedata" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="Base64-encoded raw single-frame GIF bytes (classes/heatmap_renderer.php's own output) - plain LONGTEXT rather than the File API, same reasoning settings.php's own comment gives for why 'subjects' is a plain textarea: a small, short-lived artifact that doesn't need that machinery."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="embedid-timecreated" UNIQUE="false" FIELDS="embedid, timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_omeroembed_subjects" COMMENT="Teacher-owned OMERO service-account connections - see classes/subject_repository.php. Replaces the old site-wide settings.php 'subjects' admin textarea: each teacher manages their own named entries and never sees another's. The {subject} path segment in every proxy.php/author.php URL is this table's own id (globally unique), not the name - name is a pure UI label, never itself resolved from a URL (see omero_session.php's own comment on why: names are only unique per-owner, not globally).">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Owning teacher - rows are only ever read/edited/deleted with this checked against the current user, see subject_repository.php"/>
+        <FIELD NAME="name" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="Teacher's own label, e.g. 'oral_biology' - unique per-owner (see the userid-name index), not globally"/>
+        <FIELD NAME="omerousername" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="omeropassword" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="Encrypted via core\encryption::encrypt() - never stored or displayed in plain text, unlike the old admin textarea it replaces"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid-name" UNIQUE="true" FIELDS="userid, name"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

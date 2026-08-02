@@ -102,6 +102,21 @@ $path = optional_param('path', '/iviewer/', PARAM_PATH);
 // inject_contextmenu_blocker() (and future annotation-mode features) tell "the
 // teacher is previewing this" apart from "a student is viewing the real embed"
 // without needing two different proxy scripts.
+//
+// SECURITY: this is a bare request param, exactly like $heatmap below it -
+// capability-checked a few lines down for the identical reason $heatmap is
+// (see that variable's own comment). Confirmed as a real, exploitable gap
+// (not just theoretical): before this check existed, any student could
+// append &authoring=1 to their own embed's iframe src (visible via view-
+// source) and skip the entire `else if (!$authoring)` block below, which
+// is what runs inject_hide_roi_panel_css() (see that function's own
+// docblock - OMERO's native ROI *editing* panel, not read-only) plus the
+// context-menu blocker and view-tracking script. Gated on the exact same
+// capability author.php itself requires before it would ever legitimately
+// set this param (see that file's own require_capability() call) - a
+// student reaching this branch was never supposed to be possible in the
+// first place, this just makes the server actually enforce that instead
+// of trusting author.php to be the only thing that ever sets it.
 $authoring = optional_param('authoring', false, PARAM_BOOL);
 
 // Per-placement token minted by author.js's generateEmbed() (see
@@ -112,8 +127,26 @@ $authoring = optional_param('authoring', false, PARAM_BOOL);
 // which embed placement an annotation belongs to.
 $embedid = optional_param('embedid', '', PARAM_ALPHANUMEXT);
 
+// Set only on heatmap.php's own iframe src - a third mode alongside the
+// default (real student-facing embed) and $authoring, never combined with
+// either. Unlike $authoring (which relies entirely on author.php never
+// setting it on anything but its own preview), this one is capability-
+// checked right here, since heatmap.php is reachable directly by URL and
+// $heatmap=1 would otherwise expose the tracking-notice-free heatmap
+// render (see inject_heatmap_view_script()) to anyone who guessed the
+// query param.
+$heatmap = optional_param('heatmap', false, PARAM_BOOL);
+
 $course = get_course($courseid);
 require_login($course);
+
+if ($heatmap) {
+    require_capability('local/omeroembed:viewheatmap', context_course::instance($courseid));
+}
+
+if ($authoring) {
+    require_capability('moodle/course:manageactivities', context_course::instance($courseid));
+}
 
 if (!in_array_prefix($path, PROXY_PATH_PREFIXES)) {
     throw new \moodle_exception('invalidproxypath', 'local_omeroembed', '', $path);
@@ -277,6 +310,29 @@ if ($path === '/iviewer/') {
     $querystring = '?' . http_build_query($forwardparams, '', '&');
 }
 
+// The same "images/dataset/browsable" shape author.php's own $proxyurl
+// (config.baseProxyUrl, eventually stored as embed_tracking.sourceurl) is
+// built from - reconstructed here so inject_teacher_heatmap_link() below
+// can seed heatmap.php the first time a teacher follows it directly from
+// the real embed, without ever having gone through author.php's own "View
+// heatmap" link first. Deliberately excludes collapse_right/full_page/x/y/zm
+// (those are either derived from $browsable or genuinely per-view, not part
+// of the embed's own stable identity).
+$sourceurlforlink = '';
+if ($path === '/iviewer/') {
+    $sourceurlparams = [];
+    if ($images !== '') {
+        $sourceurlparams['images'] = $images;
+    }
+    if ($dataset !== '') {
+        $sourceurlparams['dataset'] = $dataset;
+    }
+    if ($browsable) {
+        $sourceurlparams['browsable'] = 1;
+    }
+    $sourceurlforlink = $proxybase . '?' . http_build_query($sourceurlparams, '', '&');
+}
+
 $targeturl = $baseurl . $path . $querystring;
 
 $session = omero_session::get_session($subject);
@@ -326,10 +382,38 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
     $rewritten = rewrite_response_urls($responsebody, $proxybase);
     if ($path === '/iviewer/' && str_contains($contenttype, 'text/html')) {
         $rewritten = inject_server_workaround($rewritten, $proxybase);
-        $rewritten = inject_overlay_hide_css($rewritten);
-        if (!$authoring) {
-            $rewritten = inject_contextmenu_blocker($rewritten);
-            $rewritten = inject_annotation_script($rewritten, $courseid, $embedid);
+
+        // Per-embed choice if the generating author.php baked one in,
+        // else the site admin default - see resolve_overlay_setting()'s
+        // own docblock for why an explicit param (even '0') always wins.
+        // Rotate isn't configurable at all (see inject_overlay_hide_css()'s
+        // own comment) - always hidden, not part of this loop.
+        $hideflags = [];
+        foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom'] as $key) {
+            $hideflags[$key] = resolve_overlay_setting($key);
+        }
+        $enableannotations = resolve_overlay_setting('enableannotations');
+        $annotationcolours = resolve_annotation_colours();
+        $showomerorois = resolve_overlay_setting('showomerorois');
+
+        $rewritten = inject_overlay_hide_css($rewritten, $hideflags);
+        $rewritten = inject_disable_rotate_interaction($rewritten);
+        if ($heatmap) {
+            // Its own mode, like $authoring - never combined with the
+            // context-menu blocker/annotate/tracking scripts below.
+            $rewritten = inject_heatmap_view_script($rewritten, $courseid, $embedid);
+        } else if (!$authoring) {
+            $rewritten = inject_contextmenu_blocker($rewritten, $enableannotations);
+            $rewritten = inject_annotation_script($rewritten, $courseid, $embedid, $enableannotations, $annotationcolours);
+            $rewritten = inject_tracking_script($rewritten, $courseid, $embedid);
+            $rewritten = inject_teacher_heatmap_link($rewritten, $courseid, $embedid, $sourceurlforlink);
+            // Unconditional - not gated behind $showomerorois, see this
+            // function's own docblock for why the risk it closes exists
+            // either way.
+            $rewritten = inject_hide_roi_panel_css($rewritten);
+            if ($showomerorois) {
+                $rewritten = inject_show_rois_script($rewritten);
+            }
         }
     }
     echo $rewritten;
@@ -444,36 +528,77 @@ function inject_server_workaround(string $body, string $proxybase): string {
 }
 
 /**
- * Hides whichever of iviewer's own on-image UI controls are configured to be
- * hidden (Site administration > Plugins > Local plugins > OMERO slide embed >
- * "Embedded viewer overlays") - for both the authoring tool's live preview and
- * the final student-facing embed, since both load through this same proxy.
- * Class names are OpenLayers' own standard control classes, not anything
- * OMERO-specific - found by inspecting the live viewer in a browser. Purely
- * cosmetic in every case except "hide zoom controls" (see its own setting
- * description) - a single combined CSS override is enough, no JS needed.
+ * Resolves one of the 6 overlay/annotation boolean settings (hideoverview,
+ * hideintensity, hidefullscreen, hidescaleline, hidezoom, enableannotations
+ * - rotate isn't one of these, see inject_overlay_hide_css()'s own comment
+ * for why) for the current request: an explicit per-embed value baked into
+ * the URL by author.php wins outright (even '0', overriding a site default
+ * of "on") - only when the param is genuinely absent (embeds generated
+ * before this feature existed) does the site admin's own setting apply,
+ * exactly as it always has.
+ *
+ * @param string $key
+ * @return bool
+ */
+function resolve_overlay_setting(string $key): bool {
+    $override = optional_param($key, null, PARAM_BOOL);
+    return $override ?? (bool) get_config('local_omeroembed', $key);
+}
+
+/**
+ * Same precedence idea as resolve_overlay_setting(), but for the
+ * annotation colour palette - a set rather than a single boolean, so it's
+ * its own function rather than another resolve_overlay_setting() call.
+ * annotationcolours is always baked into the URL explicitly by author.php
+ * (see that file's own comment) - absence means an embed generated before
+ * this feature existed, falling back to the site default exactly like
+ * every other setting here does. Either way, re-validated through
+ * annotations_repository::parse_colours() rather than trusted as-is - a
+ * request parameter is never more trustworthy just because it usually
+ * comes from author.php's own form.
+ *
+ * @return string[]
+ */
+function resolve_annotation_colours(): array {
+    $override = optional_param('annotationcolours', null, PARAM_RAW);
+    if ($override !== null) {
+        return \local_omeroembed\annotations_repository::parse_colours($override);
+    }
+    return \local_omeroembed\annotations_repository::parse_colours((string) get_config('local_omeroembed', 'annotationcolours'));
+}
+
+/**
+ * Hides whichever of iviewer's own on-image UI controls this embed (or, for
+ * embeds generated before that was possible, the site admin default - see
+ * resolve_overlay_setting()) has configured to be hidden - for both the
+ * authoring tool's live preview and the final student-facing embed, since
+ * both load through this same proxy. Class names are OpenLayers' own
+ * standard control classes, not anything OMERO-specific - found by
+ * inspecting the live viewer in a browser. Purely cosmetic in every case
+ * except "hide zoom controls" (see its own setting description) - a single
+ * combined CSS override is enough, no JS needed.
  *
  * @param string $body
+ * @param array<string, bool> $hideflags Keyed the same as the class map below, resolved by the caller.
  * @return string
  */
-function inject_overlay_hide_css(string $body): string {
+function inject_overlay_hide_css(string $body, array $hideflags): string {
     $classesbysetting = [
         'hideoverview' => '.ol-overviewmap',
-        'hiderotate' => '.ol-rotate',
         'hideintensity' => '.ol-intensity',
         'hidefullscreen' => '.ol-full-screen',
         'hidescaleline' => '.ol-scale-line',
         'hidezoom' => '.ol-zoom',
     ];
 
-    $selectors = [];
+    // Always hidden, not configurable - confirmed with the user: there's
+    // no way to actually control slide rotation from this embed anyway,
+    // so a control for it is just confusing clutter, never a real choice.
+    $selectors = ['.ol-rotate'];
     foreach ($classesbysetting as $setting => $selector) {
-        if (get_config('local_omeroembed', $setting)) {
+        if (!empty($hideflags[$setting])) {
             $selectors[] = $selector;
         }
-    }
-    if (!$selectors) {
-        return $body;
     }
 
     $style = '<style>' . implode(', ', $selectors) . ' { display: none !important; }</style>';
@@ -482,13 +607,204 @@ function inject_overlay_hide_css(string $body): string {
 }
 
 /**
+ * Hiding the rotate *control* above only hides its on-screen button - it
+ * does nothing about OpenLayers' own DragRotate *interaction*, which
+ * independently listens for shift+drag on the map itself and is active
+ * whether or not that control is visible. Confirmed with the user: the
+ * gesture itself should be blocked too, not just the button - rotation
+ * was never meant to be a real, usable feature here (same reasoning that
+ * already made the button permanently hidden). js/annotate.js's own
+ * redraw()/tryStartRotateDrag() rotation-compounding fix stays in place
+ * regardless, as a safety net for however rotation might still end up
+ * happening (a future OL update, a different input method, etc.) - this
+ * function is the primary mitigation, not a replacement for that one.
+ *
+ * OpenLayers' interaction classes are minified in the production bundle
+ * (constructor.name is meaningless, and no global `ol` reference is
+ * exposed to compare against with instanceof) - identified instead by
+ * `lastAngle_`, a property that only ever appears on DragRotate (it
+ * tracks the previous pointer angle to compute a rotation delta; no
+ * pan/zoom interaction has any use for an angle at all), confirmed
+ * against every interaction actually present in the live viewer.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_disable_rotate_interaction(string $body): string {
+    $script = <<<'JS'
+<script>
+(function() {
+    function init() {
+        var viewerEl = document.querySelector('ol3-viewer');
+        if (!viewerEl || !viewerEl.au || !viewerEl.au.controller) {
+            window.setTimeout(init, 300);
+            return;
+        }
+        var viewer = viewerEl.au.controller.viewModel.viewer;
+        if (!viewer || !viewer.viewer_) {
+            window.setTimeout(init, 300);
+            return;
+        }
+        var interactions = viewer.viewer_.getInteractions();
+        var toRemove = [];
+        interactions.forEach(function(i) {
+            if ('lastAngle_' in i) {
+                toRemove.push(i);
+            }
+        });
+        toRemove.forEach(function(i) {
+            interactions.remove(i);
+        });
+    }
+    init();
+})();
+</script>
+JS;
+
+    $withscript = preg_replace('#(</head>)#i', $script . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $script);
+}
+
+/**
+ * Hides every element that lets a student manually open iviewer's own
+ * right-hand ROI panel, on the final student-facing embed - unconditionally,
+ * not gated behind "Show OMERO ROIs by default" (see
+ * inject_show_rois_script()). The risk this closes exists regardless of
+ * that setting: without it, a student could open OMERO's own ROI
+ * *editing* panel directly - Save/Undo/Redo, Edit/Delete, a full drawing
+ * toolbar (see inject_show_rois_script()'s own docblock for why that
+ * panel is a real risk, not just clutter, and why this plugin can't offer
+ * a "browse-only" version of it instead - it's OMERO's native editor, not
+ * something built here that could be selectively stripped down).
+ *
+ * Two independent elements needed hiding here, confirmed live - hiding
+ * only the first isn't enough on its own:
+ * - `.collapse-right`, the panel's own expand/collapse toggle arrow.
+ * - `#col_splitter_right`, a *separate* draggable divider (cursor:
+ *   ew-resize) that resizes the panel by dragging - present and grabbable
+ *   even while the panel is fully collapsed (width 0), so a student could
+ *   still drag the panel open by its edge with the arrow itself hidden
+ *   and no click involved at all. (`.col-splitter` alone isn't a safe
+ *   selector - the same class also exists on a *different*, unrelated
+ *   left-hand splitter, confirmed live - hence the specific #id here.)
+ *
+ * Never applied to the authoring tool's own preview - a teacher
+ * legitimately might use this panel themselves while building an embed,
+ * with their own real OMERO permissions; this is specifically about
+ * closing off a student's manual access, not removing the panel outright.
+ *
+ * inject_show_rois_script()'s own programmatic `.click()` on
+ * `.collapse-right` still works perfectly fine once it's hidden this way -
+ * a dispatched click event doesn't check computed style before firing
+ * bound handlers, it only means there's no visible, clickable/draggable
+ * control left for a student to trigger it themselves. Like every other
+ * client-side control this plugin hides (hidezoom, the rotate
+ * interaction, etc.), this is a deterrent against casual/curious access
+ * via the ordinary UI, not a hard security boundary - a student who opens
+ * their browser's own dev tools could still call this element's .click()
+ * directly, the same way they always could work around any of this
+ * plugin's other client-side-only restrictions. The real access boundary
+ * is still whatever OMERO session/permissions the proxy is authenticated as.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_hide_roi_panel_css(string $body): string {
+    $style = '<style>.collapse-right, #col_splitter_right { display: none !important; }</style>';
+    $withstyle = preg_replace('#(</head>)#i', $style . '$1', $body, 1);
+    return $withstyle !== null ? $withstyle : ($body . $style);
+}
+
+/**
+ * Makes OMERO's native Regions of Interest render on the slide on page
+ * load, WITHOUT leaving the panel that draws them actually open. Briefly
+ * expands iviewer's own right-hand panel and switches it to the "ROIs"
+ * tab - confirmed live that both steps are needed to make the shapes
+ * render at all (expanding the panel alone lands on "Settings" with zero
+ * ROI shapes drawn) - then collapses the panel straight back, since the
+ * shapes themselves stay rendered on the canvas once drawn, independent
+ * of whether the panel that triggered the draw is still open (also
+ * confirmed live).
+ *
+ * The collapse-back-down step is not cosmetic: this right-hand panel is
+ * OMERO's own ROI *editing* UI, not a read-only viewer - it carries
+ * Save/Undo/Redo, Edit/Delete, per-row editable Comment fields, and a
+ * full drawing toolbar. Leaving it open would hand a student direct
+ * access to edit or delete the teacher's ROIs in OMERO itself, which is
+ * exactly what this plugin's whole reason for existing (a locked-down,
+ * read-only proxied embed) exists to prevent - confirmed as a real,
+ * user-reported problem, not a hypothetical: an earlier version of this
+ * function left the panel open once expanded, and that editing UI was
+ * genuinely visible/usable on the student-facing embed.
+ *
+ * Gated behind this embed's own (or, absent an override, the site
+ * default - see resolve_overlay_setting()) "Show OMERO ROIs by default"
+ * choice; only ever called for the real student-facing embed, never the
+ * authoring tool's own preview (the teacher already has full manual
+ * control over the iviewer menu while building the embed) or the heatmap
+ * view (a static overlay page, unrelated to this panel).
+ *
+ * `a[href="#rois"]` is the stable selector for the tab itself - its
+ * visible text includes a "[N]" ROI count that varies per image (and was
+ * confirmed fragile during investigation: matching literal text like
+ * "ROIs [10]" would break for any image with a different count), but the
+ * href fragment never changes. The panel's collapsed/expanded state isn't
+ * reflected in its class list (`right-hand-panel sidebar au-target`
+ * either way) - only in its own width (0 when collapsed, confirmed live).
+ * `wasCollapsed` is captured once, before either click, so a panel some
+ * other future change had already left open by default is (a) not
+ * collapsed to trigger the render, and (b) not collapsed again
+ * afterwards either - this function only ever restores whatever state it
+ * found, it never forces the panel shut on someone else's behalf.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_show_rois_script(string $body): string {
+    $script = <<<'JS'
+<script>
+(function() {
+    function init() {
+        var roiTab = document.querySelector('a[href="#rois"]');
+        if (!roiTab) {
+            window.setTimeout(init, 300);
+            return;
+        }
+        var panel = document.querySelector('.right-hand-panel');
+        var wasCollapsed = !!(panel && panel.offsetWidth === 0);
+        var toggle = document.querySelector('.collapse-right');
+        if (wasCollapsed && toggle) {
+            toggle.click();
+        }
+        roiTab.click();
+        // The shapes take a moment to actually render onto the canvas once
+        // the tab is activated - collapsing immediately in the same tick
+        // risks racing that render, so this waits a beat before restoring
+        // the panel to whatever state it found it in.
+        window.setTimeout(function() {
+            if (wasCollapsed && toggle) {
+                toggle.click();
+            }
+        }, 300);
+    }
+    init();
+})();
+</script>
+JS;
+
+    $withscript = preg_replace('#(</head>)#i', $script . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $script);
+}
+
+/**
  * Suppresses iviewer's own right-click ROI context menu on the final
- * student-facing embed, gated behind the (currently off-by-default)
- * "Enable student annotations" setting - prep for a student annotation UI
+ * student-facing embed, gated behind this embed's own (or, absent an
+ * override, the site default - see resolve_overlay_setting())
+ * "Enable student annotations" choice - prep for a student annotation UI
  * that will take the right-click gesture over; inert (never called) while
- * that setting is off, and never applied to the authoring tool's own live
- * preview regardless (see $authoring in this file's main dispatch), so
- * teachers keep OMERO's normal ROI menu while building an embed.
+ * that's off, and never applied to the authoring tool's own live preview
+ * regardless (see $authoring in this file's main dispatch), so teachers
+ * keep OMERO's normal ROI menu while building an embed.
  *
  * iviewer is built with Aurelia, whose `.trigger`/`.delegate` binding
  * commands only ever attach bubble-phase listeners (confirmed against the
@@ -500,10 +816,11 @@ function inject_overlay_hide_css(string $body): string {
  * iviewer's own app bundle (loaded later, in <body>) finishes initialising.
  *
  * @param string $body
+ * @param bool $enableannotations
  * @return string
  */
-function inject_contextmenu_blocker(string $body): string {
-    if (!get_config('local_omeroembed', 'enableannotations')) {
+function inject_contextmenu_blocker(string $body, bool $enableannotations): string {
+    if (!$enableannotations) {
         return $body;
     }
 
@@ -522,17 +839,26 @@ function inject_contextmenu_blocker(string $body): string {
  * Requires $embedid to be non-empty - embeds generated before this feature
  * existed have no token (see author.js's generateEmbed()) and simply don't
  * get the annotation layer rather than erroring. Gated the same way as
- * inject_contextmenu_blocker() (see its own docblock for why): behind the
- * "Enable student annotations" setting, and only ever on the final embed,
- * never the authoring tool's own live preview.
+ * inject_contextmenu_blocker() (see its own docblock for why): behind this
+ * embed's own (or the site default) "Enable student annotations" choice,
+ * and only ever on the final embed, never the authoring tool's own live
+ * preview.
  *
  * @param string $body
  * @param int $courseid
  * @param string $embedid
+ * @param bool $enableannotations
+ * @param string[] $annotationcolours Already resolved/validated by resolve_annotation_colours().
  * @return string
  */
-function inject_annotation_script(string $body, int $courseid, string $embedid): string {
-    if (!get_config('local_omeroembed', 'enableannotations') || $embedid === '') {
+function inject_annotation_script(
+    string $body,
+    int $courseid,
+    string $embedid,
+    bool $enableannotations,
+    array $annotationcolours
+): string {
+    if (!$enableannotations || $embedid === '') {
         return $body;
     }
 
@@ -541,13 +867,20 @@ function inject_annotation_script(string $body, int $courseid, string $embedid):
         'embedid' => $embedid,
         'sesskey' => sesskey(),
         'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+        'colours' => $annotationcolours,
         'strings' => [
             'placepin' => get_string('annotatetoolbar_point', 'local_omeroembed'),
             'drawellipse' => get_string('annotatetoolbar_ellipse', 'local_omeroembed'),
             'drawrectangle' => get_string('annotatetoolbar_rectangle', 'local_omeroembed'),
+            'drawpolygon' => get_string('annotatetoolbar_polygon', 'local_omeroembed'),
+            'constrainshape' => get_string('annotatetoolbar_constrain', 'local_omeroembed'),
+            'cancelpolygon' => get_string('annotatetoolbar_cancelpolygon', 'local_omeroembed'),
             'snapshot' => get_string('annotatetoolbar_snapshot', 'local_omeroembed'),
             'delete' => get_string('annotatetoolbar_delete', 'local_omeroembed'),
             'labelprompt' => get_string('annotatetoolbar_labelprompt', 'local_omeroembed'),
+            'help' => get_string('annotatetoolbar_help', 'local_omeroembed'),
+            'helptitle' => get_string('annotatetoolbar_helptitle', 'local_omeroembed'),
+            'helpclose' => get_string('annotatetoolbar_helpclose', 'local_omeroembed'),
         ],
     ];
     $configscript = '<script id="omero-annotate-config" type="application/json">'
@@ -556,4 +889,187 @@ function inject_annotation_script(string $body, int $courseid, string $embedid):
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
+}
+
+/**
+ * Injects js/track.js (the heatmap feature's periodic viewport sampler)
+ * into the final student-facing embed. Requires $embedid to be non-empty,
+ * and re-checks every one of the conditions that actually determine
+ * whether sampling should happen at all, rather than relying on ajax.php's
+ * action=sample to be the only thing enforcing them - if a teacher never
+ * sees the notice/script in the first place, there's nothing for ajax.php
+ * to even need to reject.
+ *
+ * The on-slide notice itself (confirmed with the user - students should
+ * see this, not have it happen silently) is deliberately NOT injected here
+ * as static HTML - confirmed live that iviewer's Aurelia app replaces
+ * <body>'s contents once it hydrates, which silently wiped a first attempt
+ * at doing exactly that. track.js builds and appends the notice element
+ * itself instead, in JS, the same way annotate.js builds its own overlay
+ * canvas/toolbar - only after the real viewer is confirmed ready, so it
+ * survives Aurelia's own render pass. The notice text travels down via
+ * config.noticeText below.
+ *
+ * Never applied when $heatmap is set (see inject_heatmap_view_script(),
+ * called instead in that case) or on the authoring tool's own live preview.
+ *
+ * @param string $body
+ * @param int $courseid
+ * @param string $embedid
+ * @return string
+ */
+function inject_tracking_script(string $body, int $courseid, string $embedid): string {
+    if ($embedid === '' || !\local_omeroembed\tracking_repository::is_active($embedid)) {
+        return $body;
+    }
+
+    // A teacher/manager casually opening the real embed (not through
+    // heatmap.php) shouldn't see the tracking notice or generate samples
+    // of their own browsing - see ajax.php's action=sample for the actual
+    // enforcement point this mirrors, so a teacher never even sees the
+    // notice appear only for it to silently do nothing.
+    $context = context_course::instance($courseid);
+    if (has_capability('moodle/course:manageactivities', $context)) {
+        return $body;
+    }
+
+    $config = [
+        'courseid' => $courseid,
+        'embedid' => $embedid,
+        'sesskey' => sesskey(),
+        'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+        'noticeText' => get_string('trackingnotice', 'local_omeroembed'),
+    ];
+    $configscript = '<script id="omero-track-config" type="application/json">'
+        . json_encode($config) . '</script>';
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/track.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
+}
+
+/**
+ * Injects js/heatmap-view.js into a heatmap.php-driven load of the slide
+ * (see the $heatmap dispatch branch above) - a teacher-only rendering mode,
+ * entirely separate from the student-facing annotate/track scripts (never
+ * combined with them). $heatmap already required
+ * local/omeroembed:viewheatmap at the point it was read, near the top of
+ * this file, so no further capability check is needed here.
+ *
+ * @param string $body
+ * @param int $courseid
+ * @param string $embedid
+ * @return string
+ */
+function inject_heatmap_view_script(string $body, int $courseid, string $embedid): string {
+    $config = [
+        'courseid' => $courseid,
+        'embedid' => $embedid,
+        'sesskey' => sesskey(),
+        'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+    ];
+    $configscript = '<script id="omero-heatmap-config" type="application/json">'
+        . json_encode($config) . '</script>';
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/heatmap-view.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
+}
+
+/**
+ * Injects a small "View heatmap" link directly into the final student-
+ * facing embed, visible only to viewers with local/omeroembed:viewheatmap
+ * (teachers/editingteachers) - lets a teacher jump straight to heatmap.php
+ * for this exact embed from wherever it's actually shown on a course page,
+ * without having to open the authoring tool first. $sourceurlforlink lets
+ * heatmap.php bootstrap itself (see that file's own $sourceurlparam
+ * comment) even if this is genuinely the first time anyone has ever
+ * followed a link there for this embedid.
+ *
+ * Requires $embedid to be non-empty (older embeds from before the heatmap
+ * feature existed have no token to link with) - simply not injected
+ * rather than erroring, same convention inject_annotation_script()/
+ * inject_tracking_script() already use.
+ *
+ * Appended via a small inline script, polling until iviewer's own JS app
+ * has settled, rather than spliced as static HTML before </body> - a
+ * static tag there is silently wiped, confirmed live: iviewer rebuilds
+ * document.body itself during its own startup, same reason
+ * annotate.js/heatmap-view.js/track.js all defensively poll for the real
+ * viewer element instead of assuming anything about the initial markup
+ * survives.
+ *
+ * @param string $body
+ * @param int $courseid
+ * @param string $embedid
+ * @param string $sourceurlforlink
+ * @return string
+ */
+function inject_teacher_heatmap_link(string $body, int $courseid, string $embedid, string $sourceurlforlink): string {
+    if ($embedid === '') {
+        return $body;
+    }
+    if (!has_capability('local/omeroembed:viewheatmap', context_course::instance($courseid))) {
+        return $body;
+    }
+
+    $heatmapurl = new \moodle_url('/local/omeroembed/heatmap.php', [
+        'courseid' => $courseid,
+        'embedid' => $embedid,
+        'sourceurl' => $sourceurlforlink,
+        // SECURITY: heatmap.php's own first-visit branch requires this -
+        // see that file's own comment on why a plain link with no sesskey
+        // would otherwise let anyone who gets a teacher to click a crafted
+        // URL plant an arbitrary external iframe src.
+        'sesskey' => sesskey(),
+    ]);
+
+    $config = [
+        'href' => $heatmapurl->out(false),
+        'label' => get_string('viewheatmaplink', 'local_omeroembed'),
+    ];
+    $configscript = '<script id="omero-teacher-heatmap-link-config" type="application/json">'
+        . json_encode($config) . '</script>';
+
+    // Same defensive-poll idiom as annotate.js's findViewer()/init() -
+    // waits for the real ol3-viewer element (a reliable "the app has
+    // finished its own DOM setup" signal) before appending, rather than
+    // a fixed delay guess.
+    $script = <<<'JS'
+<script>
+(function() {
+    var configEl = document.getElementById('omero-teacher-heatmap-link-config');
+    var config = configEl ? JSON.parse(configEl.textContent) : null;
+    if (!config) {
+        return;
+    }
+    function init() {
+        if (!document.querySelector('ol3-viewer') || document.getElementById('omero-teacher-heatmap-link')) {
+            window.setTimeout(init, 300);
+            return;
+        }
+        var link = document.createElement('a');
+        link.id = 'omero-teacher-heatmap-link';
+        link.href = config.href;
+        link.target = '_blank';
+        link.textContent = config.label;
+        // Bottom, not top - top-right collides with OMERO's own
+        // File/ROIs/Help toolbar (confirmed live: the link rendered but
+        // was visually swallowed by the toolbar's own blue bar, same
+        // stacking area). Centred horizontally rather than pinned to
+        // bottom-left, since iviewer renders its own small corner control
+        // in both bottom corners (confirmed live) - the middle is the one
+        // stretch of the bottom edge iviewer doesn't already use.
+        link.style.cssText = 'position:fixed; bottom:0.5rem; left:50%; transform:translateX(-50%); z-index:1000; '
+            + 'background:rgba(0,0,0,0.65); color:#fff; font-size:0.75rem; padding:0.3rem 0.6rem; '
+            + 'border-radius:4px; font-family:sans-serif; text-decoration:none; white-space:nowrap;';
+        document.body.appendChild(link);
+    }
+    init();
+})();
+</script>
+JS;
+
+    $withscript = preg_replace('#(</head>)#i', $configscript . $script . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $script);
 }

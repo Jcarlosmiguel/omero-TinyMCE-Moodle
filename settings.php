@@ -24,6 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+use local_omeroembed\annotations_repository;
+
 // Local plugins don't get an automatic settings page the way e.g. filter plugins
 // do - $settings has to be created and added to the tree explicitly here, gated
 // on $hassiteconfig (whether the current user has moodle/site:config), matching
@@ -41,25 +43,10 @@ if ($hassiteconfig) {
         PARAM_URL
     ));
 
-    // One "subject_key|username|password" triple per line - the simplest storage
-    // shape that still lets author.php's subject dropdown (and the resulting
-    // proxy.php requests) select which service-account credentials to
-    // authenticate with. A dedicated DB-table-backed admin UI (add/edit/delete
-    // rows individually) would be friendlier for managing many subjects, but
-    // adds install.xml/DB schema and a custom admin page - deliberately avoided
-    // here in favour of minimal plugin footprint (see the project's own plan
-    // doc on why that matters for review).
-    //
-    // Note: like every other Moodle config value, this is stored in mdl_config_plugins
-    // as plain text, not encrypted at rest - the same as any other Moodle plugin
-    // storing a third-party service credential (e.g. an API key) in $CFG-backed config.
-    $settings->add(new admin_setting_configtextarea(
-        'local_omeroembed/subjects',
-        get_string('subjects', 'local_omeroembed'),
-        get_string('subjects_desc', 'local_omeroembed'),
-        '',
-        PARAM_RAW
-    ));
+    // OMERO service-account credentials moved from here to teacher-owned,
+    // encrypted-at-rest rows each teacher manages themselves via
+    // mysubjects.php (see db/install.xml's own comment on
+    // local_omeroembed_subjects) - no admin setting for this any more.
 
     // iviewer's own UI controls, individually hideable - see proxy.php's
     // inject_overlay_hide_css() for how these are actually applied (a single
@@ -68,6 +55,12 @@ if ($hassiteconfig) {
     // student-facing embed, since both load through this same proxy). Class
     // names are OpenLayers' own standard control classes, found by inspecting
     // the live viewer in a browser - not anything OMERO-specific.
+    //
+    // These are now just the *defaults* - author.php lets a teacher
+    // override any of them per embed (see that file's own overlaysheading
+    // fieldset and proxy.php's resolve_overlay_setting()). These settings
+    // still apply as-is to every embed generated before that existed, and
+    // seed the pre-checked state a teacher sees when building a new one.
     $settings->add(new admin_setting_heading(
         'local_omeroembed/overlaysheading',
         get_string('overlaysheading', 'local_omeroembed'),
@@ -80,12 +73,11 @@ if ($hassiteconfig) {
         get_string('hideoverview_desc', 'local_omeroembed'),
         1
     ));
-    $settings->add(new admin_setting_configcheckbox(
-        'local_omeroembed/hiderotate',
-        get_string('hiderotate', 'local_omeroembed'),
-        get_string('hiderotate_desc', 'local_omeroembed'),
-        1
-    ));
+    // No "hide rotate control" setting - the rotate control is always
+    // hidden, unconditionally, in proxy.php's inject_overlay_hide_css() -
+    // there's no way to actually control slide rotation from this embed
+    // anyway, so a toggle for it would just be confusing, never a real
+    // choice.
     $settings->add(new admin_setting_configcheckbox(
         'local_omeroembed/hideintensity',
         get_string('hideintensity', 'local_omeroembed'),
@@ -110,6 +102,15 @@ if ($hassiteconfig) {
         get_string('hidezoom_desc', 'local_omeroembed'),
         0
     ));
+    // Off by default - OMERO's own ROI panel stays exactly as it is today
+    // (collapsed) unless a teacher opts an embed into this. See proxy.php's
+    // inject_show_rois_script() for what enabling it actually does.
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/showomerorois',
+        get_string('showomerorois', 'local_omeroembed'),
+        get_string('showomerorois_desc', 'local_omeroembed'),
+        0
+    ));
 
     // Off by default - see proxy.php's inject_contextmenu_blocker() for what
     // this actually does once enabled (suppresses iviewer's own right-click
@@ -127,5 +128,44 @@ if ($hassiteconfig) {
         get_string('enableannotations', 'local_omeroembed'),
         get_string('enableannotations_desc', 'local_omeroembed'),
         0
+    ));
+
+    // The site-wide default palette - a teacher can choose a different set
+    // of up to annotations_repository::MAX_COLOURS for an individual embed
+    // in author.php (see that file's own comment); this is only what a
+    // freshly-generated embed starts with until they do. Always a subset
+    // of COLOUR_PALETTE, never an arbitrary hex value - see
+    // parse_colours()'s own docblock for why.
+    $settings->add(new admin_setting_configmulticheckbox(
+        'local_omeroembed/annotationcolours',
+        get_string('annotationcolours', 'local_omeroembed'),
+        get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
+        // admin_setting_configmulticheckbox's own write_setting()/output_html()
+        // expect this keyed by the same option value as $choices below
+        // (checks !empty($default[$key])), not a plain indexed list.
+        array_fill_keys(annotations_repository::DEFAULT_COLOURS, 1),
+        annotations_repository::get_colour_choices()
+    ));
+
+    // Applies to the heatmap feature's local_omeroembed_view_samples table
+    // only - regardless of any individual embed's own gather-hours window
+    // (see author.php's tracking panel) or a teacher manually deleting data
+    // early (see heatmap.php's delete button), this is the absolute cap
+    // that keeps that table from growing unbounded. Enforced by a daily
+    // scheduled task (classes/task/purge_view_samples.php, see
+    // db/tasks.php) - not applied retroactively/instantly on save, so a
+    // change here takes effect at the task's next scheduled run.
+    $settings->add(new admin_setting_heading(
+        'local_omeroembed/retentionheading',
+        get_string('retentionheading', 'local_omeroembed'),
+        get_string('retentionheading_desc', 'local_omeroembed', get_string('task_purgeviewsamples', 'local_omeroembed'))
+    ));
+
+    $settings->add(new admin_setting_configduration(
+        'local_omeroembed/retentionperiod',
+        get_string('retentionperiod', 'local_omeroembed'),
+        get_string('retentionperiod_desc', 'local_omeroembed'),
+        30 * DAYSECS,
+        DAYSECS
     ));
 }

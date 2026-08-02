@@ -158,6 +158,76 @@
         return checked ? checked.value : config.layout;
     }
 
+    // Matches author.php's own $overlaysettings key list (proxy.php's
+    // resolve_overlay_setting() is the actual precedence logic - this just
+    // needs to read whatever the teacher currently has checked).
+    var OVERLAY_KEYS = [
+        'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
+    ];
+
+    /**
+     * Same "read the live DOM, not a stale config snapshot" idea as
+     * currentLayout() above, for width/height/overlay-checkboxes/colour-
+     * swatches - all plain form fields that, unlike subject/image/dataset
+     * (which genuinely need a server round trip via "Load slide" to load a
+     * different image), only need their current value read at the moment
+     * the embed is actually generated. Confirmed as a real bug: generateEmbed()
+     * used to build the final iframe src from config.baseProxyUrl, which is
+     * a PHP string computed once at the last page load/"Load slide" submit -
+     * changing a colour swatch or overlay checkbox afterwards and clicking
+     * Insert/Generate straight away silently kept the old values, since
+     * that button never resubmits the form.
+     *
+     * @return {string}
+     */
+    function currentWidth() {
+        var input = document.querySelector('input[name="width"]');
+        return (input && input.value) ? input.value : config.maxWidth;
+    }
+
+    /** @return {string} */
+    function currentHeight() {
+        var input = document.querySelector('input[name="height"]');
+        if (input && input.value) {
+            return input.value;
+        }
+        return document.getElementById(config.iframeId).style.height;
+    }
+
+    /** @return {object} key => boolean, only for checkboxes actually present on the page. */
+    function currentOverlaySettings() {
+        var settings = {};
+        OVERLAY_KEYS.forEach(function(key) {
+            var checkbox = document.querySelector('input[type="checkbox"][name="' + key + '"]');
+            if (checkbox) {
+                settings[key] = checkbox.checked;
+            }
+        });
+        return settings;
+    }
+
+    /**
+     * @return {?string[]} Selected colours' real mixed-case hex values (read
+     *                     from each checkbox's own data-hex - see author.php's
+     *                     comment on why not reconstructed from the name
+     *                     attribute), or null if the colour picker isn't on
+     *                     this page at all (an embed generated before this
+     *                     feature existed would still have none of this).
+     */
+    function currentColours() {
+        var container = document.getElementById('omero-annotation-colours');
+        if (!container) {
+            return null;
+        }
+        return Array.prototype.slice.call(container.querySelectorAll('input[type="checkbox"]'))
+            .filter(function(cb) {
+                return cb.checked;
+            })
+            .map(function(cb) {
+                return cb.getAttribute('data-hex');
+            });
+    }
+
     /**
      * Switches between "slide+write-up side by side" and "slide only" purely in
      * the DOM - no form submission, no page reload. Reloading to apply a layout
@@ -271,13 +341,24 @@
     }
 
     function generateEmbed() {
-        var iframe = document.getElementById(config.iframeId);
         var layout = currentLayout();
+        var height = currentHeight();
 
         // The live preview iframe's own src never changes (see setOpeningView()
         // above) - the opening view, if any, is applied here instead, at the
         // point the embed is actually generated.
         var iframeSrcUrl = new URL(openingView ? buildViewUrl(openingView) : config.baseProxyUrl, window.location.href);
+        // Overlay checkboxes/colour swatches, re-read live rather than trusted
+        // from config.baseProxyUrl - see currentWidth()'s own comment above
+        // for why (this is the actual fix for that bug).
+        var overlaySettings = currentOverlaySettings();
+        Object.keys(overlaySettings).forEach(function(key) {
+            iframeSrcUrl.searchParams.set(key, overlaySettings[key] ? '1' : '0');
+        });
+        var colours = currentColours();
+        if (colours !== null) {
+            iframeSrcUrl.searchParams.set('annotationcolours', colours.join(','));
+        }
         // Lets proxy.php's inject_annotation_script() (see its own docblock)
         // know which embed placement this is - see getOrMintAnnotateId()'s
         // own comment for why this has to be stable across re-edits.
@@ -287,7 +368,7 @@
         // id (in addition to the existing name) gives the reset button in
         // the textbelow layout below a stable, unique target to reload -
         // important once a page/question has more than one embed.
-        var iframeHtml = '<iframe id="' + config.iframeName + '" style="width: 100%; height: ' + iframe.style.height + ';" src="' +
+        var iframeHtml = '<iframe id="' + config.iframeName + '" style="width: 100%; height: ' + height + ';" src="' +
             iframeSrc + '" name="' + config.iframeName + '"></iframe>';
 
         var inner;
@@ -325,7 +406,7 @@
             var cells = layout === 'slideright' ? (writeupCell + '\n      ' + slideCell)
                 : (slideCell + '\n      ' + writeupCell);
 
-            inner = '<table style="width: 100%; height: ' + iframe.style.height + ';" cellspacing="1" cellpadding="10">\n' +
+            inner = '<table style="width: 100%; height: ' + height + ';" cellspacing="1" cellpadding="10">\n' +
                 '  <tbody>\n    <tr>\n      ' + cells + '\n    </tr>\n  </tbody>\n</table>';
         }
 
@@ -340,7 +421,7 @@
         // readExistingEmbed()) so re-editing reuses getOrMintAnnotateId()'s
         // token instead of minting a fresh one.
         var html = '<div data-omero-embed="1" data-omero-annotate-id="' + getOrMintAnnotateId()
-            + '" style="max-width: ' + config.maxWidth + ';">\n  ' + inner + '\n</div>';
+            + '" style="max-width: ' + currentWidth() + ';">\n  ' + inner + '\n</div>';
 
         if (config.embedded) {
             // Handed off to the tiny_omeroembed TinyMCE plugin's modal (see

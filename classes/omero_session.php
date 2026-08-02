@@ -52,8 +52,10 @@ class omero_session {
      * given subject's OMERO service account - from cache if still fresh, otherwise by
      * logging in to OMERO.web now.
      *
-     * @param string $subject Subject key, as used in {omero:ID:SUBJECT} and the
-     *                         admin settings textarea.
+     * @param string $subject A local_omeroembed_subjects.id, or (permanently,
+     *                         for backward compatibility) an old-style plain
+     *                         name - see get_credentials_for_subject()'s own
+     *                         docblock.
      * @param bool $forcerefresh Skip the cache entirely and log in fresh, even if a
      *                            cached session would otherwise still look valid by
      *                            SESSION_TTL_SECONDS alone. Used by proxy.php to
@@ -85,49 +87,34 @@ class omero_session {
     }
 
     /**
-     * Lists every configured subject key (never their credentials) - used to populate
-     * the subject dropdown on author.php. Public and safe to call from a page that
-     * only needs to know which subjects exist, not authenticate as one.
+     * Looks up a subject's OMERO username/password - $subject is the
+     * {subject} path segment from proxy.php/author.php's own URLs, which
+     * means one of two things (see subject_repository.php's own docblock
+     * and db/install.xml's comment on local_omeroembed_subjects for the
+     * full reasoning):
      *
-     * @return string[]
-     */
-    public static function get_subject_keys(): array {
-        $raw = (string) get_config('local_omeroembed', 'subjects');
-        $keys = [];
-        foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                continue;
-            }
-            $parts = explode('|', $line, 3);
-            if (count($parts) === 3) {
-                $keys[] = trim($parts[0]);
-            }
-        }
-        return $keys;
-    }
-
-    /**
-     * Looks up a subject's OMERO username/password from the admin settings textarea
-     * (one "subject_key|username|password" line per subject - see settings.php).
+     * - A local_omeroembed_subjects.id (purely numeric) - the current
+     *   scheme, for every subject created via mysubjects.php.
+     * - A plain string name - the *old* site-wide admin-list key, frozen
+     *   into any embed pasted into course content before this table
+     *   existed. Permanently supported as a fallback (matches any owner,
+     *   via subject_repository::get_credentials_by_legacy_name()) so
+     *   nothing already pasted anywhere ever breaks, even though nothing
+     *   new is ever created this way again.
      *
      * @param string $subject
      * @return array{username: string, password: string}
-     * @throws \moodle_exception If the subject key isn't configured.
+     * @throws \moodle_exception If $subject doesn't resolve either way.
      */
     protected static function get_credentials_for_subject(string $subject): array {
-        $raw = (string) get_config('local_omeroembed', 'subjects');
-        foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                continue;
-            }
-            $parts = explode('|', $line, 3);
-            if (count($parts) === 3 && trim($parts[0]) === $subject) {
-                return ['username' => trim($parts[1]), 'password' => trim($parts[2])];
-            }
+        $credentials = ctype_digit($subject)
+            ? \local_omeroembed\subject_repository::get_credentials_by_id((int) $subject)
+            : \local_omeroembed\subject_repository::get_credentials_by_legacy_name($subject);
+
+        if ($credentials === null) {
+            throw new \moodle_exception('unknownsubject', 'local_omeroembed', '', $subject);
         }
-        throw new \moodle_exception('unknownsubject', 'local_omeroembed', '', $subject);
+        return $credentials;
     }
 
     /**

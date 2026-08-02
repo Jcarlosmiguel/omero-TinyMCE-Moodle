@@ -30,7 +30,8 @@
 
 require(__DIR__ . '/../../config.php');
 
-use local_omeroembed\omero_session;
+use local_omeroembed\subject_repository;
+use local_omeroembed\annotations_repository;
 
 $courseid = optional_param('courseid', 0, PARAM_INT);
 $contextid = optional_param('contextid', 0, PARAM_INT);
@@ -66,6 +67,43 @@ if ($dataset === 0) {
     $dataset = '';
 }
 $browsable = optional_param('browsable', 0, PARAM_BOOL);
+
+// Per-embed overrides of the site-wide overlay/annotation defaults (Site
+// administration > Plugins > Local plugins > OMERO slide embed) - null
+// means "not yet chosen" (first visit to this form), in which case the
+// checkbox below pre-checks from the site default; once anything is
+// submitted, that value round-trips through the setup form's own
+// GET-resubmit exactly like $browsable already does. Always written into
+// $proxyparams as an explicit 1/0 further down (never omitted) - see
+// proxy.php's resolve_overlay_setting() for why that matters.
+// Rotate isn't included - always hidden, not a real choice (see
+// proxy.php's inject_overlay_hide_css() for why).
+$overlaysettings = [];
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations'] as $key) {
+    $submitted = optional_param($key, null, PARAM_BOOL);
+    $overlaysettings[$key] = $submitted ?? (bool) get_config('local_omeroembed', $key);
+}
+
+// Same round-trip idea as $overlaysettings above, but for a *set* rather
+// than independent booleans - colours_submitted (a plain hidden field,
+// not per-checkbox) is what distinguishes "first visit, nothing chosen
+// yet" from "resubmitted with everything intentionally unchecked",
+// since a set of 8 individual null-vs-bool checks can't tell those apart
+// on its own the way a single boolean's null can.
+$coloursformsubmitted = optional_param('colours_submitted', 0, PARAM_BOOL);
+if ($coloursformsubmitted) {
+    $overlaycolours = [];
+    foreach (annotations_repository::COLOUR_PALETTE as $hex) {
+        $overlaycolours[$hex] = (bool) optional_param('colour_' . strtolower(ltrim($hex, '#')), 0, PARAM_BOOL);
+    }
+} else {
+    $sitedefaultcolours = annotations_repository::parse_colours((string) get_config('local_omeroembed', 'annotationcolours'));
+    $overlaycolours = array_fill_keys(annotations_repository::COLOUR_PALETTE, false);
+    foreach ($sitedefaultcolours as $hex) {
+        $overlaycolours[$hex] = true;
+    }
+}
+
 $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
 // Default matches the actual measured width of this Moodle instance's own
 // content column (mod/page's #region-main, ~814px at a 1920px window) - NOT
@@ -101,7 +139,7 @@ $PAGE->set_pagelayout($embedded ? 'popup' : 'course');
 $PAGE->set_title(get_string('authortitle', 'local_omeroembed'));
 $PAGE->set_heading($course->fullname);
 
-$subjectkeys = omero_session::get_subject_keys();
+$mysubjects = subject_repository::get_for_user($USER->id);
 $hasslide = ($subject !== '') && ($images !== '' || $dataset !== '');
 
 $proxyurl = null;
@@ -121,6 +159,20 @@ if ($hasslide) {
     if ($browsable) {
         $proxyparams['browsable'] = 1;
     }
+    // Unlike images/dataset/browsable above, these 7 are *always* written
+    // explicitly (never omitted when false) - proxy.php's
+    // resolve_overlay_setting() needs to tell "this embed explicitly
+    // wants X off" apart from "no opinion, use the site default", and
+    // only an explicit '0' can say the former.
+    foreach ($overlaysettings as $key => $value) {
+        $proxyparams[$key] = $value ? '1' : '0';
+    }
+    // Always baked in explicitly too - a comma-separated hex list,
+    // re-validated/capped through parse_colours() rather than trusted
+    // as-is (a teacher's own browser is no more trusted here than
+    // manage.php's equivalent submission is).
+    $selectedcolours = array_keys(array_filter($overlaycolours));
+    $proxyparams['annotationcolours'] = implode(',', annotations_repository::parse_colours(implode(',', $selectedcolours)));
     $proxyurl = new moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$subject}", $proxyparams);
 
     // Auto-generated, never teacher-typed - the whole point of choosing this tool
@@ -202,12 +254,21 @@ if ($embedded) {
 }
 echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-bottom: 1rem;']);
 
+// Values are local_omeroembed_subjects.id (a plain int, cast to string by
+// html_writer::select()) - not the display name. Only this teacher's own
+// entries, never another's (see subject_repository::get_for_user()'s own
+// docblock) - names are chosen per-teacher and aren't unique across
+// teachers, so the name alone was never enough to identify a connection
+// once ownership was introduced.
 $subjectoptions = ['' => get_string('choosesubject', 'local_omeroembed')];
-foreach ($subjectkeys as $key) {
-    $subjectoptions[$key] = $key;
+foreach ($mysubjects as $mysubject) {
+    $subjectoptions[$mysubject->id] = $mysubject->name;
 }
 echo html_writer::tag('label', get_string('subjectlabel', 'local_omeroembed') . ' ' .
     html_writer::select($subjectoptions, 'subject', $subject, null));
+
+$mysubjectsurl = new moodle_url('/local/omeroembed/mysubjects.php', ['courseid' => $courseid]);
+echo html_writer::link($mysubjectsurl, get_string('managesubjectslink', 'local_omeroembed'), ['style' => 'margin-left:0.5rem;']);
 
 echo html_writer::tag('label', get_string('imageidlabel', 'local_omeroembed') . ' ' .
     html_writer::empty_tag('input', ['type' => 'text', 'name' => 'images', 'value' => $images,
@@ -239,6 +300,88 @@ foreach ($layoutoptions as $value => $stringkey) {
         ['style' => 'margin-right: 1rem;']);
 }
 echo html_writer::end_tag('fieldset');
+
+// Per-embed overrides of the site-wide overlay/annotation defaults - see
+// $overlaysettings' own comment above for how these round-trip, and
+// proxy.php's resolve_overlay_setting() for how they're applied. Reuses
+// the exact same lang strings settings.php's own admin checkboxes use
+// (hideoverview, hideintensity, etc.) - one label, two places it's shown.
+//
+// html_writer::checkbox() emits a *plain* checkbox with no hidden
+// fallback (confirmed against core's own html_writer.php - unlike some
+// other Moodle checkbox widgets, this one doesn't add one) - an
+// unchecked box is simply absent from the submitted request, which
+// $overlaysettings' own optional_param($key, null, ...) would then read
+// as "not chosen yet" and silently fall back to the site default,
+// undoing an explicit uncheck on the very next form resubmit. Each
+// checkbox is preceded by its own hidden input of the same name/value=0
+// (standard hidden-before-checkbox technique - both share a name, the
+// browser submits both in document order, PHP's superglobals keep
+// whichever came last: the hidden "0" if unchecked, the checkbox's own
+// "1" if checked) so the field is always present either way.
+echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
+echo html_writer::tag('legend', get_string('overlaysheading', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations'] as $key) {
+    $style = $key === 'enableannotations' ? 'display:block; margin-top:0.5rem;' : 'display:block;';
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $key, 'value' => 0]);
+    echo html_writer::tag('label',
+        html_writer::checkbox($key, 1, $overlaysettings[$key], get_string($key, 'local_omeroembed')),
+        ['style' => $style]);
+}
+echo html_writer::end_tag('fieldset');
+
+// Same round-trip technique as the overlay fieldset above (hidden
+// companion per checkbox, since html_writer::checkbox() has none of its
+// own), plus one extra hidden field (colours_submitted) so a genuinely
+// empty selection can be told apart from "form never touched yet" - see
+// $overlaycolours' own comment above.
+echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
+echo html_writer::tag('legend', get_string('annotationcolours', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
+echo html_writer::tag('p', get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
+    ['class' => 'text-muted', 'style' => 'margin-top:0;']);
+echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'colours_submitted', 'value' => 1]);
+echo html_writer::start_div('', ['id' => 'omero-annotation-colours', 'style' => 'display:flex; flex-wrap:wrap; gap:0.75rem;']);
+foreach (annotations_repository::get_colour_choices() as $hex => $label) {
+    $paramname = 'colour_' . strtolower(ltrim($hex, '#'));
+    $swatch = html_writer::span('', '', [
+        'style' => 'display:inline-block; width:1rem; height:1rem; border-radius:50%; '
+            . 'background:' . $hex . '; margin-right:0.35rem; vertical-align:middle; border:1px solid #ccc;',
+    ]);
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $paramname, 'value' => 0]);
+    // Empty label passed to checkbox() - it would otherwise wrap its own
+    // nested <label>, and this whole thing is already one label itself
+    // (swatch + checkbox + text), which would double up the click target.
+    // data-hex carries the real mixed-case hex (the name attribute only has
+    // the lowercased slug, e.g. colour_e6194b) - author.js's generateEmbed()
+    // reads this back directly rather than reconstructing it from the name,
+    // since COLOUR_PALETTE/parse_colours() are case-sensitive and a
+    // reconstructed lowercase hex would silently fail to match.
+    echo html_writer::tag('label',
+        $swatch . html_writer::checkbox($paramname, 1, $overlaycolours[$hex], '', ['data-hex' => $hex]) . ' ' . s($label),
+        ['style' => 'display:flex; align-items:center; white-space:nowrap;']);
+}
+echo html_writer::end_div();
+echo html_writer::end_tag('fieldset');
+// parse_colours() (see its own docblock) already caps a submission at
+// MAX_COLOURS server-side, but silently, by truncating in palette order -
+// without this, a teacher could tick 6 boxes here, save, and have no idea
+// which 4 actually survived. Disabling the remaining unchecked boxes once
+// the cap is reached stops a 5th selection from ever being possible in the
+// first place, rather than accepting it and quietly dropping it later.
+echo html_writer::script(
+    'document.addEventListener("DOMContentLoaded", function() {'
+    . 'var container = document.getElementById("omero-annotation-colours");'
+    . 'if (!container) { return; }'
+    . 'var boxes = Array.prototype.slice.call(container.querySelectorAll("input[type=checkbox]"));'
+    . 'var max = ' . (int) annotations_repository::MAX_COLOURS . ';'
+    . 'function refresh() {'
+    . '  var checkedcount = boxes.filter(function(cb) { return cb.checked; }).length;'
+    . '  boxes.forEach(function(cb) { cb.disabled = !cb.checked && checkedcount >= max; });'
+    . '}'
+    . 'boxes.forEach(function(cb) { cb.addEventListener("change", refresh); });'
+    . 'refresh();'
+    . '});'
+);
 
 echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-bottom: 1rem;']);
 echo html_writer::tag('label', get_string('widthlabel', 'local_omeroembed') . ' ' .
@@ -356,6 +499,31 @@ if ($hasslide) {
         ]);
         echo html_writer::end_div();
     }
+
+    // Only meaningful once an embedid actually exists - a fresh embed's
+    // token isn't minted until generateEmbed() runs client-side (see
+    // getOrMintAnnotateId() in js/author.js), same constraint the student
+    // annotations feature already lives with. $annotateid is only set when
+    // re-opening an *existing* embed for editing (see author.php's own
+    // param comment above).
+    //
+    // Tracking on/off, gather-hours, delete, export all live entirely on
+    // heatmap.php now (confirmed with the user) - this is just a link
+    // there, carrying $proxyurl as a one-time "sourceurl" so heatmap.php
+    // can seed itself the first time it's ever visited for this embed
+    // (see that file's own $sourceurlparam comment for why it needs this -
+    // nothing else records which OMERO subject/image an embedid points to).
+    if ($annotateid !== '' && has_capability('local/omeroembed:viewheatmap', $context)) {
+        $heatmapurl = new moodle_url('/local/omeroembed/heatmap.php', [
+            'courseid' => $courseid,
+            'embedid' => $annotateid,
+            'sourceurl' => $proxyurl->out(false),
+        ]);
+        echo html_writer::link($heatmapurl, get_string('viewheatmaplink', 'local_omeroembed'), [
+            'target' => '_blank', 'class' => 'btn btn-secondary', 'style' => 'display:inline-block; margin-top:1rem;',
+        ]);
+    }
+
     echo html_writer::end_div();
 }
 

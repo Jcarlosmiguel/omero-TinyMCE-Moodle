@@ -60,4 +60,18 @@ $capabilities = [
             'editingteacher' => CAP_ALLOW,
         ],
     ],
+
+    // Lets a teacher configure viewport tracking on an embed and view the
+    // resulting heatmap (heatmap.php, plus ajax.php's tracking_get/
+    // tracking_set/heatmap actions) - deliberately NOT given to students,
+    // unlike :annotate above. Checked per-course, same reasoning as
+    // :annotate for why CONTEXT_COURSE rather than CONTEXT_MODULE.
+    'local/omeroembed:viewheatmap' => [
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        ],
+    ],
 ];
