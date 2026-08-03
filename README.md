@@ -1,4 +1,4 @@
-# local_omeroembed
+# omero-TinyMCE-Moodle
 
 A Moodle plugin that lets teachers embed enrolment-gated OMERO.iviewer
 slides directly into course content - Labels, Pages, Books, anywhere the
