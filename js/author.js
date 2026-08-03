@@ -163,7 +163,7 @@
     // needs to read whatever the teacher currently has checked).
     var OVERLAY_KEYS = [
         'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
-        'enablehotspot',
+        'enablehotspot', 'enablehotspotmulti',
     ];
 
     /**
@@ -498,10 +498,23 @@
     // generateEmbed() would mint anyway, just needed earlier than usual so
     // the region gets saved against the right placement from the start.
     var hotspotCheckbox = document.querySelector('input[type="checkbox"][name="enablehotspot"]');
+    // Multi-region sibling of hotspotCheckbox below - same reasoning
+    // (drawing has to happen inside the preview iframe itself), just
+    // reloading into inject_hotspot_multi_author_script()'s mode instead
+    // (enablehotspotmulti=1 rather than enablehotspot=1). The two are kept
+    // mutually exclusive here (checking one force-unchecks the other) so a
+    // teacher can never have both true on the same embed through the
+    // normal UI - proxy.php's own dispatch still checks enablehotspotmulti
+    // before enablehotspot in every branch as defense-in-depth regardless
+    // (see that file's own comment).
+    var hotspotMultiCheckbox = document.querySelector('input[type="checkbox"][name="enablehotspotmulti"]');
     if (hotspotCheckbox) {
         hotspotCheckbox.addEventListener('change', function() {
             if (!hotspotCheckbox.checked) {
                 return;
+            }
+            if (hotspotMultiCheckbox) {
+                hotspotMultiCheckbox.checked = false;
             }
             var previewIframe = document.getElementById(config.iframeId);
             if (!previewIframe) {
@@ -510,6 +523,25 @@
             var url = new URL(config.baseProxyUrl, window.location.href);
             url.searchParams.set('authoring', '1');
             url.searchParams.set('enablehotspot', '1');
+            url.searchParams.set('embedid', getOrMintAnnotateId());
+            previewIframe.src = url.toString();
+        });
+    }
+    if (hotspotMultiCheckbox) {
+        hotspotMultiCheckbox.addEventListener('change', function() {
+            if (!hotspotMultiCheckbox.checked) {
+                return;
+            }
+            if (hotspotCheckbox) {
+                hotspotCheckbox.checked = false;
+            }
+            var previewIframe = document.getElementById(config.iframeId);
+            if (!previewIframe) {
+                return;
+            }
+            var url = new URL(config.baseProxyUrl, window.location.href);
+            url.searchParams.set('authoring', '1');
+            url.searchParams.set('enablehotspotmulti', '1');
             url.searchParams.set('embedid', getOrMintAnnotateId());
             previewIframe.src = url.toString();
         });

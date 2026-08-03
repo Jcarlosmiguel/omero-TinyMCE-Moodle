@@ -52,6 +52,7 @@ require(__DIR__ . '/../../config.php');
 use local_omeroembed\annotations_repository;
 use local_omeroembed\tracking_repository;
 use local_omeroembed\hotspot_repository;
+use local_omeroembed\hotspot_multi_repository;
 
 $courseid = required_param('courseid', PARAM_INT);
 $embedid = required_param('embedid', PARAM_ALPHANUMEXT);
@@ -74,7 +75,10 @@ $context = context_course::instance($courseid);
 // already means in this plugin, and attempting a hotspot question is a
 // normal student action, not a privileged one (defining the *answer* is -
 // see $hotspotauthoractions below, a genuinely different capability).
-$annotateactions = ['list', 'create', 'update', 'delete', 'hotspot_attempt'];
+// hotspotmulti_attempt sits alongside hotspot_attempt for the identical
+// reason - attempting a multi-region hotspot question is the same normal
+// student action, not a privileged one.
+$annotateactions = ['list', 'create', 'update', 'delete', 'hotspot_attempt', 'hotspotmulti_attempt'];
 // tracking_get/tracking_set used to live here too, when author.php had its
 // own JS-driven tracking panel - that panel has since moved entirely onto
 // heatmap.php as a plain server-rendered form (confirmed with the user),
@@ -89,7 +93,11 @@ $heatmapactions = ['heatmap'];
 // like list/heatmap's "any enrolled viewer" shape - unlike those, this
 // response contains the hidden geometry itself, so it needs the same
 // authoring-only gate as the two writes.
-$hotspotauthoractions = ['hotspot_get', 'hotspot_save', 'hotspot_clear'];
+// hotspotmulti_get/save/clear are the multi-region sibling of the three
+// above - same authoring-only gate, same reasoning, just operating on a
+// set of regions instead of one shape (see classes/hotspot_multi_repository.php).
+$hotspotauthoractions = ['hotspot_get', 'hotspot_save', 'hotspot_clear',
+        'hotspotmulti_get', 'hotspotmulti_save', 'hotspotmulti_clear'];
 
 if (in_array($action, $annotateactions, true)) {
     require_capability('local/omeroembed:annotate', $context);
@@ -142,6 +150,14 @@ if ($action === 'hotspot_get') {
     // geometry, so the authoring UI can show a teacher their own existing
     // region as a reference outline when reopening it.
     $geometry = hotspot_repository::get_geometry($embedid);
+    echo json_encode(['geometry' => $geometry]);
+    exit;
+}
+
+if ($action === 'hotspotmulti_get') {
+    // Multi-region sibling of hotspot_get above - same authoring-only
+    // reasoning, returns the whole array of regions instead of one shape.
+    $geometry = hotspot_multi_repository::get_geometry($embedid);
     echo json_encode(['geometry' => $geometry]);
     exit;
 }
@@ -255,8 +271,33 @@ if ($action === 'hotspot_save') {
     exit;
 }
 
+if ($action === 'hotspotmulti_save') {
+    // Multi-region sibling of hotspot_save above - the whole current set
+    // of regions is sent as one JSON-encoded 'regions' param (per-field
+    // params like hotspot_save's don't scale to N shapes) and replaces the
+    // stored set outright, same "bulk overwrite" convention. Every element
+    // is validated inside hotspot_multi_repository::save() itself, using
+    // the same annotations_repository::TYPE_ELLIPSE/TYPE_RECTANGLE
+    // constants and invalidregion exception for a malformed element.
+    $regionsraw = required_param('regions', PARAM_RAW);
+    $regions = json_decode($regionsraw, true);
+    if (!is_array($regions)) {
+        throw new \moodle_exception('invalidregion', 'local_omeroembed');
+    }
+
+    $record = hotspot_multi_repository::save($courseid, $embedid, $USER->id, $regions);
+    echo json_encode(['geometry' => $record->geometry]);
+    exit;
+}
+
 if ($action === 'hotspot_clear') {
     $cleared = hotspot_repository::clear($embedid);
+    echo json_encode(['cleared' => $cleared]);
+    exit;
+}
+
+if ($action === 'hotspotmulti_clear') {
+    $cleared = hotspot_multi_repository::clear($embedid);
     echo json_encode(['cleared' => $cleared]);
     exit;
 }
@@ -269,6 +310,19 @@ if ($action === 'hotspot_attempt') {
     // student session - is ever allowed to reveal about the hidden region.
     $correct = hotspot_repository::check_attempt($embedid, $x, $y);
     hotspot_repository::record_attempt($courseid, $embedid, $USER->id, $x, $y, $correct);
+    echo json_encode(['correct' => $correct]);
+    exit;
+}
+
+if ($action === 'hotspotmulti_attempt') {
+    // Multi-region sibling of hotspot_attempt above - correct if the click
+    // lands inside ANY one of the stored regions (see
+    // hotspot_multi_repository::check_attempt()'s own docblock for why).
+    $x = required_param('x', PARAM_FLOAT);
+    $y = required_param('y', PARAM_FLOAT);
+
+    $correct = hotspot_multi_repository::check_attempt($embedid, $x, $y);
+    hotspot_multi_repository::record_attempt($courseid, $embedid, $USER->id, $x, $y, $correct);
     echo json_encode(['correct' => $correct]);
     exit;
 }

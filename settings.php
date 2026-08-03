@@ -192,6 +192,19 @@ if ($hassiteconfig) {
         0
     ));
 
+    // Multi-region sibling of enablehotspot above - a click is correct
+    // against ANY one of several teacher-marked regions instead of one
+    // single shape (see classes/hotspot_multi_repository.php's own
+    // docblock). A separate setting/table/feature, not a mode of the
+    // single-region one - kept under the same heading since it's the same
+    // conceptual feature area.
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/enablehotspotmulti',
+        get_string('enablehotspotmulti', 'local_omeroembed'),
+        get_string('enablehotspotmulti_desc', 'local_omeroembed'),
+        0
+    ));
+
     // Applies to the heatmap feature's local_omeroembed_view_samples table
     // only - regardless of any individual embed's own gather-hours window
     // (see author.php's tracking panel) or a teacher manually deleting data

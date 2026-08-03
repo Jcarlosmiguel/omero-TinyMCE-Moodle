@@ -282,5 +282,58 @@ function xmldb_local_omeroembed_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026080201, 'local', 'omeroembed');
     }
 
+    if ($oldversion < 2026080305) {
+        // Multi-region hotspot feature - a sibling of local_omeroembed_hotspots,
+        // not a mode of it (see db/install.xml's own COMMENT on this table
+        // for why): a click is correct against ANY one of several
+        // teacher-marked regions, rather than one single shape.
+        $table = new xmldb_table('local_omeroembed_hotspot_multi');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('embedid', XMLDB_TYPE_CHAR, '36', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('createdby', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('geometry', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('courseid', XMLDB_KEY_FOREIGN, ['courseid'], 'course', ['id']);
+        $table->add_key('createdby', XMLDB_KEY_FOREIGN, ['createdby'], 'user', ['id']);
+
+        $table->add_index('embedid', XMLDB_INDEX_UNIQUE, ['embedid']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026080305, 'local', 'omeroembed');
+    }
+
+    if ($oldversion < 2026080306) {
+        // Every multi-region hotspot attempt, right or wrong - see
+        // db/install.xml's own COMMENT on this table for what it's for.
+        $table = new xmldb_table('local_omeroembed_hotspot_multi_attempts');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('embedid', XMLDB_TYPE_CHAR, '36', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('x', XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('y', XMLDB_TYPE_NUMBER, '10, 2', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('correct', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('courseid', XMLDB_KEY_FOREIGN, ['courseid'], 'course', ['id']);
+        $table->add_key('userid', XMLDB_KEY_FOREIGN, ['userid'], 'user', ['id']);
+
+        $table->add_index('embedid-userid', XMLDB_INDEX_NOTUNIQUE, ['embedid', 'userid']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(true, 2026080306, 'local', 'omeroembed');
+    }
+
     return true;
 }

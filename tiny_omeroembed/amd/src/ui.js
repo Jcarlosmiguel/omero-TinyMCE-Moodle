@@ -50,7 +50,7 @@ const WRITEUP_MESSAGE_TYPE = 'omero-embed-existing-writeup';
 // only needs to round-trip whatever an existing embed already has).
 const OVERLAY_PARAM_KEYS = [
     'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
-    'enablehotspot',
+    'enablehotspot', 'enablehotspotmulti',
 ];
 
 /**

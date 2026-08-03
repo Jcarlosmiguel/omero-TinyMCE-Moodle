@@ -79,7 +79,7 @@ $browsable = optional_param('browsable', 0, PARAM_BOOL);
 // Rotate isn't included - always hidden, not a real choice (see
 // proxy.php's inject_overlay_hide_css() for why).
 $overlaysettings = [];
-foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations', 'enablehotspot'] as $key) {
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations', 'enablehotspot', 'enablehotspotmulti'] as $key) {
     $submitted = optional_param($key, null, PARAM_BOOL);
     $overlaysettings[$key] = $submitted ?? (bool) get_config('local_omeroembed', $key);
 }
@@ -159,7 +159,7 @@ if ($hasslide) {
     if ($browsable) {
         $proxyparams['browsable'] = 1;
     }
-    // Unlike images/dataset/browsable above, these 7 are *always* written
+    // Unlike images/dataset/browsable above, these 9 are *always* written
     // explicitly (never omitted when false) - proxy.php's
     // resolve_overlay_setting() needs to tell "this embed explicitly
     // wants X off" apart from "no opinion, use the site default", and
@@ -321,8 +321,9 @@ echo html_writer::end_tag('fieldset');
 // "1" if checked) so the field is always present either way.
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('overlaysheading', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations', 'enablehotspot'] as $key) {
-    $style = ($key === 'enableannotations' || $key === 'enablehotspot') ? 'display:block; margin-top:0.5rem;' : 'display:block;';
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations', 'enablehotspot', 'enablehotspotmulti'] as $key) {
+    $style = ($key === 'enableannotations' || $key === 'enablehotspot' || $key === 'enablehotspotmulti')
+            ? 'display:block; margin-top:0.5rem;' : 'display:block;';
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $key, 'value' => 0]);
     echo html_writer::tag('label',
         html_writer::checkbox($key, 1, $overlaysettings[$key], get_string($key, 'local_omeroembed')),

@@ -60,6 +60,17 @@ $string['hotspot_saved'] = 'Saved';
 $string['hotspot_correct'] = 'Correct!';
 $string['hotspot_incorrect'] = 'Not quite - try again';
 
+// Multi-region sibling of the click-to-answer hotspot feature above - a
+// click is correct against ANY one of several teacher-marked regions
+// instead of one single shape (see classes/hotspot_multi_repository.php's
+// own docblock). A separate feature/setting/table, not a mode of the
+// single-region one.
+$string['enablehotspotmulti'] = 'Enable multi-region hotspot question';
+$string['enablehotspotmulti_desc'] = 'Turns on the multi-region hotspot feature for this embed - like the single-region hotspot question above, but a student\'s click is correct if it lands inside ANY of several regions you mark (e.g. several equally-correct examples of a feature scattered across the same slide), not just one. Checking this in the authoring tool reveals a drawing toolbar on the live preview for marking as many correct regions as needed.';
+$string['hotspotmultitoolbar_delete'] = 'Delete region';
+$string['invalidregion'] = 'One of the submitted regions is missing a required field, has an invalid type, or has a non-positive radius.';
+$string['toomanyregions'] = 'Too many regions submitted at once (maximum {$a}) - this is almost certainly not something drawn by hand, so the request was refused.';
+
 $string['annotationcolours'] = 'Annotation colours';
 $string['annotationcolours_desc'] = 'Which colours appear on the annotation toolbar\'s colour picker - choose up to {$a} in total. A teacher can choose a different set of up to {$a} for an individual embed in the authoring tool; this is just the default for embeds where they haven\'t.';
 $string['colour_e6194b'] = 'Red';
@@ -215,3 +226,12 @@ $string['privacy:metadata:local_omeroembed_hotspot_attempts:x'] = 'The horizonta
 $string['privacy:metadata:local_omeroembed_hotspot_attempts:y'] = 'The vertical image-pixel position the student clicked.';
 $string['privacy:metadata:local_omeroembed_hotspot_attempts:correct'] = 'Whether this attempt was correct.';
 $string['privacy:metadata:local_omeroembed_hotspot_attempts:timecreated'] = 'The time the attempt was made.';
+
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts'] = 'One attempt (right or wrong) at a multi-region hotspot question on an embedded OMERO slide.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:userid'] = 'The ID of the user who made this attempt.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:courseid'] = 'The course the hotspot question belongs to.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:embedid'] = 'The specific embed placement this attempt was made on.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:x'] = 'The horizontal image-pixel position the student clicked.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:y'] = 'The vertical image-pixel position the student clicked.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:correct'] = 'Whether this attempt was correct.';
+$string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:timecreated'] = 'The time the attempt was made.';

@@ -121,6 +121,45 @@
         <INDEX NAME="embedid-userid" UNIQUE="false" FIELDS="embedid, userid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="local_omeroembed_hotspot_multi" COMMENT="The hidden set of equally-acceptable correct-answer regions for one embed's multi-region hotspot question - see classes/hotspot_multi_repository.php. A sibling of local_omeroembed_hotspots, not a mode of it: this feature lets a click be correct against ANY one of several teacher-marked regions (e.g. several carcinogenic-looking cells on the same slide), rather than the single-region feature's one-shape model. Geometry is never sent to a student's browser at any point - only check_attempt()'s bare true/false verdict is. One row per embedid - a 'Save regions' action replaces the whole array outright, there is no partial-edit case.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Course the embed belongs to"/>
+        <FIELD NAME="embedid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Per-placement token, same one local_omeroembed_annotations keys on"/>
+        <FIELD NAME="createdby" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="Teacher who defined these regions"/>
+        <FIELD NAME="geometry" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON ARRAY of {type,x,y,rx,ry,rotation} objects - same per-shape shape as local_omeroembed_hotspots.geometry, just plural - so the single-shape hit-test math ported into check_attempt() needs no translation, only a loop"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="createdby" TYPE="foreign" FIELDS="createdby" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="embedid" UNIQUE="true" FIELDS="embedid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_omeroembed_hotspot_multi_attempts" COMMENT="Every student click at a multi-region hotspot question, right or wrong - real personal data (see classes/privacy/provider.php). Identical shape to local_omeroembed_hotspot_attempts. Nothing reads these yet (no teacher review page in this first pass), kept purely so one can be added later without losing history.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="embedid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The student who clicked"/>
+        <FIELD NAME="x" TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" SEQUENCE="false" COMMENT="Image-pixel x of the click - same coordinate convention as hotspot_multi.geometry"/>
+        <FIELD NAME="y" TYPE="number" LENGTH="10" DECIMALS="2" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="correct" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="embedid-userid" UNIQUE="false" FIELDS="embedid, userid"/>
+      </INDEXES>
+    </TABLE>
     <TABLE NAME="local_omeroembed_subjects" COMMENT="Teacher-owned OMERO service-account connections - see classes/subject_repository.php. Replaces the old site-wide settings.php 'subjects' admin textarea: each teacher manages their own named entries and never sees another's. The {subject} path segment in every proxy.php/author.php URL is this table's own id (globally unique), not the name - name is a pure UI label, never itself resolved from a URL (see omero_session.php's own comment on why: names are only unique per-owner, not globally).">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
