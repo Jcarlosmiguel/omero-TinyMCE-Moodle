@@ -36,13 +36,15 @@ URLs are ever exposed to the browser.
 - **Individually hideable viewer overlays** (overview map, rotate, zoom
   controls, scale bar, coordinate readout, full-screen) to reduce clutter
   for students - purely cosmetic, no effect on pan/zoom or view-links.
-- **Two ways to configure the OMERO server, subject accounts, and overlay
-  settings**: the standard Moodle Site administration page, or a dedicated
-  page (`manage.php`) gated by a new capability
+- **Two ways to configure the OMERO server and overlay settings**: the
+  standard Moodle Site administration page, or a dedicated page
+  (`manage.php`) gated by a new capability
   (`local/omeroembed:managesettings`, Manager role by default) - lets
   someone who isn't a full Site administrator (e.g. whoever actually
   administers the OMERO side) manage these settings without needing
-  site-wide config access.
+  site-wide config access. Subject accounts are separate from both of
+  these - every teacher adds and manages their own (`mysubjects.php`), no
+  admin or manager step required.
 - **Self-healing OMERO sessions.** If a cached session has quietly expired
   on OMERO's side, the proxy detects it and transparently re-authenticates
   once before giving up, rather than surfacing a confusing error.
@@ -55,12 +57,15 @@ URLs are ever exposed to the browser.
 
 Students never authenticate to OMERO at all - every embed is served using
 one of a small number of shared "subject" service accounts (e.g. one per
-department/subject area), configured centrally. Access control is entirely
-on the Moodle side: `proxy.php` re-derives the real, current Moodle session
-and checks enrolment against the real course on every single request - it
-cannot be bypassed by editing the embed's URL, since the course ID only
-selects *which* course to check enrolment against, not whether that check
-happens.
+department/subject area). Each teacher adds and manages their own subject
+accounts directly (**local/omeroembed/mysubjects.php**, linked from the
+authoring tool) - no site administrator or Manager involvement needed for
+this at all, and no site-wide credential list to maintain. Access control
+is entirely on the Moodle side: `proxy.php` re-derives the real, current
+Moodle session and checks enrolment against the real course on every
+single request - it cannot be bypassed by editing the embed's URL, since
+the course ID only selects *which* course to check enrolment against, not
+whether that check happens.
 
 ## Requirements
 
@@ -88,18 +93,21 @@ git clone https://github.com/Jcarlosmiguel/moodle-omero-embed.git local/omeroemb
 php admin/cli/upgrade.php --non-interactive
 ```
 
-Then configure the OMERO server, subject accounts, and viewer overlay
-settings, either as a Site administrator (Site administration > Plugins >
-Local plugins > OMERO slide embed) or - once granted
+Then configure the OMERO server and viewer overlay settings (one-time,
+site-wide), either as a Site administrator (Site administration > Plugins
+> Local plugins > OMERO slide embed) or - once granted
 `local/omeroembed:managesettings` - via **local/omeroembed/manage.php**,
 linked as "OMERO slide embed settings" in the site's top navigation bar's
 **"More"** menu (and the drawer menu) for anyone with that capability.
 
 - **OMERO base URL** - the real OMERO.web server, e.g.
   `https://your-omero-server.example.org`.
-- **Subject accounts** - one per line, `subject_key|username|password`.
-  These are OMERO service-account credentials, used server-side only -
-  never sent to students' browsers.
+
+**Subject accounts are not configured here.** Each teacher adds their own
+OMERO service-account credentials directly, from a link on the authoring
+tool (**local/omeroembed/mysubjects.php**) - no Site administrator or
+Manager step needed, and nothing for an admin to maintain on a teacher's
+behalf. See [USAGE.md](USAGE.md).
 
 ### Granting settings access to someone who isn't a Site administrator
 

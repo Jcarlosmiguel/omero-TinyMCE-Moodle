@@ -24,33 +24,22 @@ The real OMERO.web server this plugin talks to, e.g.
 request is proxied through Moodle, so this address (and the credentials
 below) never reach a student's browser.
 
-### Subject accounts
+### Subject accounts - not an admin/manager setting
 
-One line per subject, in the form:
+Subject accounts (the shared OMERO service-account credentials teachers
+pick from a dropdown when embedding a slide) are **not** configured on
+this page or via `manage.php` - each teacher adds, edits, and deletes
+their own from **local/omeroembed/mysubjects.php** (linked from the
+authoring tool), gated by the same `moodle/course:manageactivities`
+capability that already lets them edit that course. There is no
+site-wide subject-account list for an administrator or Manager to
+maintain, and nothing here needs updating when a teacher rotates a
+password or adds a new one themselves.
 
-```
-subject_key|username|password
-```
-
-- **subject_key** is what teachers see in the dropdown on the authoring
-  tool - pick something meaningful, e.g. `oral_biology`, `histology`,
-  `anatomy`.
-- **username** / **password** are real OMERO credentials for a *shared
-  service account*, not any individual person's login. One subject
-  account can be shared by every teacher in that subject area - students
-  never authenticate to OMERO directly at all, access is controlled
-  entirely by their normal Moodle enrolment instead.
-- These are stored as plain configuration (same as any Moodle plugin
-  storing a third-party credential, e.g. an API key) - not shown to
-  students under any circumstance, used server-side only.
-
-**Adding a new subject**: add a new line. **Removing one**: delete its
-line and save - any embeds already built using that subject will start
-failing (with a clear "unknown subject" error) until either the line is
-restored or those embeds are rebuilt against a different subject.
-**Rotating a password**: change it on the OMERO side first, then update
-the matching line here - the very next request re-authenticates with the
-new credentials automatically (no restart needed).
+If a teacher reports a subject they need isn't available, or an
+"unknown subject" error, the fix is for them (or another teacher in that
+course) to add it themselves via `mysubjects.php` - not something an
+admin/manager needs to do on their behalf.
 
 ### Embedded viewer overlays
 
@@ -135,14 +124,15 @@ image's own name from OMERO, whatever it was named there.
 **"Image not found" when loading a slide.** Usually resolves itself
 automatically (see "stale session" above) - if it persists after a
 refresh, check: the Image ID/Dataset ID actually exist and are correct,
-the configured subject account still has permission to view them in
-OMERO, and the subject's username/password in the settings page are still
-correct.
+the subject account still has permission to view them in OMERO, and its
+username/password (in that teacher's own **mysubjects.php**, not a
+site-wide setting) are still correct.
 
 **A subject doesn't appear in the authoring tool's dropdown, or shows an
-"unknown subject" error.** Check its line in "Subject accounts" - it must
-be exactly `subject_key|username|password`, one subject per line, no
-extra blank lines within an entry.
+"unknown subject" error.** Subject accounts are teacher-owned, not
+something to look for here - the teacher (or another teacher in that
+course) needs to add it themselves via **mysubjects.php**, linked from
+the authoring tool.
 
 **A setting doesn't seem to be taking effect right after install/upgrade.**
 See "New settings need a first save" above - open the settings page and

@@ -2,8 +2,10 @@
 
 This is for anyone with editing rights in a course who wants to embed an
 OMERO microscopy slide into a Label, Page, or Book chapter. It assumes
-someone else has already configured the OMERO server and subject accounts
-(see [README.md](README.md) if that's you instead).
+someone else has already configured the OMERO server itself (see
+[README.md](README.md) if that's you instead) - but **your own subject
+account is something you add yourself**, no admin or manager needed (see
+Step 1 below).
 
 ## Finding the tool
 
@@ -21,7 +23,11 @@ your Moodle's plugins.
 You'll see a form with:
 
 - **Subject account** - a dropdown. Pick whichever matches the department
-  or subject area your slide belongs to.
+  or subject area your slide belongs to. Don't see one yet, or need a new
+  one? Click **"Manage your OMERO connections"** next to the dropdown (or
+  go directly to `local/omeroembed/mysubjects.php?courseid=<id>`) to add
+  your own OMERO service-account credentials - this is entirely
+  self-service, nobody needs to set this up for you.
 - **Image ID** - the OMERO image ID of the slide you want. You'll already
   know this from having uploaded/found the image in OMERO yourself.
 - **Dataset ID (optional)** - if this slide is part of a dataset you want
