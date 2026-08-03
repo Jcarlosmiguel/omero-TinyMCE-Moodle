@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="question/type/omerohotspot/db" VERSION="20260803" COMMENT="XMLDB file for Moodle question/type/omerohotspot"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="qtype_omerohotspot_options" COMMENT="One row per omerohotspot question - which OMERO slide it points at, and the hidden correct-answer region. geometry is the same {type,x,y,rx,ry,rotation} JSON shape local_omeroembed_hotspots.geometry already uses, on purpose, so the point-in-shape hit-test math ported into this plugin's own lib.php needs no translation. Never read by anything outside this plugin's own grade_response()/edit form - the whole point of this table is that its geometry column never reaches a student's browser before they answer.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="questionid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="subjectid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="local_omeroembed_subjects.id - which OMERO connection this question's slide is served through"/>
+        <FIELD NAME="imageid" TYPE="char" LENGTH="32" NOTNULL="false" SEQUENCE="false" COMMENT="OMERO image id - same convention as author.php's own 'images' param"/>
+        <FIELD NAME="datasetid" TYPE="char" LENGTH="32" NOTNULL="false" SEQUENCE="false" COMMENT="OMERO dataset id, if the student is meant to browse a dataset rather than one fixed image - same convention as author.php's own 'dataset' param"/>
+        <FIELD NAME="geometry" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON {type,x,y,rx,ry,rotation} - identical shape to local_omeroembed_hotspots.geometry"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="questionid" TYPE="foreign" FIELDS="questionid" REFTABLE="question" REFFIELDS="id"/>
+        <KEY NAME="subjectid" TYPE="foreign" FIELDS="subjectid" REFTABLE="local_omeroembed_subjects" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="questionid" UNIQUE="true" FIELDS="questionid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

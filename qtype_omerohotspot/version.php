@@ -15,17 +15,24 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details.
+ * Version information.
  *
- * @package    local_omeroembed
+ * @package    qtype_omerohotspot
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026080303;         // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
-$plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.2.0';
-$plugin->maturity  = MATURITY_STABLE;
+$plugin->component = 'qtype_omerohotspot';
+$plugin->version   = 2026080300;
+$plugin->requires  = 2024100100;
+$plugin->maturity  = MATURITY_ALPHA;
+
+// Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
+// embedding mechanism) and subject_repository.php (OMERO connections)
+// rather than duplicating either - see this plugin's own README/plan doc
+// for why. Can never be installed without it.
+$plugin->dependencies = [
+    'local_omeroembed' => 2026080303,
+];

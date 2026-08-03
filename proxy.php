@@ -127,6 +127,17 @@ $authoring = optional_param('authoring', false, PARAM_BOOL);
 // which embed placement an annotation belongs to.
 $embedid = optional_param('embedid', '', PARAM_ALPHANUMEXT);
 
+// 'standalone' (default - local_omeroembed's own hotspot activity, keyed
+// by $embedid, see hotspot_repository.php) or 'qtype' (qtype_omerohotspot's
+// question edit form / attempt renderer - no $embedid at all, since the
+// question itself is the identity; the region round-trips via postMessage
+// into a hidden form field instead of any ajax.php call - see that
+// plugin's own editform.js/question.js). Purely a request param, never
+// trusted as a security boundary on its own - both modes still go through
+// their own real checks below ($embedid+hotspot_repository::exists() for
+// standalone, local/omeroembed:hotspotauthor for qtype authoring).
+$hotspotmode = optional_param('hotspotmode', 'standalone', PARAM_ALPHA);
+
 // Set only on heatmap.php's own iframe src - a third mode alongside the
 // default (real student-facing embed) and $authoring, never combined with
 // either. Unlike $authoring (which relies entirely on author.php never
@@ -437,22 +448,44 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
             if ($showomerorois) {
                 $rewritten = inject_show_rois_script($rewritten);
             }
-            // Existence-checked, not just flag-checked - a teacher who
-            // turned this on but never actually drew a region has nothing
-            // for a student to click on yet; "simply not injected" is the
-            // same convention inject_annotation_script() already uses for
-            // an empty $embedid.
-            if ($enablehotspot && $embedid !== '' && \local_omeroembed\hotspot_repository::exists($embedid)) {
+            if ($enablehotspot && $hotspotmode === 'qtype') {
+                // qtype_omerohotspot's own student-attempt mode - no
+                // $embedid to check existence against at all (the question
+                // itself is the identity, not an embed placement); the
+                // click never triggers an ajax.php call either, it only
+                // ever posts up to the qtype's own hidden form fields (see
+                // that plugin's own renderer.php/amd/src/question.js).
+                $rewritten = inject_hotspot_qtype_attempt_script($rewritten);
+            } else if ($enablehotspot && $embedid !== ''
+                    && \local_omeroembed\hotspot_repository::exists($embedid)) {
+                // Existence-checked, not just flag-checked - a teacher who
+                // turned this on but never actually drew a region has
+                // nothing for a student to click on yet; "simply not
+                // injected" is the same convention
+                // inject_annotation_script() already uses for an empty
+                // $embedid.
                 $rewritten = inject_hotspot_attempt_script($rewritten, $courseid, $embedid);
             }
+        } else if ($hotspotmode === 'qtype' && $enablehotspot
+                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
+            // qtype_omerohotspot's own question-edit-form preview - draws
+            // the hidden region the same way the standalone activity's
+            // authoring script does, but posts the finished geometry up
+            // via postMessage into the edit form's own hidden field
+            // instead of calling ajax.php's hotspot_save (there is no
+            // $embedid, and nothing to persist server-side here at all -
+            // the geometry is just one more field on that form, saved
+            // when the whole question is saved).
+            $rewritten = inject_hotspot_edit_form_script($rewritten);
         } else if ($enablehotspot && $embedid !== ''
                 && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
-            // The authoring preview's own mode - drawing the hidden region
-            // itself, never combined with any of the student-facing
-            // scripts above. Capability-checked here too, not just relied
-            // on as "author.php would never show this checkbox to a
-            // student" - the same lesson the $authoring capability fix
-            // itself already taught (see $authoring's own comment above).
+            // The standalone activity's own authoring preview - drawing
+            // the hidden region itself, never combined with any of the
+            // student-facing scripts above. Capability-checked here too,
+            // not just relied on as "author.php would never show this
+            // checkbox to a student" - the same lesson the $authoring
+            // capability fix itself already taught (see $authoring's own
+            // comment above).
             $rewritten = inject_hotspot_author_script($rewritten, $courseid, $embedid);
         }
     }
@@ -1193,4 +1226,45 @@ function inject_hotspot_attempt_script(string $body, int $courseid, string $embe
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
+}
+
+/**
+ * qtype_omerohotspot's own question-edit-form authoring mode - draws the
+ * hidden region the same way inject_hotspot_author_script() does, but the
+ * injected script (js/hotspot-qtype-author.js) reports the finished
+ * geometry to the parent *question edit form* via postMessage instead of
+ * calling ajax.php's hotspot_save. No courseid/embedid needed by this
+ * function at all - unlike the standalone activity, there's nothing to
+ * key a database row by here (the geometry is just one more field on the
+ * qtype's own edit form, saved when the whole question is saved).
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_hotspot_edit_form_script(string $body): string {
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-qtype-author.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $srcscript);
+}
+
+/**
+ * qtype_omerohotspot's own student-attempt mode - the injected script
+ * (js/hotspot-qtype-attempt.js) reports every click's image-pixel
+ * coordinates to the parent attempt page via postMessage, but never
+ * calls ajax.php and never learns whether a click was correct - that
+ * verdict only ever gets computed later, server-side, by
+ * qtype_omerohotspot_question::grade_response() (see that class's own
+ * docblock), whenever the surrounding question behaviour decides to
+ * grade. No courseid/embedid needed here either, same reasoning as
+ * inject_hotspot_edit_form_script() above.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_hotspot_qtype_attempt_script(string $body): string {
+    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-qtype-attempt.js'))->out(false) . '"></script>';
+
+    $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $srcscript);
 }

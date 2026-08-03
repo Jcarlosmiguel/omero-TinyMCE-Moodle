@@ -1,0 +1,137 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Defines the editing form for the OMERO hotspot question type.
+ *
+ * @package    qtype_omerohotspot
+ * @copyright  2026 University of Glasgow MVLS
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+defined('MOODLE_INTERNAL') || die();
+
+require_once($CFG->dirroot . '/question/type/edit_question_form.php');
+
+/**
+ * OMERO hotspot question editing form. The hidden correct-answer region is
+ * never typed in as a form field a teacher could read/copy - it's drawn
+ * live on an embedded proxy.php preview (reusing local_omeroembed's own
+ * locked-down embedding and js/hotspot-author.js's drag-to-draw gesture),
+ * which posts the finished geometry up to this page via postMessage (see
+ * amd/src/editform.js) into the one hidden 'geometry' field below. There is
+ * deliberately no server round-trip during authoring itself (no embedid,
+ * no ajax.php call) - the geometry only gets persisted when the whole
+ * question form is submitted, same as every other field on this form.
+ */
+class qtype_omerohotspot_edit_form extends question_edit_form {
+    protected function definition_inner($mform) {
+        global $OUTPUT, $PAGE;
+
+        $courseid = $this->get_preview_courseid();
+
+        $subjects = \local_omeroembed\subject_repository::get_for_user($this->qtypeobj_userid());
+        $subjectchoices = [0 => get_string('choosesubject', 'local_omeroembed')];
+        foreach ($subjects as $subject) {
+            $subjectchoices[$subject->id] = $subject->name;
+        }
+        $mform->addElement('select', 'subjectid', get_string('subjectlabel', 'local_omeroembed'), $subjectchoices);
+        $mform->addRule('subjectid', null, 'required', null, 'client');
+
+        $mform->addElement('text', 'imageid', get_string('imageidlabel', 'qtype_omerohotspot'));
+        $mform->setType('imageid', PARAM_ALPHANUMEXT);
+
+        $mform->addElement('text', 'datasetid', get_string('datasetidlabel', 'qtype_omerohotspot'));
+        $mform->setType('datasetid', PARAM_ALPHANUMEXT);
+
+        $mform->addElement('static', 'loadslidehelp', '', get_string('loadslidehelp', 'qtype_omerohotspot'));
+
+        $mform->addElement('hidden', 'geometry', '', ['id' => 'id_geometry']);
+        $mform->setType('geometry', PARAM_RAW);
+
+        if ($courseid === null) {
+            // No course to build a locked-down proxy.php URL against (this
+            // question category isn't scoped to a course/activity) - refuse
+            // to render a broken preview rather than a confusing one.
+            $mform->addElement('static', 'nopreview', '',
+                    $OUTPUT->notification(get_string('needscoursecontext', 'qtype_omerohotspot'), 'warning'));
+        } else {
+            $mform->addElement('static', 'preview', get_string('regionpreview', 'qtype_omerohotspot'),
+                    \html_writer::tag('div', '',
+                            ['id' => 'qtype_omerohotspot_preview_wrap', 'data-courseid' => $courseid,
+                             'style' => 'width:100%; max-width:900px; height:550px; border:1px solid #ccc;']));
+            $PAGE->requires->js_call_amd('qtype_omerohotspot/editform', 'init',
+                    ['qtype_omerohotspot_preview_wrap']);
+        }
+    }
+
+    /**
+     * The course this question's category is scoped to, or null if it
+     * isn't scoped to a course at all (category/system-level question
+     * bank) - proxy.php's own security model requires a real course to
+     * check capabilities against (see resolve/require_capability calls
+     * throughout that file), so there's no meaningful preview to offer
+     * without one.
+     *
+     * @return int|null
+     */
+    protected function get_preview_courseid(): ?int {
+        $coursecontext = $this->categorycontext->get_course_context(false);
+        return $coursecontext ? (int) $coursecontext->instanceid : null;
+    }
+
+    /**
+     * @return int
+     */
+    protected function qtypeobj_userid(): int {
+        global $USER;
+        return (int) $USER->id;
+    }
+
+    public function data_preprocessing($question) {
+        $question = parent::data_preprocessing($question);
+
+        if (!empty($question->options)) {
+            $question->subjectid = $question->options->subjectid;
+            $question->imageid = $question->options->imageid;
+            $question->datasetid = $question->options->datasetid;
+            $question->geometry = $question->options->geometry;
+        }
+
+        return $question;
+    }
+
+    public function validation($data, $files) {
+        $errors = parent::validation($data, $files);
+
+        if (empty($data['subjectid'])) {
+            $errors['subjectid'] = get_string('required');
+        }
+        if (empty($data['imageid']) && empty($data['datasetid'])) {
+            $errors['imageid'] = get_string('missingimageordataset', 'local_omeroembed');
+        }
+        $geometry = json_decode($data['geometry'] ?? '', true);
+        if (!is_array($geometry) || !isset($geometry['type'], $geometry['x'], $geometry['y'], $geometry['rx'], $geometry['ry'])) {
+            $errors['loadslidehelp'] = get_string('missinggeometry', 'qtype_omerohotspot');
+        }
+
+        return $errors;
+    }
+
+    public function qtype() {
+        return 'omerohotspot';
+    }
+}
