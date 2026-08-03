@@ -7,13 +7,22 @@ default). If you're a teacher wanting to embed a slide, see
 
 ## Finding the settings page
 
-- **If you're a Site administrator**: Site administration > Plugins >
-  Local plugins > OMERO slide embed.
+Both pages live under **Site administration > Plugins**:
+
+- **If you're a Site administrator**: **Local plugins > OMERO slide
+  embed** - the full raw settings form (every setting below, including
+  `showomerorois`, `enableannotations`, `enablehotspot`, and the heatmap
+  data retention period).
 - **If you have `local/omeroembed:managesettings` but aren't a Site
-  administrator**: look for **"OMERO slide embed settings"** in the top
-  navigation bar's **"More"** menu, or in the drawer menu on the left.
-  Both pages read and write the exact same settings - it doesn't matter
-  which one you use, or if different people use different ones.
+  administrator**: look for **"OMERO slide embed settings"** directly
+  under **Plugins** (you won't see "Local plugins" itself, or anything
+  else under Site administration, unless you're also a Site
+  administrator - this one page is the only thing this capability grants
+  access to). It reads and writes the *same underlying config values* as
+  a subset of the full form - just the OMERO base URL, the 5 overlay
+  hide/show checkboxes, and the annotation colour palette. Whichever page
+  last saved a shared setting wins; there's nothing to keep in sync
+  between them.
 
 ## What each setting does
 
@@ -45,8 +54,26 @@ admin/manager needs to do on their behalf.
 
 Six checkboxes, each hiding one on-image control - purely cosmetic, no
 effect on pan/zoom, view-links, or the opening view teachers set up.
-Applies everywhere the slide is shown - the authoring tool's own live
-preview and the final student-facing embed both use the same setting.
+
+**This is only a starting point for new embeds, not a live global
+override.** Changing one of these settings never touches anything a
+teacher has already published:
+
+- Every embed is generated through the authoring tool (`author.php`),
+  which pre-fills its overlay checkboxes from whatever this setting
+  currently is - but the teacher can freely change any of them before
+  clicking "Generate embed HTML".
+- Whatever the checkboxes show at that moment gets written permanently
+  into that specific embed's own stored HTML, as an explicit choice - not
+  a reference back to this setting.
+- So changing this setting later only changes what a teacher sees as the
+  *starting* checkbox state the next time they build a **new** embed.
+  Every embed already published elsewhere keeps behaving exactly as it
+  was set up, indefinitely, regardless of what this page says afterwards.
+- The one exception: an embed built with an older version of the plugin,
+  before a particular checkbox existed at all, has no explicit choice
+  baked in for that one setting - it keeps following whatever this page
+  says until someone reopens and re-saves it through the authoring tool.
 
 | Setting | What it hides | Recommendation |
 |---|---|---|

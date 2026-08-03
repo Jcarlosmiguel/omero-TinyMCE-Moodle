@@ -89,16 +89,17 @@ worth re-confirming against any significantly newer iviewer version.
 ## Installing
 
 ```bash
-git clone https://github.com/Jcarlosmiguel/moodle-omero-embed.git local/omeroembed
+git clone https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle.git local/omeroembed
 php admin/cli/upgrade.php --non-interactive
 ```
 
 Then configure the OMERO server and viewer overlay settings (one-time,
 site-wide), either as a Site administrator (Site administration > Plugins
-> Local plugins > OMERO slide embed) or - once granted
-`local/omeroembed:managesettings` - via **local/omeroembed/manage.php**,
-linked as "OMERO slide embed settings" in the site's top navigation bar's
-**"More"** menu (and the drawer menu) for anyone with that capability.
+> Local plugins > OMERO slide embed - the full raw settings form) or - once
+granted `local/omeroembed:managesettings` - via **local/omeroembed/manage.php**,
+linked as "OMERO slide embed settings" directly under **Site
+administration > Plugins** for anyone with that capability, even without
+full Site administrator access.
 
 - **OMERO base URL** - the real OMERO.web server, e.g.
   `https://your-omero-server.example.org`.

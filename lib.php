@@ -15,11 +15,13 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Navigation hooks - without these, author.php and manage.php are only
- * reachable by typing their URL directly. Both callbacks re-check the exact
- * same capability the target page itself checks, so a link only ever appears
- * for someone who could actually use the page anyway - never a dead link for
- * students or ordinary staff.
+ * Navigation hook - without it, author.php is only reachable by typing its
+ * URL directly. Re-checks the exact same capability author.php itself
+ * checks, so this link only ever appears for someone who could actually use
+ * the page anyway - never a dead link for students or ordinary staff.
+ * manage.php's own discoverability is handled differently - see
+ * settings.php's admin_externalpage registration (Site administration >
+ * Plugins), not a navigation callback at all.
  *
  * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
@@ -55,16 +57,3 @@ function local_omeroembed_extend_navigation_course(navigation_node $coursenode, 
     );
     $coursenode->add_node($node);
 }
-
-// The "OMERO slide embed settings" link (manage.php) is added via the newer
-// \core\hook\navigation\primary_extend hook instead of a plain
-// local_omeroembed_extend_navigation() callback here - see
-// classes/hook_callbacks.php for why: the legacy global callback still runs
-// (confirmed - get_plugin_list_with_function() finds it, has_capability()
-// inside it evaluates correctly), but Boost's actual top nav bar in Moodle
-// 4.4+ is built from \core\navigation\views\primary, which does NOT read
-// from the legacy global_navigation tree at all - a node added the old way
-// exists in the tree but is never rendered anywhere. Confirmed by testing:
-// the course-level link below (extend_navigation_course(), a still-current
-// mechanism) showed up correctly; the old-style global one did not, on the
-// same page, for the same user.

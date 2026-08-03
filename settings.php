@@ -26,6 +26,31 @@ defined('MOODLE_INTERNAL') || die();
 
 use local_omeroembed\annotations_repository;
 
+// Site administration entry point for manage.php, reachable by anyone with
+// local/omeroembed:managesettings (Manager by default) - deliberately
+// unconditional, NOT inside the $hassiteconfig block below. Core's own
+// admin/settings/plugins.php calls every local plugin's load_settings()
+// unconditionally regardless of $hassiteconfig ("their settings may be in
+// any part of the settings tree and may be visible not only for
+// administrators" - see that file's own comment), and admin_externalpage's
+// own check_access() genuinely respects whatever capability is passed as
+// its 4th constructor argument, not just moodle/site:config - the same
+// mechanism core itself uses (e.g. contentbank's customfields page).
+// Attached to the 'modules' ("Plugins") category rather than 'localplugins'
+// - that subcategory is itself only created when $hassiteconfig is true,
+// so attaching there would silently fail to appear for a Manager who lacks
+// full site-config. This was previously a primary-navigation-bar link
+// (classes/hook_callbacks.php) - moved here since Moodle's own convention
+// is to keep primary nav sparse and put plugin settings in the admin tree;
+// this capability check achieves the same "reachable without site:config"
+// goal without needing primary nav for it.
+$ADMIN->add('modules', new admin_externalpage(
+    'local_omeroembed_manage',
+    get_string('managetitle', 'local_omeroembed'),
+    (new moodle_url('/local/omeroembed/manage.php'))->out(false),
+    'local/omeroembed:managesettings'
+));
+
 // Local plugins don't get an automatic settings page the way e.g. filter plugins
 // do - $settings has to be created and added to the tree explicitly here, gated
 // on $hassiteconfig (whether the current user has moodle/site:config), matching
