@@ -226,6 +226,7 @@ if ($hasslide) {
             'previewnotready' => get_string('previewnotready', 'local_omeroembed'),
             'selecttextfirst' => get_string('selecttextfirst', 'local_omeroembed'),
             'selectinsidewriteup' => get_string('selectinsidewriteup', 'local_omeroembed'),
+            'clicklinkfirst' => get_string('clicklinkfirst', 'local_omeroembed'),
             'copied' => get_string('copied', 'local_omeroembed'),
             'openingviewset' => get_string('openingviewset', 'local_omeroembed'),
             'resetview' => get_string('resetview', 'local_omeroembed'),
@@ -434,6 +435,10 @@ if ($hasslide) {
     echo html_writer::tag('button', get_string('insertviewlink', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-insert-link-btn', 'class' => 'btn btn-secondary',
         'style' => $imageonly ? 'display:none;' : '', // Stays visible for textbelow - it's still a rich write-up box.
+    ]);
+    echo html_writer::tag('button', get_string('removeviewlink', 'local_omeroembed'), [
+        'type' => 'button', 'id' => 'omero-remove-link-btn', 'class' => 'btn btn-secondary',
+        'style' => $imageonly ? 'display:none;' : '',
     ]);
     echo html_writer::tag('button', get_string('setopeningview', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-set-opening-btn', 'class' => 'btn btn-info',

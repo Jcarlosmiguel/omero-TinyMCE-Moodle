@@ -143,7 +143,14 @@
         url.searchParams.set('x', view.x);
         url.searchParams.set('y', view.y);
         url.searchParams.set('zm', view.zm);
-        return url.toString();
+        // Root-relative, not url.toString() (absolute) - this gets inserted
+        // directly into stored write-up content via insertViewLink() below,
+        // so baking in the current host/port would silently break every
+        // view-link the moment Moodle's own address ever changes (a new
+        // domain, a different port, an HTTP->HTTPS migration...). A root-
+        // relative URL instead resolves correctly against whatever host is
+        // actually serving the page at click time, forever.
+        return url.pathname + url.search;
     }
 
     /**
@@ -241,11 +248,13 @@
         var pane = document.getElementById('omero-split-pane');
         var writeup = document.getElementById(config.writeupId);
         var insertBtn = document.getElementById('omero-insert-link-btn');
+        var removeBtn = document.getElementById('omero-remove-link-btn');
         var iframeWrap = document.getElementById('omero-iframe-wrap');
 
         if (layout === 'imageonly') {
             writeup.style.display = 'none';
             insertBtn.style.display = 'none';
+            removeBtn.style.display = 'none';
             iframeWrap.style.flex = '1 1 100%';
             pane.style.flexDirection = 'row';
         } else if (layout === 'textbelow') {
@@ -253,6 +262,7 @@
             // not a full-height write-up pane next to it.
             writeup.style.display = '';
             insertBtn.style.display = '';
+            removeBtn.style.display = '';
             writeup.style.flex = '0 0 auto';
             writeup.style.width = '100%';
             writeup.style.height = 'auto';
@@ -263,6 +273,7 @@
         } else {
             writeup.style.display = '';
             insertBtn.style.display = '';
+            removeBtn.style.display = '';
             writeup.style.flex = '1';
             writeup.style.width = '';
             writeup.style.height = document.getElementById(config.iframeId).style.height;
@@ -309,6 +320,50 @@
         }
 
         selection.removeAllRanges();
+    }
+
+    // The <a> a mousedown most recently landed on inside the write-up box -
+    // see removeViewLink() below for why this, and not the current
+    // Selection/Range, is what it acts on.
+    var lastClickedLink = null;
+
+    /**
+     * Unwraps the <a> most recently clicked inside the write-up box, leaving
+     * its text behind - the only way to actually get rid of a view-link,
+     * since insertViewLink() above can't replace one in place: selecting
+     * text that's already (even partially) inside an existing <a> makes
+     * range.surroundContents() throw (a Range can't wrap around part of one
+     * element and not the rest), so it falls back to extractContents(),
+     * which nests the new link inside the old one instead of replacing it -
+     * the old, wrong href never actually goes away on its own.
+     *
+     * Deliberately keyed off the clicked DOM element (via the mousedown
+     * listener below), not off window.getSelection() - a Range's
+     * commonAncestorContainer can land above the actual <a> a teacher
+     * clicked (e.g. an ordinary click-and-drag that starts inside a link
+     * and drifts past its edge before release, which is easy to do without
+     * noticing), which made an earlier Selection-walking version of this
+     * unreliable at finding the link that was actually meant. Reading the
+     * clicked element directly is unambiguous regardless of selection
+     * shape, and for a nested/corrupted link (see the doc comment above)
+     * correctly targets whichever layer was actually clicked on, so
+     * clicking repeatedly peels one layer at a time.
+     */
+    function removeViewLink() {
+        var writeup = document.getElementById(config.writeupId);
+        var link = lastClickedLink;
+
+        if (!link || !writeup.contains(link)) {
+            window.alert(config.strings.clicklinkfirst);
+            return;
+        }
+
+        var parent = link.parentNode;
+        while (link.firstChild) {
+            parent.insertBefore(link.firstChild, link);
+        }
+        parent.removeChild(link);
+        lastClickedLink = null;
     }
 
     // The opening view chosen via setOpeningView() below - stored here rather
@@ -364,7 +419,11 @@
         // know which embed placement this is - see getOrMintAnnotateId()'s
         // own comment for why this has to be stable across re-edits.
         iframeSrcUrl.searchParams.set('embedid', getOrMintAnnotateId());
-        var iframeSrc = iframeSrcUrl.toString();
+        // Root-relative, not iframeSrcUrl.toString() (absolute) - same
+        // reasoning as buildViewUrl() above: this gets baked directly into
+        // the embed HTML the teacher pastes into a Page/Label, so it must
+        // keep working if Moodle's own host/port ever changes later.
+        var iframeSrc = iframeSrcUrl.pathname + iframeSrcUrl.search;
 
         // id (in addition to the existing name) gives the reset button in
         // the textbelow layout below a stable, unique target to reload -
@@ -464,6 +523,14 @@
     }
 
     document.getElementById('omero-insert-link-btn').addEventListener('click', insertViewLink);
+    document.getElementById('omero-remove-link-btn').addEventListener('click', removeViewLink);
+    // Tracks lastClickedLink for removeViewLink() - see its own doc comment
+    // for why mousedown (fires at the start of a click *or* a drag-select,
+    // before the selection itself has necessarily settled) rather than
+    // click or the Selection API.
+    document.getElementById(config.writeupId).addEventListener('mousedown', function(event) {
+        lastClickedLink = event.target.closest ? event.target.closest('a') : null;
+    });
     document.getElementById('omero-set-opening-btn').addEventListener('click', setOpeningView);
     document.getElementById('omero-generate-btn').addEventListener('click', generateEmbed);
     // Not rendered in embedded mode (see author.php) - generateEmbed()

@@ -133,6 +133,7 @@ $string['widthdesc'] = 'Match this to the actual content width of a course page/
 $string['heightlabel'] = 'Height';
 $string['loadslide'] = 'Load slide';
 $string['insertviewlink'] = 'Insert view link';
+$string['removeviewlink'] = 'Remove view link';
 $string['setopeningview'] = 'Set as opening view';
 $string['openingviewset'] = 'Opening view set!';
 $string['generateembed'] = 'Generate embed HTML';
@@ -142,6 +143,7 @@ $string['copied'] = 'Copied!';
 $string['previewnotready'] = 'Could not read the slide\'s current position - wait for it to finish loading, then pan or zoom before trying again.';
 $string['selecttextfirst'] = 'Select some text in the write-up box first, then click Insert view link.';
 $string['selectinsidewriteup'] = 'Select text inside the write-up box (not the slide or anything else on the page).';
+$string['clicklinkfirst'] = 'Click inside an existing view link first, then click Remove view link. To point a link at a different view, remove it, then select the text again and click Insert view link.';
 
 $string['omeroembed:managesettings'] = 'Manage OMERO slide embed settings (base URL, subject accounts, viewer overlays)';
 $string['omeroembed:annotate'] = 'Draw and delete your own point annotations on an embedded OMERO slide';
