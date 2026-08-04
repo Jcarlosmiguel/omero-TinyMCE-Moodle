@@ -19,7 +19,7 @@ Both pages live under **Site administration > Plugins**:
   else under Site administration, unless you're also a Site
   administrator - this one page is the only thing this capability grants
   access to). It reads and writes the *same underlying config values* as
-  a subset of the full form - just the OMERO base URL, the 5 overlay
+  a subset of the full form - just the OMERO base URL, the 6 overlay
   hide/show checkboxes, and the annotation colour palette. Whichever page
   last saved a shared setting wins; there's nothing to keep in sync
   between them.
@@ -78,11 +78,13 @@ teacher has already published:
 | Setting | What it hides | Recommendation |
 |---|---|---|
 | Hide overview map | Small inset thumbnail of the whole image | Usually fine to hide - most people find it more distracting than useful for a single embedded slide |
-| Hide rotate control | "Reset rotation" arrow | Usually fine to hide - rarely relevant for flat slide images |
 | Hide coordinate/zoom readout | Diagnostic pixel position readout | Safe to hide - the authoring tool reads this value directly, not by displaying it, so hiding it doesn't break "Insert view link" or "Set as opening view" |
 | Hide full-screen button | Full-screen toggle | Consider leaving visible - useful for students wanting to see fine detail |
 | Hide scale bar | Real-world size reference (e.g. "5 mm") | Consider leaving visible - often pedagogically useful for judging magnification |
 | Hide zoom controls | Zoom in/out, "1:1", zoom % input | **Not just cosmetic** - hiding this removes the ability to zoom interactively at all. Only enable if an embed is meant to show one fixed view with no student interaction |
+| Hide OMERO top navigation bar | OMERO.web's own File/ROIs/Help menu bar - not part of the slide viewer | **Recommended, and on by default** - its links point outside this locked-down embed and don't work correctly here |
+
+The slide's rotate control isn't in this list because it isn't configurable at all - it's always hidden, unconditionally, regardless of any setting here (there's no way to actually control rotation from this embed, so a visible control for it would just be confusing clutter).
 
 ## Granting settings access to someone who isn't a Site administrator
 

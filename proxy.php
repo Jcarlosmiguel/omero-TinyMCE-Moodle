@@ -400,7 +400,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
         // Rotate isn't configurable at all (see inject_overlay_hide_css()'s
         // own comment) - always hidden, not part of this loop.
         $hideflags = [];
-        foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom'] as $key) {
+        foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar'] as $key) {
             $hideflags[$key] = resolve_overlay_setting($key);
         }
         $enableannotations = resolve_overlay_setting('enableannotations');
@@ -696,6 +696,11 @@ function inject_overlay_hide_css(string $body, array $hideflags): string {
         'hidefullscreen' => '.ol-full-screen',
         'hidescaleline' => '.ol-scale-line',
         'hidezoom' => '.ol-zoom',
+        // OMERO.web's own top navbar, not part of the OpenLayers viewer -
+        // its links lead outside this locked-down embed and don't work
+        // correctly here (confirmed with the user), so this is on by
+        // default (see settings.php) unlike the OpenLayers controls above.
+        'hidenavbar' => '.navbar-fixed-top',
     ];
 
     // Always hidden, not configurable - confirmed with the user: there's

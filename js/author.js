@@ -169,7 +169,7 @@
     // resolve_overlay_setting() is the actual precedence logic - this just
     // needs to read whatever the teacher currently has checked).
     var OVERLAY_KEYS = [
-        'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
+        'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
         'enablehotspot', 'enablehotspotmulti',
     ];
 
@@ -575,6 +575,13 @@
     // before enablehotspot in every branch as defense-in-depth regardless
     // (see that file's own comment).
     var hotspotMultiCheckbox = document.querySelector('input[type="checkbox"][name="enablehotspotmulti"]');
+    // proxy.php unconditionally forces enableannotations off on the actual
+    // student-facing view whenever either hotspot mode is active (see its
+    // own $hotspotoverridesstudentview comment - "no sensible way to want
+    // both active on the same click at once") - force-unchecking this here
+    // too keeps the form honest about that, instead of letting a teacher
+    // leave it checked and believe it's still doing something.
+    var annotationsCheckbox = document.querySelector('input[type="checkbox"][name="enableannotations"]');
     if (hotspotCheckbox) {
         hotspotCheckbox.addEventListener('change', function() {
             if (!hotspotCheckbox.checked) {
@@ -582,6 +589,9 @@
             }
             if (hotspotMultiCheckbox) {
                 hotspotMultiCheckbox.checked = false;
+            }
+            if (annotationsCheckbox) {
+                annotationsCheckbox.checked = false;
             }
             var previewIframe = document.getElementById(config.iframeId);
             if (!previewIframe) {
@@ -602,6 +612,9 @@
             if (hotspotCheckbox) {
                 hotspotCheckbox.checked = false;
             }
+            if (annotationsCheckbox) {
+                annotationsCheckbox.checked = false;
+            }
             var previewIframe = document.getElementById(config.iframeId);
             if (!previewIframe) {
                 return;
@@ -611,6 +624,22 @@
             url.searchParams.set('enablehotspotmulti', '1');
             url.searchParams.set('embedid', getOrMintAnnotateId());
             previewIframe.src = url.toString();
+        });
+    }
+    // Reverse direction of the same exclusivity: turning annotations *on*
+    // while a hotspot mode is already checked would otherwise leave the
+    // form showing a combination proxy.php never actually honours.
+    if (annotationsCheckbox) {
+        annotationsCheckbox.addEventListener('change', function() {
+            if (!annotationsCheckbox.checked) {
+                return;
+            }
+            if (hotspotCheckbox) {
+                hotspotCheckbox.checked = false;
+            }
+            if (hotspotMultiCheckbox) {
+                hotspotMultiCheckbox.checked = false;
+            }
         });
     }
 

@@ -41,6 +41,8 @@ $string['hidescaleline'] = 'Hide scale bar';
 $string['hidescaleline_desc'] = 'Shows a real-world size reference (e.g. "5 mm"). Consider leaving this visible - it\'s often pedagogically useful for judging magnification.';
 $string['hidezoom'] = 'Hide zoom controls';
 $string['hidezoom_desc'] = 'The zoom in/out buttons, "1:1" reset, and zoom percentage input. Hiding this removes the ability to zoom interactively, not just a cosmetic change - only enable if the embed is meant to show a single fixed view with no student interaction.';
+$string['hidenavbar'] = 'Hide OMERO top navigation bar';
+$string['hidenavbar_desc'] = 'OMERO.web\'s own top bar (File/ROIs/Help menus, its own branding) - not part of the slide viewer itself. Its links lead to pages outside this locked-down embed and don\'t work correctly here, so hiding it is recommended for every embed.';
 $string['showomerorois'] = 'Show OMERO ROIs by default';
 $string['showomerorois_desc'] = 'Automatically expands the right-hand panel and switches to its "ROIs" tab when a student opens the embed, so OMERO.iviewer\'s own Regions of Interest are visible immediately instead of hidden behind a collapsed panel. Purely a starting state - students can still collapse the panel or switch tabs themselves afterwards.';
 

@@ -127,6 +127,15 @@ if ($hassiteconfig) {
         get_string('hidezoom_desc', 'local_omeroembed'),
         0
     ));
+    // On by default, unlike the others above - this bar's own links point
+    // outside the locked-down embed and don't work correctly here, so
+    // there's no real reason a new embed would want it visible.
+    $settings->add(new admin_setting_configcheckbox(
+        'local_omeroembed/hidenavbar',
+        get_string('hidenavbar', 'local_omeroembed'),
+        get_string('hidenavbar_desc', 'local_omeroembed'),
+        1
+    ));
     // Off by default - OMERO's own ROI panel stays exactly as it is today
     // (collapsed) unless a teacher opts an embed into this. See proxy.php's
     // inject_show_rois_script() for what enabling it actually does.

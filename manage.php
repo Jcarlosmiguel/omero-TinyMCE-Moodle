@@ -54,7 +54,7 @@ $PAGE->set_heading(get_string('managetitle', 'local_omeroembed'));
 // No "hide rotate control" here either - always hidden, unconditionally,
 // in proxy.php's inject_overlay_hide_css() (see settings.php's own
 // comment on why).
-$overlaysettings = ['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom'];
+$overlaysettings = ['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar'];
 
 $saved = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
