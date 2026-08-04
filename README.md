@@ -88,9 +88,50 @@ worth re-confirming against any significantly newer iviewer version.
 
 ## Installing
 
+This one repository bundles **four** separate Moodle plugins - the local
+plugin itself, a TinyMCE editor button, and two quiz question types - each
+of which Moodle requires in its own fixed location. Cloning the whole repo
+straight into `local/omeroembed` (as earlier versions of this document
+said to) only installs the local plugin: the other three end up as inert
+subfolders nested inside it, with no error to explain why the TinyMCE
+button or either hotspot question type never appears. Clone once to a
+staging directory, then copy each piece to where Moodle actually expects
+it:
+
 ```bash
-git clone https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle.git local/omeroembed
+# 1. Clone to a staging checkout - not directly into your Moodle install.
+git clone https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle.git omero-tinymce-moodle
+cd omero-tinymce-moodle
+
+# 2. Copy each of the four plugins to its real location under your
+#    Moodle codebase ($MOODLE_DIR below - adjust to your actual path).
+MOODLE_DIR=/path/to/your/moodle
+
+mkdir -p "$MOODLE_DIR/local/omeroembed"
+cp -r ajax.php author.php classes db export.php heatmap.php js lang \
+      lib.php manage.php mysubjects.php proxy.php settings.php \
+      version.php video.php LICENSE \
+      "$MOODLE_DIR/local/omeroembed/"
+cp -r tiny_omeroembed        "$MOODLE_DIR/lib/editor/tiny/plugins/omeroembed"
+cp -r qtype_omerohotspot     "$MOODLE_DIR/question/type/omerohotspot"
+cp -r qtype_omerohotspotmulti "$MOODLE_DIR/question/type/omerohotspotmulti"
+
+# 3. Install all four in one pass.
+cd "$MOODLE_DIR"
 php admin/cli/upgrade.php --non-interactive
+```
+
+Confirm all four actually installed before moving on - each of these
+should print a version number, not "NOT INSTALLED":
+
+```bash
+php -r '
+define("CLI_SCRIPT", true);
+require(__DIR__ . "/config.php");
+foreach (["local_omeroembed", "tiny_omeroembed", "qtype_omerohotspot", "qtype_omerohotspotmulti"] as $c) {
+    echo "$c: " . (get_config($c, "version") ?: "NOT INSTALLED") . "\n";
+}
+'
 ```
 
 Then configure the OMERO server and viewer overlay settings (one-time,
