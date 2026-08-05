@@ -49,7 +49,7 @@ const WRITEUP_MESSAGE_TYPE = 'omero-embed-existing-writeup';
 // resolve_overlay_setting() is the actual precedence logic - this file
 // only needs to round-trip whatever an existing embed already has).
 const OVERLAY_PARAM_KEYS = [
-    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'showomerorois', 'enableannotations',
+    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
     'enablehotspot', 'enablehotspotmulti',
 ];
 
