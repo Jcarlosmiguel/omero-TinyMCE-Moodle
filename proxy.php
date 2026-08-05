@@ -714,6 +714,15 @@ function inject_overlay_hide_css(string $body, array $hideflags): string {
     }
 
     $style = '<style>' . implode(', ', $selectors) . ' { display: none !important; }</style>';
+    if (!empty($hideflags['hidenavbar'])) {
+        // The page's own top padding exists to keep content clear of the
+        // fixed navbar above it - hiding the navbar without this leaves an
+        // empty gap the same height where it used to be. Scoped to this one
+        // specific container (.row.center is unique on this page, confirmed
+        // directly), not a bare .row.center rule that could catch something
+        // unrelated on a future page layout.
+        $style .= '<style>body.container-fluid > .row.center { padding-top: 0 !important; }</style>';
+    }
     $withstyle = preg_replace('#(</head>)#i', $style . '$1', $body, 1);
     return $withstyle !== null ? $withstyle : ($body . $style);
 }
