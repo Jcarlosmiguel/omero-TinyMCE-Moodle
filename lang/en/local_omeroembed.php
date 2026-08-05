@@ -69,6 +69,15 @@ $string['hotspot_incorrect'] = 'Not quite - try again';
 // single-region one.
 $string['enablehotspotmulti'] = 'Enable multi-region hotspot question';
 $string['enablehotspotmulti_desc'] = 'Turns on the multi-region hotspot feature for this embed - like the single-region hotspot question above, but a student\'s click is correct if it lands inside ANY of several regions you mark (e.g. several equally-correct examples of a feature scattered across the same slide), not just one. Checking this in the authoring tool reveals a drawing toolbar on the live preview for marking as many correct regions as needed.';
+
+// The authoring tool presents the two settings above as a single dropdown,
+// not two independent checkboxes - see author.php's own $hotspotmode
+// comment for why. Same two underlying settings either way; these three
+// strings are only the dropdown's own label and option text.
+$string['hotspotmodelabel'] = 'Hotspot question';
+$string['hotspotmodenone'] = 'None';
+$string['hotspotmodesingle'] = 'Single region (one correct spot)';
+$string['hotspotmodemulti'] = 'Multiple regions (any one of several is correct)';
 $string['hotspotmultitoolbar_delete'] = 'Delete region';
 $string['invalidregion'] = 'One of the submitted regions is missing a required field, has an invalid type, or has a non-positive radius.';
 $string['toomanyregions'] = 'Too many regions submitted at once (maximum {$a}) - this is almost certainly not something drawn by hand, so the request was refused.';

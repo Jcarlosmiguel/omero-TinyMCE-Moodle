@@ -79,10 +79,59 @@ $browsable = optional_param('browsable', 0, PARAM_BOOL);
 // Rotate isn't included - always hidden, not a real choice (see
 // proxy.php's inject_overlay_hide_css() for why).
 $overlaysettings = [];
-foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations', 'enablehotspot', 'enablehotspotmulti'] as $key) {
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations'] as $key) {
     $submitted = optional_param($key, null, PARAM_BOOL);
     $overlaysettings[$key] = $submitted ?? (bool) get_config('local_omeroembed', $key);
 }
+
+// enablehotspot/enablehotspotmulti are presented as a single dropdown
+// ('', 'single', 'multi') rather than two independent checkboxes -
+// confirmed with the user: two checkboxes could reach an ambiguous
+// "both checked" state that meant nothing real (proxy.php's own dispatch
+// had to pick a winner for it), and needed JS on both sides just to keep
+// them mutually exclusive. A dropdown can't represent "both" at all, and
+// correctly pre-selects whichever was already saved when editing an
+// existing embed. Still stored/consumed everywhere else (proxy.php,
+// ajax.php, the DB) as the same two independent booleans as before -
+// this is a presentation-layer change only, not a data model change.
+$hotspotmode = optional_param('hotspotmode', null, PARAM_ALPHA);
+if ($hotspotmode === null) {
+    // No hotspotmode param - either a genuinely first visit to this form,
+    // or (just as likely) tiny_omeroembed's ui.js re-opening an existing
+    // embed for editing, which round-trips whatever that embed's own
+    // stored iframe src already has as separate enablehotspot/
+    // enablehotspotmulti GET params (the pre-dropdown format every embed
+    // generated before this change - and still every embed generated
+    // *after* it, since generateEmbed() only ever writes the two
+    // underlying params, never a hotspotmode of its own) - see
+    // OVERLAY_PARAM_KEYS in tiny_omeroembed/amd/src/ui.js. Checking those
+    // explicitly first is what makes "comes back with its previous
+    // settings" actually true when editing an existing hotspot embed,
+    // rather than silently resetting it to the site default.
+    $legacyhotspot = optional_param('enablehotspot', null, PARAM_BOOL);
+    $legacyhotspotmulti = optional_param('enablehotspotmulti', null, PARAM_BOOL);
+    if ($legacyhotspot !== null || $legacyhotspotmulti !== null) {
+        if ($legacyhotspotmulti) {
+            $hotspotmode = 'multi';
+        } else if ($legacyhotspot) {
+            $hotspotmode = 'single';
+        } else {
+            $hotspotmode = '';
+        }
+    } else {
+        // Genuinely nothing submitted at all - fall back to the site-wide
+        // defaults, same as every other overlay setting above.
+        if ((bool) get_config('local_omeroembed', 'enablehotspotmulti')) {
+            $hotspotmode = 'multi';
+        } else if ((bool) get_config('local_omeroembed', 'enablehotspot')) {
+            $hotspotmode = 'single';
+        } else {
+            $hotspotmode = '';
+        }
+    }
+}
+$overlaysettings['enablehotspot'] = ($hotspotmode === 'single');
+$overlaysettings['enablehotspotmulti'] = ($hotspotmode === 'multi');
 
 // Same round-trip idea as $overlaysettings above, but for a *set* rather
 // than independent booleans - colours_submitted (a plain hidden field,
@@ -322,14 +371,33 @@ echo html_writer::end_tag('fieldset');
 // "1" if checked) so the field is always present either way.
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('overlaysheading', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations', 'enablehotspot', 'enablehotspotmulti'] as $key) {
-    $style = ($key === 'enableannotations' || $key === 'enablehotspot' || $key === 'enablehotspotmulti')
-            ? 'display:block; margin-top:0.5rem;' : 'display:block;';
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations'] as $key) {
+    $style = ($key === 'enableannotations') ? 'display:block; margin-top:0.5rem;' : 'display:block;';
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $key, 'value' => 0]);
     echo html_writer::tag('label',
         html_writer::checkbox($key, 1, $overlaysettings[$key], get_string($key, 'local_omeroembed')),
         ['style' => $style]);
 }
+// Single dropdown, not two independent checkboxes - see $hotspotmode's
+// own comment above for why. js/author.js greys out (and unchecks) the
+// annotations checkbox above whenever this isn't '', since proxy.php
+// itself always overrides annotations off while a hotspot mode is
+// active anyway (see its own $hotspotoverridesstudentview comment) -
+// this just makes the form honest about that rather than letting a
+// teacher believe both are active at once.
+echo html_writer::tag('label', get_string('hotspotmodelabel', 'local_omeroembed'),
+    ['style' => 'display:block; margin-top:0.5rem;', 'for' => 'id_hotspotmode']);
+echo html_writer::select(
+    [
+        '' => get_string('hotspotmodenone', 'local_omeroembed'),
+        'single' => get_string('hotspotmodesingle', 'local_omeroembed'),
+        'multi' => get_string('hotspotmodemulti', 'local_omeroembed'),
+    ],
+    'hotspotmode',
+    $hotspotmode,
+    false,
+    ['id' => 'id_hotspotmode']
+);
 echo html_writer::end_tag('fieldset');
 
 // Same round-trip technique as the overlay fieldset above (hidden

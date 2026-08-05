@@ -168,9 +168,11 @@
     // Matches author.php's own $overlaysettings key list (proxy.php's
     // resolve_overlay_setting() is the actual precedence logic - this just
     // needs to read whatever the teacher currently has checked).
+    // enablehotspot/enablehotspotmulti aren't here - they're a dropdown
+    // now, not checkboxes (see author.php's own $hotspotmode comment) -
+    // currentHotspotMode() below reads that instead.
     var OVERLAY_KEYS = [
         'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
-        'enablehotspot', 'enablehotspotmulti',
     ];
 
     /**
@@ -212,6 +214,12 @@
             }
         });
         return settings;
+    }
+
+    /** @return {string} '', 'single', or 'multi' - see author.php's own $hotspotmode comment. */
+    function currentHotspotMode() {
+        var select = document.querySelector('select[name="hotspotmode"]');
+        return select ? select.value : '';
     }
 
     /**
@@ -411,6 +419,11 @@
         Object.keys(overlaySettings).forEach(function(key) {
             iframeSrcUrl.searchParams.set(key, overlaySettings[key] ? '1' : '0');
         });
+        // Not part of overlaySettings above - a dropdown, not a checkbox
+        // (see author.php's own $hotspotmode comment).
+        var hotspotmode = currentHotspotMode();
+        iframeSrcUrl.searchParams.set('enablehotspot', hotspotmode === 'single' ? '1' : '0');
+        iframeSrcUrl.searchParams.set('enablehotspotmulti', hotspotmode === 'multi' ? '1' : '0');
         var colours = currentColours();
         if (colours !== null) {
             iframeSrcUrl.searchParams.set('annotationcolours', colours.join(','));
@@ -555,91 +568,68 @@
     // Every other overlay checkbox only ever affects the *final generated*
     // embed - generateEmbed() re-reads them live at insert time (see its
     // own comment), the live preview iframe itself never needs to know.
-    // This one is different: drawing the hidden hotspot region has to
+    // The hotspot mode is different: drawing the hidden region(s) has to
     // happen inside the preview iframe itself, which means proxy.php needs
-    // to see authoring=1&enablehotspot=1&embedid=<this placement's own
-    // token> on *that* iframe's own src before it will inject
-    // inject_hotspot_author_script() - so checking this box reloads the
+    // to see authoring=1&enablehotspot(multi)=1&embedid=<this placement's
+    // own token> on *that* iframe's own src before it will inject the
+    // right authoring script - so changing this dropdown reloads the
     // preview into that mode. getOrMintAnnotateId() is reused as-is
     // (already idempotent/cached for the session) - the same token
     // generateEmbed() would mint anyway, just needed earlier than usual so
-    // the region gets saved against the right placement from the start.
-    var hotspotCheckbox = document.querySelector('input[type="checkbox"][name="enablehotspot"]');
-    // Multi-region sibling of hotspotCheckbox below - same reasoning
-    // (drawing has to happen inside the preview iframe itself), just
-    // reloading into inject_hotspot_multi_author_script()'s mode instead
-    // (enablehotspotmulti=1 rather than enablehotspot=1). The two are kept
-    // mutually exclusive here (checking one force-unchecks the other) so a
-    // teacher can never have both true on the same embed through the
-    // normal UI - proxy.php's own dispatch still checks enablehotspotmulti
-    // before enablehotspot in every branch as defense-in-depth regardless
-    // (see that file's own comment).
-    var hotspotMultiCheckbox = document.querySelector('input[type="checkbox"][name="enablehotspotmulti"]');
+    // the region(s) get saved against the right placement from the start.
+    //
+    // A dropdown, not two checkboxes - see author.php's own $hotspotmode
+    // comment for why. Confirmed as a real bug in the old two-checkbox
+    // version: its own reload rebuilt the preview URL from
+    // config.baseProxyUrl (the page's *original* load-time values), not
+    // the teacher's *current* checkbox states - so toggling any other
+    // overlay setting (e.g. "Hide OMERO top navigation bar") after
+    // switching a hotspot mode on silently reverted to whatever that
+    // setting was at page load, with no visible error. This version
+    // rebuilds from currentOverlaySettings() instead, the same live-read
+    // generateEmbed() already relies on, so it can never go stale that
+    // way again.
+    var hotspotModeSelect = document.querySelector('select[name="hotspotmode"]');
     // proxy.php unconditionally forces enableannotations off on the actual
-    // student-facing view whenever either hotspot mode is active (see its
-    // own $hotspotoverridesstudentview comment - "no sensible way to want
-    // both active on the same click at once") - force-unchecking this here
-    // too keeps the form honest about that, instead of letting a teacher
-    // leave it checked and believe it's still doing something.
+    // student-facing view whenever any hotspot mode is active (see its own
+    // $hotspotoverridesstudentview comment - "no sensible way to want both
+    // active on the same click at once") - greying this out (not just
+    // unchecking it) keeps the form honest about that, instead of letting
+    // a teacher believe it's still an active, independent choice.
     var annotationsCheckbox = document.querySelector('input[type="checkbox"][name="enableannotations"]');
-    if (hotspotCheckbox) {
-        hotspotCheckbox.addEventListener('change', function() {
-            if (!hotspotCheckbox.checked) {
-                return;
-            }
-            if (hotspotMultiCheckbox) {
-                hotspotMultiCheckbox.checked = false;
-            }
-            if (annotationsCheckbox) {
+
+    function applyHotspotModeUI() {
+        var active = !!(hotspotModeSelect && hotspotModeSelect.value !== '');
+        if (annotationsCheckbox) {
+            annotationsCheckbox.disabled = active;
+            if (active) {
                 annotationsCheckbox.checked = false;
             }
+        }
+    }
+
+    if (hotspotModeSelect) {
+        // Runs once on page load too - editing an existing hotspot embed
+        // should start with annotations already greyed out, not just
+        // after the teacher next touches the dropdown.
+        applyHotspotModeUI();
+        hotspotModeSelect.addEventListener('change', function() {
+            applyHotspotModeUI();
+
             var previewIframe = document.getElementById(config.iframeId);
             if (!previewIframe) {
                 return;
             }
+            var mode = hotspotModeSelect.value;
             var url = new URL(config.baseProxyUrl, window.location.href);
-            url.searchParams.set('authoring', '1');
-            url.searchParams.set('enablehotspot', '1');
+            var overlaySettings = currentOverlaySettings();
+            Object.keys(overlaySettings).forEach(function(key) {
+                url.searchParams.set(key, overlaySettings[key] ? '1' : '0');
+            });
+            url.searchParams.set('enablehotspot', mode === 'single' ? '1' : '0');
+            url.searchParams.set('enablehotspotmulti', mode === 'multi' ? '1' : '0');
             url.searchParams.set('embedid', getOrMintAnnotateId());
             previewIframe.src = url.toString();
-        });
-    }
-    if (hotspotMultiCheckbox) {
-        hotspotMultiCheckbox.addEventListener('change', function() {
-            if (!hotspotMultiCheckbox.checked) {
-                return;
-            }
-            if (hotspotCheckbox) {
-                hotspotCheckbox.checked = false;
-            }
-            if (annotationsCheckbox) {
-                annotationsCheckbox.checked = false;
-            }
-            var previewIframe = document.getElementById(config.iframeId);
-            if (!previewIframe) {
-                return;
-            }
-            var url = new URL(config.baseProxyUrl, window.location.href);
-            url.searchParams.set('authoring', '1');
-            url.searchParams.set('enablehotspotmulti', '1');
-            url.searchParams.set('embedid', getOrMintAnnotateId());
-            previewIframe.src = url.toString();
-        });
-    }
-    // Reverse direction of the same exclusivity: turning annotations *on*
-    // while a hotspot mode is already checked would otherwise leave the
-    // form showing a combination proxy.php never actually honours.
-    if (annotationsCheckbox) {
-        annotationsCheckbox.addEventListener('change', function() {
-            if (!annotationsCheckbox.checked) {
-                return;
-            }
-            if (hotspotCheckbox) {
-                hotspotCheckbox.checked = false;
-            }
-            if (hotspotMultiCheckbox) {
-                hotspotMultiCheckbox.checked = false;
-            }
         });
     }
 
