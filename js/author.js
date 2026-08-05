@@ -629,6 +629,17 @@
             url.searchParams.set('enablehotspot', mode === 'single' ? '1' : '0');
             url.searchParams.set('enablehotspotmulti', mode === 'multi' ? '1' : '0');
             url.searchParams.set('embedid', getOrMintAnnotateId());
+            if (mode !== '') {
+                // config.baseProxyUrl (the pristine, page-load base this
+                // reload is rebuilt from every time) never has this set on
+                // its own - the old two-checkbox version's own reload set
+                // it explicitly for exactly this reason, and this rewrite
+                // dropped it by mistake. Without it proxy.php has no way
+                // to know it should inject the drawing toolbar/overlay at
+                // all, so the preview looks like a plain read-only slide
+                // with no way to mark a region.
+                url.searchParams.set('authoring', '1');
+            }
             previewIframe.src = url.toString();
         });
     }
