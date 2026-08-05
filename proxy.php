@@ -443,7 +443,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
             // context-menu blocker/annotate/tracking scripts below.
             $rewritten = inject_heatmap_view_script($rewritten, $courseid, $embedid);
         } else if (!$authoring) {
-            $rewritten = inject_contextmenu_blocker($rewritten, $enableannotations);
+            $rewritten = inject_contextmenu_blocker($rewritten, $enableannotations || $enablehotspot || $enablehotspotmulti);
             $rewritten = inject_annotation_script($rewritten, $courseid, $embedid, $enableannotations, $annotationcolours);
             $rewritten = inject_tracking_script($rewritten, $courseid, $embedid);
             $rewritten = inject_teacher_heatmap_link($rewritten, $courseid, $embedid, $sourceurlforlink);
@@ -927,14 +927,22 @@ JS;
 }
 
 /**
- * Suppresses iviewer's own right-click ROI context menu on the final
- * student-facing embed, gated behind this embed's own (or, absent an
- * override, the site default - see resolve_overlay_setting())
- * "Enable student annotations" choice - prep for a student annotation UI
- * that will take the right-click gesture over; inert (never called) while
- * that's off, and never applied to the authoring tool's own live preview
- * regardless (see $authoring in this file's main dispatch), so teachers
- * keep OMERO's normal ROI menu while building an embed.
+ * Suppresses iviewer's own right-click ROI context menu ("Enable ROI
+ * Popup" / "Save Viewport as PNG" / "Get Link to Viewport") on the final
+ * student-facing embed, gated behind whether this specific view has any
+ * reason to want the right-click gesture kept clear for itself: either the
+ * student annotation UI (original reason this existed - prep for it taking
+ * the gesture over), or a hotspot question's own click-to-answer
+ * interaction, standalone or a quiz question either way. Confirmed as a
+ * real gap: originally gated on "Enable student annotations" alone, since
+ * hotspot mode didn't exist yet when this was written - but hotspot mode
+ * unconditionally forces annotations off (see $hotspotoverridesstudentview
+ * above), so a hotspot question got OMERO's raw right-click menu back with
+ * no way to suppress it, letting a student reach "Get Link to Viewport"
+ * mid-attempt. Inert (never called) when none of these apply, and never
+ * applied to the authoring tool's own live preview regardless (see
+ * $authoring in this file's main dispatch), so teachers keep OMERO's
+ * normal ROI menu while building an embed either way.
  *
  * iviewer is built with Aurelia, whose `.trigger`/`.delegate` binding
  * commands only ever attach bubble-phase listeners (confirmed against the
@@ -946,11 +954,13 @@ JS;
  * iviewer's own app bundle (loaded later, in <body>) finishes initialising.
  *
  * @param string $body
- * @param bool $enableannotations
+ * @param bool $suppress Whether this view has any reason to want the
+ *        right-click gesture suppressed - annotations enabled, or either
+ *        hotspot mode active.
  * @return string
  */
-function inject_contextmenu_blocker(string $body, bool $enableannotations): string {
-    if (!$enableannotations) {
+function inject_contextmenu_blocker(string $body, bool $suppress): string {
+    if (!$suppress) {
         return $body;
     }
 
