@@ -716,12 +716,21 @@ function inject_overlay_hide_css(string $body, array $hideflags): string {
     $style = '<style>' . implode(', ', $selectors) . ' { display: none !important; }</style>';
     if (!empty($hideflags['hidenavbar'])) {
         // The page's own top padding exists to keep content clear of the
-        // fixed navbar above it - hiding the navbar without this leaves an
-        // empty gap the same height where it used to be. Scoped to this one
-        // specific container (.row.center is unique on this page, confirmed
-        // directly), not a bare .row.center rule that could catch something
-        // unrelated on a future page layout.
-        $style .= '<style>body.container-fluid > .row.center { padding-top: 0 !important; }</style>';
+        // fixed navbar above it - hiding the navbar without also touching
+        // this would leave an empty gap the same height where it used to
+        // be. Not zeroed outright though: .row.center has its own 3px
+        // solid outline (confirmed directly, not a border - it renders
+        // outside the box, not counted in padding/layout) that gives the
+        // viewer a consistent frame on every side today. Dropping the top
+        // padding to 0 leaves nothing above the box for that outline to
+        // render into at the very top specifically, so it reads as
+        // clipped/missing there while still showing normally on the other
+        // three sides. 3px (matching the outline's own width) keeps the
+        // same framed look on all four sides instead. Scoped to this one
+        // specific container (.row.center is unique on this page,
+        // confirmed directly), not a bare .row.center rule that could
+        // catch something unrelated on a future page layout.
+        $style .= '<style>body.container-fluid > .row.center { padding-top: 3px !important; }</style>';
     }
     $withstyle = preg_replace('#(</head>)#i', $style . '$1', $body, 1);
     return $withstyle !== null ? $withstyle : ($body . $style);
