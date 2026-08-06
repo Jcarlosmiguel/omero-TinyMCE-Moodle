@@ -45,9 +45,6 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('moodle/course:manageactivities', $context);
-// PERFORMANCE: nothing below writes to $_SESSION - see proxy.php's own
-// write_close() comment.
-\core\session\manager::write_close();
 
 $pageurl = new moodle_url('/local/omeroembed/mysubjects.php', ['courseid' => $courseid]);
 $PAGE->set_url($pageurl);
@@ -81,6 +78,16 @@ if ($delete && $confirm && confirm_sesskey()) {
     subject_repository::delete($delete, $USER->id);
     redirect($pageurl, get_string('subjectdeleted', 'local_omeroembed'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
+
+// PERFORMANCE: nothing past this point writes to $_SESSION - see
+// proxy.php's own write_close() comment. Deliberately placed *after* the
+// POST-handling above, not before it: redirect()'s $message argument
+// works by writing to $SESSION->notifications for the next page load
+// (see \core\notification::add()) - closing the session before that
+// write happens means it's silently discarded and the confirmation
+// message never appears on the page the user lands on. Confirmed as a
+// real regression the earlier, too-early placement introduced.
+\core\session\manager::write_close();
 
 if ($delete) {
     echo $OUTPUT->header();

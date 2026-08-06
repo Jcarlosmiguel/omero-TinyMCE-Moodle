@@ -79,10 +79,6 @@ require_capability('local/omeroembed:viewheatmap', $context);
 // reasoning. A brand-new embedid (nothing recorded yet) passes silently -
 // the first-visit bootstrap flow below is what creates that first row.
 tracking_repository::verify_course($embedid, $courseid);
-// PERFORMANCE: nothing below writes to $_SESSION - see proxy.php's own
-// write_close() comment. This page's own heatmap-density iframe hits
-// proxy.php on the same session concurrently with this request.
-\core\session\manager::write_close();
 
 $pageurl = new moodle_url('/local/omeroembed/heatmap.php', ['courseid' => $courseid, 'embedid' => $embedid]);
 $PAGE->set_url($pageurl);
@@ -156,6 +152,17 @@ if ($delete && $confirm && confirm_sesskey()) {
     redirect($pageurl, get_string('datadeleted', 'local_omeroembed', $deletedcount),
         null, \core\output\notification::NOTIFY_SUCCESS);
 }
+
+// PERFORMANCE: nothing past this point writes to $_SESSION - see
+// proxy.php's own write_close() comment. Deliberately placed *after* all
+// the POST-handling above, not before it: redirect()'s $message argument
+// works by writing to $SESSION->notifications for the next page load
+// (see \core\notification::add()) - closing the session before that
+// write happens means it's silently discarded and the confirmation (or
+// refusal - see the "cannot delete while tracking" redirect just above)
+// never appears on the page the user lands on. Confirmed as a real
+// regression the earlier, too-early placement introduced.
+\core\session\manager::write_close();
 
 if ($delete) {
     echo $OUTPUT->header();
