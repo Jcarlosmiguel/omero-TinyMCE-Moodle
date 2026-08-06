@@ -159,36 +159,38 @@ containers fully paused) to rule out resource contention as a confound.
 
 ## Security
 
-A per-file audit of every web-reachable entry point (`ajax.php`,
-`author.php`, `export.php`, `heatmap.php`, `video.php`, `proxy.php`) ahead
-of Marketplace submission, 2026-08-06. Two real, exploitable issues were
+A per-file audit of every web-reachable entry point ahead of Marketplace
+submission, 2026-08-06, plus a follow-up review. Three real issues were
 found and fixed; two broader checks came back clean.
 
-**Fixed - stored XSS in the generated embed HTML.** `author.js`'s
-`generateEmbed()` built the final embed HTML (the string saved into course
-content and rendered to every student who views it) by string
-concatenation, and the width/height form fields flowed into `style="..."`
-attributes unescaped. A crafted link with a malicious width/height value
-could inject a real `<script>` tag into persisted, student-facing content.
-Fixed in two layers: `author.js` now HTML-escapes every value it
-concatenates into the generated markup, and `author.php` independently
-validates width/height against a genuine CSS-length pattern server-side.
-Verified against the actual attack payload, not just asserted clean.
+**If you're running a version older than `2026080307`, upgrade** - all
+three fixes below landed in that release.
 
-**Fixed - cross-course broken access control.** Every privileged action
-(`hotspot_get`/`save`/`clear`, the multi-region siblings, `heatmap.php`,
-`export.php`, `video.php`) checked the requester's capability against
-whichever `courseid` was declared in the request, then read or wrote data
-keyed by `embedid` alone - with no check that the embedid actually
-belonged to that course. Anyone holding `hotspotauthor` or `viewheatmap`
-in *any* course could, given another course's embedid, read a hidden
-quiz answer region, overwrite or delete it outright, or view/export
-another course's gathered student tracking data. Fixed by verifying each
-embedid's real, stored courseid matches the declared one before any
-operation proceeds. Verified end-to-end against live production with real
-cross-course test data - the exploit attempt, the read case, and the
+**Fixed - a content-injection issue in the slide-embedding flow.** Certain
+input to the authoring tool could end up persisted into course content and
+rendered back out without being properly escaped. Fixed with proper
+escaping plus stricter server-side validation, verified against a real
+attack payload before and after the fix.
+
+**Fixed - a cross-course access control gap affecting hotspot and heatmap
+data.** A capability check against one course didn't guarantee the data
+being acted on actually belonged to that course, which could expose or
+allow modification of another course's hidden hotspot answers or gathered
+tracking data. Fixed by verifying the data's real owning course before any
+operation proceeds, with automated regression tests added specifically to
+stop this recurring, and verified end-to-end against real cross-course
+test data - the exploit attempt, the read case, and the
 sabotage-by-overwrite case were all confirmed blocked, with legitimate
 same-course access continuing to work normally throughout.
+
+**Fixed - a concurrency issue affecting slide-loading performance.** Every
+request through the plugin held Moodle's session lock longer than
+necessary, causing concurrent requests from the same session - notably
+the many parallel tile fetches a student's browser issues while panning
+or zooming a slide - to queue behind each other instead of running in
+parallel, regardless of server capacity. Fixed by releasing the lock as
+soon as it's no longer needed. Verified directly: a controlled test of
+the exact mechanism went from serialised to fully parallel once fixed.
 
 **Checked, no issues found - SQL injection.** Every database interaction
 in the codebase (90 call sites across 14 files) goes through Moodle's
