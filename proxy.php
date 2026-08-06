@@ -57,6 +57,7 @@
 require(__DIR__ . '/../../config.php');
 
 use local_omeroembed\omero_session;
+use local_omeroembed\tracking_repository;
 
 /**
  * Only these path prefixes are ever proxied through to OMERO - matches the same
@@ -153,6 +154,13 @@ require_login($course);
 
 if ($heatmap) {
     require_capability('local/omeroembed:viewheatmap', context_course::instance($courseid));
+    // SECURITY: the capability check above only checks the *declared*
+    // courseid - see tracking_repository::verify_course()'s own docblock.
+    // Without this, local/omeroembed:viewheatmap in ANY course would let
+    // a teacher render another course's heatmap density view here.
+    if ($embedid !== '') {
+        tracking_repository::verify_course($embedid, $courseid);
+    }
 }
 
 if ($authoring) {

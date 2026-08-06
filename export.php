@@ -47,6 +47,11 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('local/omeroembed:viewheatmap', $context);
+// SECURITY: see tracking_repository::verify_course()'s own docblock -
+// without this, local/omeroembed:viewheatmap in ANY course would let a
+// teacher export another course's gathered student behavioural data by
+// supplying that course's embedid alongside their own courseid.
+tracking_repository::verify_course($embedid, $courseid);
 
 $samples = tracking_repository::get_all_samples_for_export($embedid);
 

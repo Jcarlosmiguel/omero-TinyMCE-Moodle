@@ -167,6 +167,7 @@ $string['invalidradius'] = 'Invalid ellipse radius ({$a}) - both must be greater
 $string['invalidpolygon'] = 'Invalid polygon points ({$a}) - expected a JSON array of at least 3 [x,y] pairs.';
 $string['invalidaction'] = 'Invalid action "{$a}".';
 $string['invalidgatherminutes'] = 'Invalid gather window ({$a}) - must be at least 1 minute.';
+$string['embedcoursemismatch'] = 'This embed does not belong to the specified course.';
 
 $string['annotatetoolbar_point'] = 'Place a pin';
 $string['annotatetoolbar_ellipse'] = 'Draw an ellipse (hold Shift, or use the lock button, for a circle)';

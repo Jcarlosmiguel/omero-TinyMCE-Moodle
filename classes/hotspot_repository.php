@@ -34,6 +34,38 @@ namespace local_omeroembed;
  */
 class hotspot_repository {
     /**
+     * Confirms $embedid actually belongs to $courseid before any caller
+     * proceeds to read/write/clear/attempt its hidden region.
+     *
+     * SECURITY: ajax.php's require_capability() checks the *declared*
+     * $courseid; every actual operation below (get_geometry, save, clear,
+     * check_attempt) looks up by $embedid alone. Without this,
+     * local/omeroembed:hotspotauthor in ANY course would let a teacher
+     * read, overwrite, or delete another course's hidden correct-answer
+     * region - and hotspot_attempt's plain correct/incorrect response
+     * would work as a brute-force oracle against it for anyone holding
+     * :annotate anywhere. Confirmed exploitable before this fix, found
+     * during a security audit ahead of Marketplace submission.
+     *
+     * A never-before-seen embedid (no row yet) passes silently - a
+     * teacher defining a region for the first time has nothing yet to
+     * conflict with.
+     *
+     * @param string $embedid
+     * @param int $courseid
+     * @throws \moodle_exception if a hotspot row exists for this embedid
+     *                            under a *different* courseid.
+     */
+    public static function verify_course(string $embedid, int $courseid): void {
+        global $DB;
+
+        $record = $DB->get_record('local_omeroembed_hotspots', ['embedid' => $embedid], 'courseid');
+        if ($record && (int) $record->courseid !== $courseid) {
+            throw new \moodle_exception('embedcoursemismatch', 'local_omeroembed');
+        }
+    }
+
+    /**
      * The current hidden region for one embed, decoded - teacher-authoring
      * use only (rendering the existing region as a reference outline when
      * reopening author.php). Never call this from the student attempt path.

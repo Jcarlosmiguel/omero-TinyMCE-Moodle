@@ -35,6 +35,7 @@ require(__DIR__ . '/../../config.php');
 
 use local_omeroembed\heatmap_frame_repository;
 use local_omeroembed\gif_encoder;
+use local_omeroembed\tracking_repository;
 
 $courseid = required_param('courseid', PARAM_INT);
 $embedid = required_param('embedid', PARAM_ALPHANUMEXT);
@@ -44,6 +45,15 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('local/omeroembed:viewheatmap', $context);
+// SECURITY: see tracking_repository::verify_course()'s own docblock -
+// without this, local/omeroembed:viewheatmap in ANY course would let a
+// teacher download another course's captured heatmap video by supplying
+// that course's embedid alongside their own courseid. heatmap_frames has
+// no courseid of its own to check against directly (see
+// heatmap_frame_repository), so this reuses embed_tracking's - the same
+// table heatmap.php/export.php already trust as the authoritative
+// embedid-to-course mapping.
+tracking_repository::verify_course($embedid, $courseid);
 
 $frames = heatmap_frame_repository::get_frames_for_embed($embedid);
 if (empty($frames)) {

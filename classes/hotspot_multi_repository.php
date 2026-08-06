@@ -41,6 +41,26 @@ class hotspot_multi_repository {
     const MAX_REGIONS = 500;
 
     /**
+     * Confirms $embedid actually belongs to $courseid before any caller
+     * proceeds to read/write/clear/attempt its hidden regions. Sibling of
+     * hotspot_repository::verify_course() - see that method's own docblock
+     * for the full security reasoning, identical here.
+     *
+     * @param string $embedid
+     * @param int $courseid
+     * @throws \moodle_exception if a row exists for this embedid under a
+     *                            *different* courseid.
+     */
+    public static function verify_course(string $embedid, int $courseid): void {
+        global $DB;
+
+        $record = $DB->get_record('local_omeroembed_hotspot_multi', ['embedid' => $embedid], 'courseid');
+        if ($record && (int) $record->courseid !== $courseid) {
+            throw new \moodle_exception('embedcoursemismatch', 'local_omeroembed');
+        }
+    }
+
+    /**
      * The current set of hidden regions for one embed, decoded - teacher-
      * authoring use only (rendering the existing regions as reference
      * outlines when reopening author.php). Never call this from the

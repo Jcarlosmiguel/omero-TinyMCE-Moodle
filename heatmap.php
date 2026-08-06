@@ -71,6 +71,14 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('local/omeroembed:viewheatmap', $context);
+// SECURITY: require_capability() above only checks the *declared*
+// courseid - everything below looks up by embedid alone, so without this,
+// local/omeroembed:viewheatmap in ANY course would let a teacher view,
+// control, or delete another course's tracking data. See
+// tracking_repository::verify_course()'s own docblock for the full
+// reasoning. A brand-new embedid (nothing recorded yet) passes silently -
+// the first-visit bootstrap flow below is what creates that first row.
+tracking_repository::verify_course($embedid, $courseid);
 
 $pageurl = new moodle_url('/local/omeroembed/heatmap.php', ['courseid' => $courseid, 'embedid' => $embedid]);
 $PAGE->set_url($pageurl);

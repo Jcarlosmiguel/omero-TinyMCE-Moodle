@@ -37,6 +37,39 @@ class tracking_repository {
     const MAX_SAMPLES = 5000;
 
     /**
+     * Confirms $embedid actually belongs to $courseid before any caller
+     * proceeds to read/write/delete its tracking data.
+     *
+     * SECURITY: heatmap.php/export.php/video.php/proxy.php's heatmap mode
+     * all require_capability() the *declared* $courseid, then every actual
+     * data operation below looks records up by $embedid alone - without
+     * this check, anyone holding local/omeroembed:viewheatmap in ANY
+     * course (their own) could view, export, or delete another course's
+     * gathered student viewport/behavioural data by supplying that
+     * course's embedid alongside their own courseid. Confirmed exploitable
+     * before this fix, found during a security audit ahead of Marketplace
+     * submission.
+     *
+     * A never-before-seen embedid (no row yet) passes silently - nothing
+     * exists yet to protect, matching heatmap.php's own existing
+     * first-visit bootstrap semantics (see that file's $sourceurlparam
+     * handling, itself sesskey + same-site-prefix gated already).
+     *
+     * @param string $embedid
+     * @param int $courseid
+     * @throws \moodle_exception if a tracking row exists for this embedid
+     *                            under a *different* courseid.
+     */
+    public static function verify_course(string $embedid, int $courseid): void {
+        global $DB;
+
+        $record = $DB->get_record('local_omeroembed_embed_tracking', ['embedid' => $embedid], 'courseid');
+        if ($record && (int) $record->courseid !== $courseid) {
+            throw new \moodle_exception('embedcoursemismatch', 'local_omeroembed');
+        }
+    }
+
+    /**
      * The current tracking configuration for one embed placement - the
      * defaults below (not a DB row at all) if a teacher has never touched
      * the tracking panel for it.

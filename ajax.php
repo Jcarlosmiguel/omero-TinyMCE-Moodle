@@ -133,6 +133,7 @@ if ($action === 'list') {
 }
 
 if ($action === 'heatmap') {
+    tracking_repository::verify_course($embedid, $courseid);
     $samples = tracking_repository::get_samples($embedid);
     echo json_encode(array_map(function ($record) {
         return [
@@ -149,6 +150,7 @@ if ($action === 'hotspot_get') {
     // in this whole endpoint that's allowed to contain the hidden
     // geometry, so the authoring UI can show a teacher their own existing
     // region as a reference outline when reopening it.
+    hotspot_repository::verify_course($embedid, $courseid);
     $geometry = hotspot_repository::get_geometry($embedid);
     echo json_encode(['geometry' => $geometry]);
     exit;
@@ -157,6 +159,7 @@ if ($action === 'hotspot_get') {
 if ($action === 'hotspotmulti_get') {
     // Multi-region sibling of hotspot_get above - same authoring-only
     // reasoning, returns the whole array of regions instead of one shape.
+    hotspot_multi_repository::verify_course($embedid, $courseid);
     $geometry = hotspot_multi_repository::get_geometry($embedid);
     echo json_encode(['geometry' => $geometry]);
     exit;
@@ -266,6 +269,7 @@ if ($action === 'hotspot_save') {
     }
     $geometry = ['type' => $type, 'x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry, 'rotation' => 0];
 
+    hotspot_repository::verify_course($embedid, $courseid);
     $record = hotspot_repository::save($courseid, $embedid, $USER->id, $geometry);
     echo json_encode(['geometry' => $record->geometry]);
     exit;
@@ -285,18 +289,21 @@ if ($action === 'hotspotmulti_save') {
         throw new \moodle_exception('invalidregion', 'local_omeroembed');
     }
 
+    hotspot_multi_repository::verify_course($embedid, $courseid);
     $record = hotspot_multi_repository::save($courseid, $embedid, $USER->id, $regions);
     echo json_encode(['geometry' => $record->geometry]);
     exit;
 }
 
 if ($action === 'hotspot_clear') {
+    hotspot_repository::verify_course($embedid, $courseid);
     $cleared = hotspot_repository::clear($embedid);
     echo json_encode(['cleared' => $cleared]);
     exit;
 }
 
 if ($action === 'hotspotmulti_clear') {
+    hotspot_multi_repository::verify_course($embedid, $courseid);
     $cleared = hotspot_multi_repository::clear($embedid);
     echo json_encode(['cleared' => $cleared]);
     exit;
@@ -308,6 +315,7 @@ if ($action === 'hotspot_attempt') {
 
     // The only thing this response - or any code path reachable from a
     // student session - is ever allowed to reveal about the hidden region.
+    hotspot_repository::verify_course($embedid, $courseid);
     $correct = hotspot_repository::check_attempt($embedid, $x, $y);
     hotspot_repository::record_attempt($courseid, $embedid, $USER->id, $x, $y, $correct);
     echo json_encode(['correct' => $correct]);
@@ -321,6 +329,7 @@ if ($action === 'hotspotmulti_attempt') {
     $x = required_param('x', PARAM_FLOAT);
     $y = required_param('y', PARAM_FLOAT);
 
+    hotspot_multi_repository::verify_course($embedid, $courseid);
     $correct = hotspot_multi_repository::check_attempt($embedid, $x, $y);
     hotspot_multi_repository::record_attempt($courseid, $embedid, $USER->id, $x, $y, $correct);
     echo json_encode(['correct' => $correct]);
