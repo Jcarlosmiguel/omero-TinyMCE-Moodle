@@ -1,7 +1,7 @@
 # tiny_omeroembed
 
 A TinyMCE editor plugin for Moodle that puts
-[local_omeroembed](https://github.com/Jcarlosmiguel/moodle-omero-embed)'s
+[local_omeroembed](https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle/tree/main/local_omeroembed)'s
 "Embed an OMERO slide" authoring tool directly inside the standard Moodle
 text editor - no separate page, no copy-pasting generated HTML by hand.
 
@@ -38,14 +38,19 @@ into the editor on save.
 ## Requirements
 
 - Moodle 4.5+ (developed and tested against 4.5.12)
-- [local_omeroembed](https://github.com/Jcarlosmiguel/moodle-omero-embed)
+- [local_omeroembed](https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle/tree/main/local_omeroembed)
   installed and configured - this plugin is a thin editor-integration layer
   around it and does nothing on its own without it.
 
 ## Installing
 
+This plugin is one of four bundled together in a single repository - see
+[the repository root README](https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle#installing)
+for the full four-plugin install. This component alone:
+
 ```bash
-git clone https://github.com/Jcarlosmiguel/tiny_omeroembed.git lib/editor/tiny/plugins/omeroembed
+git clone https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle.git omero-tinymce-moodle
+cp -r omero-tinymce-moodle/tiny_omeroembed lib/editor/tiny/plugins/omeroembed
 php admin/cli/upgrade.php --non-interactive
 ```
 
