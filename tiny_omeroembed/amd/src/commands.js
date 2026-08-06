@@ -44,6 +44,10 @@ import {
  * live: this is what fixed a reported "icon shows grey instead of white
  * in dark mode" issue (the <image href> version could only ever show its
  * one hardcoded colour, never adapt).
+ *
+ * @param {string} identifier The icon identifier, e.g. 'icon'.
+ * @param {string} iconcomponent The component the icon belongs to.
+ * @returns {Promise<string>} The icon's raw SVG markup.
  */
 const getIconMarkup = async(identifier, iconcomponent) => {
     const url = await getImagePath(identifier, iconcomponent);
