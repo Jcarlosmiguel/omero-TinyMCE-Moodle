@@ -160,8 +160,23 @@ $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
 // not the much narrower column a Label/Page/Book will actually render the
 // final embed inside. This is a max-width on the preview/output, not a fixed
 // iframe width - see where it's used below.
+// PARAM_TEXT alone doesn't restrict format - both values end up
+// string-concatenated into the final generated embed HTML client-side
+// (js/author.js's generateEmbed(), which separately HTML-escapes them as
+// the actual fix for that - see its own escapeHtmlAttr() docblock).
+// Restricting to genuine CSS-length syntax here too, defense in depth:
+// closes the hole even if some future code path forgets to escape, and
+// rejects nonsensical values outright rather than accepting them and
+// producing a visibly broken embed.
+$cssunitpattern = '/^\d+(\.\d+)?(px|%|em|rem|vh|vw)$/';
 $width = optional_param('width', '800px', PARAM_TEXT);
+if (!preg_match($cssunitpattern, $width)) {
+    $width = '800px';
+}
 $height = optional_param('height', '500px', PARAM_TEXT);
+if (!preg_match($cssunitpattern, $height)) {
+    $height = '500px';
+}
 // Set only when re-opening an *existing* embed for editing (tiny_omeroembed's
 // ui.js reads it back from the wrapper's own data-omero-annotate-id - see
 // that file's readExistingEmbed()) - forwarded into $jsconfig so js/author.js's

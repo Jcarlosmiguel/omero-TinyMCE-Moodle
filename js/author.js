@@ -51,6 +51,36 @@
     var embedAnnotateId = config.embedAnnotateId || null;
 
     /**
+     * Escapes a string for safe use inside an HTML attribute value.
+     *
+     * generateEmbed() below builds the final embed HTML - the string that
+     * gets saved into course content and rendered to every student who
+     * views it - by string concatenation, not DOM APIs. width/height come
+     * from plain text inputs (author.php's optional_param(..., PARAM_TEXT),
+     * no format restriction either side) and are read live from those
+     * inputs' current values, not from a re-validated source - a value
+     * containing a quote and angle bracket breaks out of the style
+     * attribute and injects arbitrary markup into stored content. Every
+     * value concatenated into iframeHtml/inner/html below must go through
+     * this first, not just the ones already known to be attacker-reachable
+     * today - config.iframeName is server-regex-restricted to alphanumeric
+     * (see author.php's own $iframename) but is escaped here too, since
+     * this function being the one uniform gate is what stops it staying
+     * safe only by accident of what author.php happens to do today.
+     *
+     * @param {string} value
+     * @return {string}
+     */
+    function escapeHtmlAttr(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /**
      * @return {string} A stable token identifying this specific embed
      *                   placement - reused from an existing embed being
      *                   edited if there is one, otherwise minted once and
@@ -406,7 +436,13 @@
 
     function generateEmbed() {
         var layout = currentLayout();
-        var height = currentHeight();
+        // Escaped once here, reused everywhere below instead of the raw
+        // values - see escapeHtmlAttr()'s own docblock for why every value
+        // concatenated into this function's generated HTML goes through it,
+        // not just the ones already known to be attacker-reachable today.
+        var height = escapeHtmlAttr(currentHeight());
+        var width = escapeHtmlAttr(currentWidth());
+        var iframeName = escapeHtmlAttr(config.iframeName);
 
         // The live preview iframe's own src never changes (see setOpeningView()
         // above) - the opening view, if any, is applied here instead, at the
@@ -441,15 +477,15 @@
         // id (in addition to the existing name) gives the reset button in
         // the textbelow layout below a stable, unique target to reload -
         // important once a page/question has more than one embed.
-        var iframeHtml = '<iframe id="' + config.iframeName + '" style="width: 100%; height: ' + height + ';" src="' +
-            iframeSrc + '" name="' + config.iframeName + '"></iframe>';
+        var iframeHtml = '<iframe id="' + iframeName + '" style="width: 100%; height: ' + height + ';" src="' +
+            iframeSrc + '" name="' + iframeName + '"></iframe>';
 
         var inner;
         if (layout === 'imageonly') {
             inner = iframeHtml;
         } else if (layout === 'textbelow') {
             var textBelowWriteup = document.getElementById(config.writeupId);
-            var resetBtnId = 'omero-reset-' + config.iframeName;
+            var resetBtnId = 'omero-reset-' + iframeName;
             // A plain onclick attribute gets silently stripped by TinyMCE's
             // own client-side schema on insert - confirmed live, it never
             // even reaches the server, regardless of how permissive Moodle's
@@ -494,7 +530,7 @@
         // readExistingEmbed()) so re-editing reuses getOrMintAnnotateId()'s
         // token instead of minting a fresh one.
         var html = '<div data-omero-embed="1" data-omero-annotate-id="' + getOrMintAnnotateId()
-            + '" style="max-width: ' + currentWidth() + ';">\n  ' + inner + '\n</div>';
+            + '" style="max-width: ' + width + ';">\n  ' + inner + '\n</div>';
 
         if (config.embedded) {
             // Handed off to the tiny_omeroembed TinyMCE plugin's modal (see
