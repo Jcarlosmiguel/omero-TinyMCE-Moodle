@@ -34,20 +34,31 @@ use core_privacy\local\request\writer;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * This plugin stores four kinds of personal data: a student's own point
+ * This plugin stores five kinds of personal data: a student's own point
  * annotations on an embedded OMERO slide (local_omeroembed_annotations),
  * periodic samples of a student's own viewport position while viewing a
  * tracked embed for the teacher heatmap feature
  * (local_omeroembed_view_samples), every student's own attempt (click
  * position + right/wrong) at a click-to-answer hotspot question
- * (local_omeroembed_hotspot_attempts), and the identical shape of attempt
+ * (local_omeroembed_hotspot_attempts), the identical shape of attempt
  * for the multi-region hotspot sibling feature
- * (local_omeroembed_hotspot_multi_attempts). Everything else this plugin
- * stores - OMERO subject-account credentials (local_omeroembed_subjects),
- * the short-lived OMERO session cache (classes/omero_session.php),
- * local_omeroembed_embed_tracking (a teacher's on/off + gather-window
- * setting, keyed only by embedid - no userid), local_omeroembed_hotspots,
- * and local_omeroembed_hotspot_multi
+ * (local_omeroembed_hotspot_multi_attempts), and a teacher's own OMERO
+ * service-account connections (local_omeroembed_subjects) - a login
+ * credential tied to a specific identified person, not course content,
+ * so (unlike local_omeroembed_hotspots/local_omeroembed_hotspot_multi
+ * below) it is genuinely personal data and is fully covered: exported on
+ * request (omerousername and the connection's own name, never the
+ * encrypted password itself - see get_metadata() below) and deleted on
+ * request. Deleting it does mean any embed still relying on that specific
+ * connection stops working for students until the teacher registers a
+ * replacement - an expected, not avoided, consequence of the teacher's
+ * own credential being removed, the same way deleting their forum posts
+ * as part of an erasure request also breaks continuity of a discussion.
+ *
+ * Everything else this plugin stores - the short-lived OMERO session
+ * cache (classes/omero_session.php), local_omeroembed_embed_tracking (a
+ * teacher's on/off + gather-window setting, keyed only by embedid - no
+ * userid), local_omeroembed_hotspots, and local_omeroembed_hotspot_multi
  * (the hidden answer region(s) themselves, plus which teacher defined
  * them - treated the same as authorship on any other piece of course
  * content, e.g. a Page's own author, not as a personal data trail about
@@ -55,12 +66,14 @@ defined('MOODLE_INTERNAL') || die();
  * the actual quiz content for every student, which is never the right
  * outcome) - is not personal data and is intentionally not covered here.
  *
- * All four tables are scoped to CONTEXT_COURSE, not CONTEXT_MODULE - an
- * embed lives inside arbitrary course content (a Page, a quiz question,
- * ...) with no course-module of its own, so the course itself is the only
- * meaningful context to hang this on (matches how
+ * The first four tables are scoped to CONTEXT_COURSE, not CONTEXT_MODULE -
+ * an embed lives inside arbitrary course content (a Page, a quiz
+ * question, ...) with no course-module of its own, so the course itself
+ * is the only meaningful context to hang this on (matches how
  * local/omeroembed:annotate, local/omeroembed:viewheatmap, and
  * local/omeroembed:hotspotauthor are also all checked at course context).
+ * local_omeroembed_subjects is scoped to CONTEXT_USER instead - it isn't
+ * tied to any one course at all, it belongs to the teacher directly.
  */
 class provider implements
         // This plugin stores personal data.
@@ -135,6 +148,19 @@ class provider implements
             'privacy:metadata:local_omeroembed_hotspot_multi_attempts'
         );
 
+        $items->add_database_table(
+            'local_omeroembed_subjects',
+            [
+                'userid' => 'privacy:metadata:local_omeroembed_subjects:userid',
+                'name' => 'privacy:metadata:local_omeroembed_subjects:name',
+                'omerousername' => 'privacy:metadata:local_omeroembed_subjects:omerousername',
+                'omeropassword' => 'privacy:metadata:local_omeroembed_subjects:omeropassword',
+                'timecreated' => 'privacy:metadata:local_omeroembed_subjects:timecreated',
+                'timemodified' => 'privacy:metadata:local_omeroembed_subjects:timemodified',
+            ],
+            'privacy:metadata:local_omeroembed_subjects'
+        );
+
         return $items;
     }
 
@@ -145,6 +171,8 @@ class provider implements
      * @return contextlist the list of contexts containing user info for the user.
      */
     public static function get_contexts_for_userid(int $userid): contextlist {
+        global $DB;
+
         $contextlist = new contextlist();
 
         $contextlist->add_from_sql(
@@ -183,6 +211,10 @@ class provider implements
             ['contextlevel4' => CONTEXT_COURSE, 'userid4' => $userid]
         );
 
+        if ($DB->record_exists('local_omeroembed_subjects', ['userid' => $userid])) {
+            $contextlist->add_user_context($userid);
+        }
+
         return $contextlist;
     }
 
@@ -193,6 +225,13 @@ class provider implements
      */
     public static function get_users_in_context(userlist $userlist) {
         $context = $userlist->get_context();
+
+        if ($context instanceof \context_user) {
+            $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_subjects} WHERE userid = :userid', [
+                'userid' => $context->instanceid,
+            ]);
+            return;
+        }
 
         if (!$context instanceof \context_course) {
             return;
@@ -227,6 +266,26 @@ class provider implements
         $user = $contextlist->get_user();
 
         foreach ($contextlist->get_contexts() as $context) {
+            if ($context instanceof \context_user && $context->instanceid == $user->id) {
+                $subjects = $DB->get_records('local_omeroembed_subjects', ['userid' => $user->id]);
+                if ($subjects) {
+                    $data = array_map(function ($subject) {
+                        return [
+                            'name' => $subject->name,
+                            'omerousername' => $subject->omerousername,
+                            'timecreated' => \core_privacy\local\request\transform::datetime($subject->timecreated),
+                            'timemodified' => \core_privacy\local\request\transform::datetime($subject->timemodified),
+                        ];
+                    }, array_values($subjects));
+
+                    writer::with_context($context)->export_data(
+                        [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - OMERO connections'],
+                        (object) ['subjects' => $data]
+                    );
+                }
+                continue;
+            }
+
             if (!$context instanceof \context_course) {
                 continue;
             }
@@ -326,6 +385,11 @@ class provider implements
     public static function delete_data_for_all_users_in_context(\context $context) {
         global $DB;
 
+        if ($context instanceof \context_user) {
+            $DB->delete_records('local_omeroembed_subjects', ['userid' => $context->instanceid]);
+            return;
+        }
+
         if (!$context instanceof \context_course) {
             return;
         }
@@ -350,6 +414,11 @@ class provider implements
 
         $userid = $contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
+            if ($context instanceof \context_user && $context->instanceid == $userid) {
+                $DB->delete_records('local_omeroembed_subjects', ['userid' => $userid]);
+                continue;
+            }
+
             if (!$context instanceof \context_course) {
                 continue;
             }
@@ -369,6 +438,13 @@ class provider implements
         global $DB;
 
         $context = $userlist->get_context();
+
+        if ($context instanceof \context_user) {
+            [$usersql, $userparams] = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
+            $DB->delete_records_select('local_omeroembed_subjects', "userid $usersql", $userparams);
+            return;
+        }
+
         if (!$context instanceof \context_course) {
             return;
         }

@@ -248,3 +248,11 @@ $string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:x'] = 'The hor
 $string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:y'] = 'The vertical image-pixel position the student clicked.';
 $string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:correct'] = 'Whether this attempt was correct.';
 $string['privacy:metadata:local_omeroembed_hotspot_multi_attempts:timecreated'] = 'The time the attempt was made.';
+
+$string['privacy:metadata:local_omeroembed_subjects'] = 'An OMERO service-account connection a teacher registered, used to serve embedded slides to students on their behalf.';
+$string['privacy:metadata:local_omeroembed_subjects:userid'] = 'The ID of the teacher who owns this OMERO connection.';
+$string['privacy:metadata:local_omeroembed_subjects:name'] = 'The teacher\'s own label for this connection.';
+$string['privacy:metadata:local_omeroembed_subjects:omerousername'] = 'The OMERO account username used to authenticate this connection.';
+$string['privacy:metadata:local_omeroembed_subjects:omeropassword'] = 'The OMERO account password for this connection, stored encrypted and never included in a data export.';
+$string['privacy:metadata:local_omeroembed_subjects:timecreated'] = 'The time this connection was created.';
+$string['privacy:metadata:local_omeroembed_subjects:timemodified'] = 'The time this connection was last edited.';
