@@ -15,17 +15,32 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Strings for tiny_omeroembed.
+ * Privacy Subsystem implementation for tiny_omeroembed.
  *
  * @package    tiny_omeroembed
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace tiny_omeroembed\privacy;
+
 defined('MOODLE_INTERNAL') || die();
 
-$string['pluginname'] = 'OMERO embed';
-$string['buttontitle'] = 'Insert OMERO slide';
-$string['omeroembed:embed'] = 'Insert an OMERO slide embed';
-$string['modaltitle'] = 'Insert an OMERO slide';
-$string['privacy:metadata'] = 'The OMERO embed TinyMCE plugin does not store any personal data itself - it has no database tables of its own, it only opens local_omeroembed\'s own authoring tool in a modal, and any actual data (embeds, annotations, tracking) belongs to that plugin\'s own privacy provider.';
+/**
+ * This plugin stores no data of its own - it has no database tables at
+ * all. It's a TinyMCE toolbar button that opens local_omeroembed's own
+ * author.php in a modal (see amd/src/ui.js) - any actual data (embeds,
+ * annotations, tracking) is local_omeroembed's, already covered by that
+ * plugin's own privacy provider.
+ */
+class provider implements \core_privacy\local\metadata\null_provider {
+    /**
+     * Get the language string identifier with the component's language
+     * file to explain why this plugin stores no data.
+     *
+     * @return string
+     */
+    public static function get_reason(): string {
+        return 'privacy:metadata';
+    }
+}
