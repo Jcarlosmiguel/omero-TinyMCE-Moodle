@@ -57,29 +57,58 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
     /** @var array Array of {type,x,y,rx,ry,rotation} - the hidden set of acceptable correct-answer regions. */
     public $regions;
 
+    /**
+     * The response fields this question expects: the raw click position.
+     *
+     * @return array
+     */
     public function get_expected_data() {
         return ['clickx' => PARAM_FLOAT, 'clicky' => PARAM_FLOAT];
     }
 
+    /**
+     * Deliberately not coordinates - see this class's own docblock.
+     *
+     * @return array|null
+     */
     public function get_correct_response() {
-        // Deliberately not coordinates - see this class's own docblock.
         return null;
     }
 
+    /**
+     * A human-readable summary of where the student clicked.
+     *
+     * @param array $response
+     * @return string|null
+     */
     public function summarise_response(array $response) {
         if (!array_key_exists('clickx', $response) || !array_key_exists('clicky', $response)) {
             return null;
         }
-        return get_string('clickedat', 'qtype_omerohotspotmulti',
-                (object) ['x' => round($response['clickx']), 'y' => round($response['clicky'])]);
+        return get_string(
+            'clickedat',
+            'qtype_omerohotspotmulti',
+            (object) ['x' => round($response['clickx']), 'y' => round($response['clicky'])]
+        );
     }
 
+    /**
+     * Same reasoning as qtype_omerohotspot's own equivalent - not
+     * attempted, nothing in core depends on this round-tripping here.
+     *
+     * @param string $summary
+     * @return array
+     */
     public function un_summarise_response(string $summary) {
-        // Same reasoning as qtype_omerohotspot's own equivalent - not
-        // attempted, nothing in core depends on this round-tripping here.
         return [];
     }
 
+    /**
+     * Classifies the response as inside or outside every hidden region.
+     *
+     * @param array $response
+     * @return array
+     */
     public function classify_response(array $response) {
         if (!$this->is_complete_response($response)) {
             return [$this->id => question_classified_response::no_response()];
@@ -91,11 +120,23 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
         return [$this->id => new question_classified_response($fraction > 0 ? 1 : 0, $responseclass, $fraction)];
     }
 
+    /**
+     * Whether a click position was submitted at all.
+     *
+     * @param array $response
+     * @return bool
+     */
     public function is_complete_response(array $response) {
         return array_key_exists('clickx', $response) && array_key_exists('clicky', $response)
             && $response['clickx'] !== '' && $response['clicky'] !== '';
     }
 
+    /**
+     * The validation error to show when no click was submitted.
+     *
+     * @param array $response
+     * @return string
+     */
     public function get_validation_error(array $response) {
         if ($this->is_gradable_response($response)) {
             return '';
@@ -103,36 +144,50 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
         return get_string('pleaseclickimage', 'qtype_omerohotspotmulti');
     }
 
+    /**
+     * Whether the response is complete enough to grade.
+     *
+     * @param array $response
+     * @return bool
+     */
     public function is_gradable_response(array $response) {
         return $this->is_complete_response($response);
     }
 
+    /**
+     * Whether two responses represent the same click position.
+     *
+     * @param array $prevresponse
+     * @param array $newresponse
+     * @return bool
+     */
     public function is_same_response(array $prevresponse, array $newresponse) {
         return question_utils::arrays_same_at_key_missing_is_blank($prevresponse, $newresponse, 'clickx')
             && question_utils::arrays_same_at_key_missing_is_blank($prevresponse, $newresponse, 'clicky');
     }
 
+    /**
+     * Grades the response by testing the click against every hidden
+     * region, correct if it lands inside any one of them.
+     *
+     * @param array $response
+     * @return array
+     */
     public function grade_response(array $response) {
         $correct = qtype_omerohotspotmulti_check($this->regions, (float) $response['clickx'], (float) $response['clicky']);
         $fraction = $correct ? 1 : 0;
         return [$fraction, question_state::graded_state_for_fraction($fraction)];
     }
 
-    public function check_file_access($qa, $options, $component, $filearea, $args, $forcedownload) {
-        // No qtype-specific file areas (see lib.php's own comment) - only
-        // ever the standard question text/generalfeedback ones, already
-        // handled by the parent.
-        return parent::check_file_access($qa, $options, $component, $filearea, $args, $forcedownload);
-    }
-
     /**
+     * Same as qtype_omerohotspot's own - no external/mobile-app rendering
+     * support for this qtype yet.
+     *
      * @param question_attempt $qa
      * @param question_display_options $options
      * @return mixed
      */
     public function get_question_definition_for_external_rendering(question_attempt $qa, question_display_options $options) {
-        // Same as qtype_omerohotspot's own - no external/mobile-app
-        // rendering support for this qtype yet.
         return null;
     }
 }

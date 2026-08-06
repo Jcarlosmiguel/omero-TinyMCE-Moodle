@@ -45,12 +45,18 @@ namespace local_omeroembed;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class gif_encoder {
-    /** GIF block introducer bytes. */
+    /** GIF Extension Introducer block byte. */
     const EXTENSION_INTRODUCER = 0x21;
+
+    /** GIF Image Descriptor Introducer block byte. */
     const IMAGE_DESCRIPTOR_INTRODUCER = 0x2C;
+
+    /** GIF Trailer block byte, marking end of file. */
     const TRAILER = 0x3B;
 
     /**
+     * Assembles a set of single-frame GIFs into one animated GIF.
+     *
      * @param string[] $rawgifframes Raw single-frame GIF bytes, oldest first.
      * @param int $delaycentiseconds Display duration per frame, in 1/100s.
      * @return string Raw bytes of one animated GIF file.
@@ -123,7 +129,7 @@ class gif_encoder {
             $offset += $gctsize;
         }
 
-        // headerandlsd is only ever used for the *first* frame, as the
+        // The headerandlsd value is only ever used for the *first* frame, as the
         // shared file-level header - and since every frame's own colour
         // table travels with it as a Local Colour Table instead (see this
         // class's own docblock for why), this clears the Global Colour

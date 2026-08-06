@@ -24,8 +24,6 @@
 
 namespace qtype_omerohotspotmulti\privacy;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * This qtype stores no personal data of its own - a student's clicked
  * coordinates and grade are recorded by Moodle's own question engine

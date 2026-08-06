@@ -42,7 +42,6 @@ namespace local_omeroembed;
  * @covers     \local_omeroembed\hotspot_multi_repository::verify_course
  */
 final class verify_course_test extends \advanced_testcase {
-
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
@@ -73,7 +72,9 @@ final class verify_course_test extends \advanced_testcase {
         $embedid = \core\uuid::generate();
 
         tracking_repository::set_settings((int) $course->id, $embedid, true, 60, 'https://example.invalid/proxy.php');
-        hotspot_repository::save((int) $course->id, $embedid, 2, ['type' => 'ellipse', 'x' => 1.5, 'y' => 1.5, 'rx' => 1.5, 'ry' => 1.5, 'rotation' => 0]);
+        hotspot_repository::save((int) $course->id, $embedid, 2, [
+            'type' => 'ellipse', 'x' => 1.5, 'y' => 1.5, 'rx' => 1.5, 'ry' => 1.5, 'rotation' => 0,
+        ]);
         hotspot_multi_repository::save((int) $course->id, $embedid, 2, [
             ['type' => 'ellipse', 'x' => 1.5, 'y' => 1.5, 'rx' => 1.5, 'ry' => 1.5, 'rotation' => 0],
         ]);
@@ -106,7 +107,9 @@ final class verify_course_test extends \advanced_testcase {
         $othercourse = $this->getDataGenerator()->create_course();
         $embedid = \core\uuid::generate();
 
-        hotspot_repository::save((int) $realcourse->id, $embedid, 2, ['type' => 'ellipse', 'x' => 1.5, 'y' => 1.5, 'rx' => 1.5, 'ry' => 1.5, 'rotation' => 0]);
+        hotspot_repository::save((int) $realcourse->id, $embedid, 2, [
+            'type' => 'ellipse', 'x' => 1.5, 'y' => 1.5, 'rx' => 1.5, 'ry' => 1.5, 'rotation' => 0,
+        ]);
 
         $this->expectException(\moodle_exception::class);
         hotspot_repository::verify_course($embedid, (int) $othercourse->id);
@@ -143,7 +146,7 @@ final class verify_course_test extends \advanced_testcase {
             hotspot_repository::verify_course($embedid, (int) $othercourse->id);
             $this->fail('Expected verify_course() to reject the mismatched course before any write was attempted.');
         } catch (\moodle_exception $e) {
-            // Expected - the point of this test is what happens next.
+            $this->assertMatchesRegularExpression('/does not belong to the specified course/', $e->getMessage());
         }
 
         $this->assertSame($original, hotspot_repository::get_geometry($embedid));

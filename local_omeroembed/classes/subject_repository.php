@@ -47,7 +47,10 @@ class subject_repository {
         global $DB;
 
         return array_values($DB->get_records(
-            'local_omeroembed_subjects', ['userid' => $userid], 'name ASC', 'id, name, omerousername'
+            'local_omeroembed_subjects',
+            ['userid' => $userid],
+            'name ASC',
+            'id, name, omerousername'
         ));
     }
 
@@ -67,6 +70,8 @@ class subject_repository {
     }
 
     /**
+     * Creates a new OMERO subject connection for a teacher.
+     *
      * @param int $userid
      * @param string $name
      * @param string $omerousername
@@ -89,6 +94,8 @@ class subject_repository {
     }
 
     /**
+     * Updates an existing OMERO subject connection.
+     *
      * @param int $id
      * @param int $userid
      * @param string $name
@@ -115,6 +122,8 @@ class subject_repository {
     }
 
     /**
+     * Deletes an OMERO subject connection.
+     *
      * @param int $id
      * @param int $userid
      * @return void

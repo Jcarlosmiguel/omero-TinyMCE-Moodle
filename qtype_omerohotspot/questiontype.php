@@ -34,12 +34,26 @@ require_once($CFG->libdir . '/questionlib.php');
  * there's genuinely only one thing to persist.
  */
 class qtype_omerohotspot extends question_type {
+    /**
+     * Validates and persists the drawn geometry alongside the subject/
+     * image/dataset selection.
+     *
+     * @param object $question
+     * @return bool
+     */
     public function save_question_options($question) {
         global $DB;
 
         $geometry = json_decode($question->geometry, true);
-        if (!is_array($geometry) || !isset($geometry['type'], $geometry['x'], $geometry['y'],
-                $geometry['rx'], $geometry['ry'])) {
+        if (
+            !is_array($geometry) || !isset(
+                $geometry['type'],
+                $geometry['x'],
+                $geometry['y'],
+                $geometry['rx'],
+                $geometry['ry']
+            )
+        ) {
             // The edit form's own JS is what normally populates this -
             // refuse rather than silently save a question with no real
             // answer region, same "never trust the client, even our own
@@ -68,12 +82,22 @@ class qtype_omerohotspot extends question_type {
         return true;
     }
 
+    /**
+     * Loads the saved options row for this question.
+     *
+     * @param object $question
+     * @return bool
+     */
     public function get_question_options($question) {
         global $DB, $OUTPUT;
         parent::get_question_options($question);
 
-        if (!$question->options = $DB->get_record('qtype_omerohotspot_options',
-                ['questionid' => $question->id])) {
+        if (
+            !$question->options = $DB->get_record(
+                'qtype_omerohotspot_options',
+                ['questionid' => $question->id]
+            )
+        ) {
             echo $OUTPUT->notification('Error: Missing question options for omerohotspot question ' .
                     $question->id . '!');
             return false;
@@ -82,6 +106,13 @@ class qtype_omerohotspot extends question_type {
         return true;
     }
 
+    /**
+     * Copies the saved subject/image/dataset/geometry onto the runtime
+     * question instance.
+     *
+     * @param question_definition $question
+     * @param object $questiondata
+     */
     protected function initialise_question_instance(question_definition $question, $questiondata) {
         parent::initialise_question_instance($question, $questiondata);
 
@@ -92,6 +123,12 @@ class qtype_omerohotspot extends question_type {
         $question->geometry = json_decode($questiondata->options->geometry, true);
     }
 
+    /**
+     * Deletes this question's saved options alongside the base question.
+     *
+     * @param int $questionid
+     * @param int $contextid
+     */
     public function delete_question($questionid, $contextid) {
         global $DB;
         $DB->delete_records('qtype_omerohotspot_options', ['questionid' => $questionid]);
@@ -104,17 +141,28 @@ class qtype_omerohotspot extends question_type {
     // text/generalfeedback file areas - unlike truefalse, which also has
     // to move/delete its per-answer feedback file areas.
 
+    /**
+     * A click anywhere on a whole-slide image landing inside a small
+     * marked region by pure chance is negligible - reported as 0 rather
+     * than attempting a genuine area-ratio estimate (which would need the
+     * full slide's real pixel dimensions, not available here), matching
+     * how question_type's own default already treats "true random-guess
+     * score genuinely unknown" for other free-response qtypes such as
+     * shortanswer.
+     *
+     * @param object $questiondata
+     * @return float
+     */
     public function get_random_guess_score($questiondata) {
-        // A click anywhere on a whole-slide image landing inside a small
-        // marked region by pure chance is negligible - reported as 0
-        // rather than attempting a genuine area-ratio estimate (which
-        // would need the full slide's real pixel dimensions, not
-        // available here), matching how question_type's own default
-        // already treats "true random-guess score genuinely unknown"
-        // for other free-response qtypes such as shortanswer.
         return 0;
     }
 
+    /**
+     * The set of possible response classifications for reports.
+     *
+     * @param object $questiondata
+     * @return array
+     */
     public function get_possible_responses($questiondata) {
         return [
             $questiondata->id => [

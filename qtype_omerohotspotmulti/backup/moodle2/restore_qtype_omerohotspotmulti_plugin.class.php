@@ -22,8 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Restore plugin class for the omerohotspotmulti question type plugin -
  * identical pattern to qtype_omerohotspot's own restore class.

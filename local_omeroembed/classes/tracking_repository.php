@@ -92,7 +92,7 @@ class tracking_repository {
 
         $gatherminutes = self::DEFAULT_GATHERMINUTES;
         if ($record->trackinguntil) {
-            // gatherminutes itself isn't stored (only its consequence,
+            // The gatherminutes value itself isn't stored (only its consequence,
             // trackinguntil, is) - reconstructed here purely so the
             // tracking panel can show teachers roughly what they last
             // entered rather than always resetting the input back to the

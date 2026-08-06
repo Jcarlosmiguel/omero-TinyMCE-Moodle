@@ -36,7 +36,15 @@ use editor_tiny\plugin_with_menuitems;
 class plugininfo extends plugin implements
     plugin_with_buttons,
     plugin_with_menuitems {
-
+    /**
+     * Whether the button/menu item should be offered in this context.
+     *
+     * @param context $context
+     * @param array $options
+     * @param array $fpoptions
+     * @param \editor_tiny\editor|null $editor
+     * @return bool
+     */
     public static function is_enabled(
         context $context,
         array $options,
@@ -50,12 +58,22 @@ class plugininfo extends plugin implements
         return has_capability('tiny/omeroembed:embed', $context);
     }
 
+    /**
+     * The list of toolbar buttons this plugin provides.
+     *
+     * @return string[]
+     */
     public static function get_available_buttons(): array {
         return [
             'tiny_omeroembed/omeroembed',
         ];
     }
 
+    /**
+     * The list of menu items this plugin provides.
+     *
+     * @return string[]
+     */
     public static function get_available_menuitems(): array {
         return [
             'tiny_omeroembed/omeroembed',

@@ -31,8 +31,6 @@ use core_privacy\local\request\contextlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * This plugin stores five kinds of personal data: a student's own point
  * annotations on an embedded OMERO slide (local_omeroembed_annotations),
@@ -77,14 +75,13 @@ defined('MOODLE_INTERNAL') || die();
  */
 class provider implements
         // This plugin stores personal data.
-        \core_privacy\local\metadata\provider,
-
-        // This plugin is a core_user_data_provider.
-        \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\metadata\provider,
 
         // This plugin is capable of determining which users have data within it.
-        \core_privacy\local\request\core_userlist_provider {
+    \core_privacy\local\request\core_userlist_provider,
 
+        // This plugin is a core_user_data_provider.
+    \core_privacy\local\request\plugin\provider {
     /**
      * Return the fields which contain personal data.
      *
@@ -246,9 +243,11 @@ class provider implements
         $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_hotspot_attempts} WHERE courseid = :courseid', [
             'courseid' => $context->instanceid,
         ]);
-        $userlist->add_from_sql('userid', 'SELECT userid FROM {local_omeroembed_hotspot_multi_attempts} WHERE courseid = :courseid', [
-            'courseid' => $context->instanceid,
-        ]);
+        $userlist->add_from_sql(
+            'userid',
+            'SELECT userid FROM {local_omeroembed_hotspot_multi_attempts} WHERE courseid = :courseid',
+            ['courseid' => $context->instanceid]
+        );
     }
 
     /**
@@ -279,7 +278,10 @@ class provider implements
                     }, array_values($subjects));
 
                     writer::with_context($context)->export_data(
-                        [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - OMERO connections'],
+                        [
+                            get_string('pluginname', 'local_omeroembed'),
+                            get_string('pluginname', 'local_omeroembed') . ' - OMERO connections',
+                        ],
                         (object) ['subjects' => $data]
                     );
                 }
@@ -328,7 +330,10 @@ class provider implements
                 }, array_values($samples));
 
                 writer::with_context($context)->export_data(
-                    [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - heatmap samples'],
+                    [
+                        get_string('pluginname', 'local_omeroembed'),
+                        get_string('pluginname', 'local_omeroembed') . ' - heatmap samples',
+                    ],
                     (object) ['viewsamples' => $data]
                 );
             }
@@ -349,7 +354,10 @@ class provider implements
                 }, array_values($attempts));
 
                 writer::with_context($context)->export_data(
-                    [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - hotspot attempts'],
+                    [
+                        get_string('pluginname', 'local_omeroembed'),
+                        get_string('pluginname', 'local_omeroembed') . ' - hotspot attempts',
+                    ],
                     (object) ['hotspotattempts' => $data]
                 );
             }
@@ -370,7 +378,10 @@ class provider implements
                 }, array_values($multiattempts));
 
                 writer::with_context($context)->export_data(
-                    [get_string('pluginname', 'local_omeroembed'), get_string('pluginname', 'local_omeroembed') . ' - multi-region hotspot attempts'],
+                    [
+                        get_string('pluginname', 'local_omeroembed'),
+                        get_string('pluginname', 'local_omeroembed') . ' - multi-region hotspot attempts',
+                    ],
                     (object) ['hotspotmultiattempts' => $data]
                 );
             }
@@ -425,7 +436,9 @@ class provider implements
             $DB->delete_records('local_omeroembed_annotations', ['courseid' => $context->instanceid, 'userid' => $userid]);
             $DB->delete_records('local_omeroembed_view_samples', ['courseid' => $context->instanceid, 'userid' => $userid]);
             $DB->delete_records('local_omeroembed_hotspot_attempts', ['courseid' => $context->instanceid, 'userid' => $userid]);
-            $DB->delete_records('local_omeroembed_hotspot_multi_attempts', ['courseid' => $context->instanceid, 'userid' => $userid]);
+            $DB->delete_records('local_omeroembed_hotspot_multi_attempts', [
+                'courseid' => $context->instanceid, 'userid' => $userid,
+            ]);
         }
     }
 

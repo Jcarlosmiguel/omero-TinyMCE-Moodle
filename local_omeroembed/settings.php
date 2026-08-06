@@ -73,7 +73,7 @@ if ($hassiteconfig) {
     // mysubjects.php (see db/install.xml's own comment on
     // local_omeroembed_subjects) - no admin setting for this any more.
 
-    // iviewer's own UI controls, individually hideable - see proxy.php's
+    // These are iviewer's own UI controls, individually hideable - see proxy.php's
     // inject_overlay_hide_css() for how these are actually applied (a single
     // combined CSS override injected into the proxied /iviewer/ response,
     // covering both the authoring tool's live preview and the final
@@ -174,7 +174,7 @@ if ($hassiteconfig) {
         'local_omeroembed/annotationcolours',
         get_string('annotationcolours', 'local_omeroembed'),
         get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
-        // admin_setting_configmulticheckbox's own write_setting()/output_html()
+        // The admin_setting_configmulticheckbox class's own write_setting()/output_html() methods
         // expect this keyed by the same option value as $choices below
         // (checks !empty($default[$key])), not a plain indexed list.
         array_fill_keys(annotations_repository::DEFAULT_COLOURS, 1),

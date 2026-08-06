@@ -35,6 +35,13 @@ require_once($CFG->libdir . '/questionlib.php');
  * array, rather than qtype_omerohotspot's single object).
  */
 class qtype_omerohotspotmulti extends question_type {
+    /**
+     * Validates and persists the drawn region array alongside the
+     * subject/image/dataset selection.
+     *
+     * @param object $question
+     * @return bool
+     */
     public function save_question_options($question) {
         global $DB;
 
@@ -51,8 +58,15 @@ class qtype_omerohotspotmulti extends question_type {
             throw new \moodle_exception('missinggeometry', 'qtype_omerohotspotmulti');
         }
         foreach ($regions as $region) {
-            if (!is_array($region) || !isset($region['type'], $region['x'], $region['y'],
-                    $region['rx'], $region['ry'])) {
+            if (
+                !is_array($region) || !isset(
+                    $region['type'],
+                    $region['x'],
+                    $region['y'],
+                    $region['rx'],
+                    $region['ry']
+                )
+            ) {
                 throw new \moodle_exception('missinggeometry', 'qtype_omerohotspotmulti');
             }
         }
@@ -77,12 +91,22 @@ class qtype_omerohotspotmulti extends question_type {
         return true;
     }
 
+    /**
+     * Loads the saved options row for this question.
+     *
+     * @param object $question
+     * @return bool
+     */
     public function get_question_options($question) {
         global $DB, $OUTPUT;
         parent::get_question_options($question);
 
-        if (!$question->options = $DB->get_record('qtype_omerohotspotmulti_options',
-                ['questionid' => $question->id])) {
+        if (
+            !$question->options = $DB->get_record(
+                'qtype_omerohotspotmulti_options',
+                ['questionid' => $question->id]
+            )
+        ) {
             echo $OUTPUT->notification('Error: Missing question options for omerohotspotmulti question ' .
                     $question->id . '!');
             return false;
@@ -91,6 +115,13 @@ class qtype_omerohotspotmulti extends question_type {
         return true;
     }
 
+    /**
+     * Copies the saved subject/image/dataset/regions onto the runtime
+     * question instance.
+     *
+     * @param question_definition $question
+     * @param object $questiondata
+     */
     protected function initialise_question_instance(question_definition $question, $questiondata) {
         parent::initialise_question_instance($question, $questiondata);
 
@@ -101,6 +132,12 @@ class qtype_omerohotspotmulti extends question_type {
         $question->regions = json_decode($questiondata->options->geometry, true);
     }
 
+    /**
+     * Deletes this question's saved options alongside the base question.
+     *
+     * @param int $questionid
+     * @param int $contextid
+     */
     public function delete_question($questionid, $contextid) {
         global $DB;
         $DB->delete_records('qtype_omerohotspotmulti_options', ['questionid' => $questionid]);
@@ -113,14 +150,25 @@ class qtype_omerohotspotmulti extends question_type {
     // text/generalfeedback file areas - same reasoning qtype_omerohotspot's
     // own questiontype.php already gives.
 
+    /**
+     * Same reasoning as qtype_omerohotspot's own equivalent - a click
+     * anywhere on a whole-slide image landing inside a small marked region
+     * by pure chance is negligible, reported as 0 rather than attempting a
+     * genuine area-ratio estimate.
+     *
+     * @param object $questiondata
+     * @return float
+     */
     public function get_random_guess_score($questiondata) {
-        // Same reasoning as qtype_omerohotspot's own equivalent - a click
-        // anywhere on a whole-slide image landing inside a small marked
-        // region by pure chance is negligible, reported as 0 rather than
-        // attempting a genuine area-ratio estimate.
         return 0;
     }
 
+    /**
+     * The set of possible response classifications for reports.
+     *
+     * @param object $questiondata
+     * @return array
+     */
     public function get_possible_responses($questiondata) {
         return [
             $questiondata->id => [

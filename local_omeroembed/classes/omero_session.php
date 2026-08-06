@@ -138,8 +138,13 @@ class omero_session {
         $getresult = self::curl_request($loginurl, 'GET');
         $csrftoken = $getresult['cookies']['csrftoken'] ?? null;
         if (!$csrftoken) {
-            throw new \moodle_exception('omerologinfailed', 'local_omeroembed', '', $subject,
-                'No csrftoken cookie received from ' . $loginurl);
+            throw new \moodle_exception(
+                'omerologinfailed',
+                'local_omeroembed',
+                '',
+                $subject,
+                'No csrftoken cookie received from ' . $loginurl
+            );
         }
 
         // Step 2: POST credentials, presenting that same csrftoken both as a cookie
@@ -165,9 +170,14 @@ class omero_session {
 
         $sessionid = $postresult['cookies']['sessionid'] ?? null;
         if (!$sessionid) {
-            throw new \moodle_exception('omerologinfailed', 'local_omeroembed', '', $subject,
+            throw new \moodle_exception(
+                'omerologinfailed',
+                'local_omeroembed',
+                '',
+                $subject,
                 'Login POST did not return a sessionid cookie - check the configured '
-                . 'credentials for this subject.');
+                . 'credentials for this subject.'
+            );
         }
         // OMERO.web rotates csrftoken on login - prefer the new value if one came back.
         $csrftoken = $postresult['cookies']['csrftoken'] ?? $csrftoken;

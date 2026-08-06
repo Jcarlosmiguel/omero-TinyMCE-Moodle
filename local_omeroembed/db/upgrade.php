@@ -22,8 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Function to upgrade local_omeroembed.
  *
@@ -77,7 +75,7 @@ function xmldb_local_omeroembed_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026073006) {
-        // 'circle' is superseded by 'ellipse' (a circle is just the rx===ry
+        // The 'circle' type is superseded by 'ellipse' (a circle is just the rx===ry
         // case, drawn by holding Shift - see js/annotate.js and
         // annotations_repository::TYPE_ELLIPSE's own comment) - migrate any
         // existing rows' type and geometry {x,y,r} -> {x,y,rx,ry} rather

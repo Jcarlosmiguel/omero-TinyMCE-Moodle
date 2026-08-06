@@ -70,21 +70,21 @@ require_login($course);
 
 $context = context_course::instance($courseid);
 
-// hotspot_attempt sits alongside list/create/update/delete on purpose -
-// "any enrolled viewer may do this" is exactly what local/omeroembed:annotate
-// already means in this plugin, and attempting a hotspot question is a
-// normal student action, not a privileged one (defining the *answer* is -
-// see $hotspotauthoractions below, a genuinely different capability).
-// hotspotmulti_attempt sits alongside hotspot_attempt for the identical
-// reason - attempting a multi-region hotspot question is the same normal
-// student action, not a privileged one.
+// The hotspot_attempt action sits alongside list/create/update/delete on
+// purpose - "any enrolled viewer may do this" is exactly what
+// local/omeroembed:annotate already means in this plugin, and attempting a
+// hotspot question is a normal student action, not a privileged one
+// (defining the *answer* is - see $hotspotauthoractions below, a
+// genuinely different capability). hotspotmulti_attempt sits alongside
+// hotspot_attempt for the identical reason - attempting a multi-region
+// hotspot question is the same normal student action, not a privileged one.
 $annotateactions = ['list', 'create', 'update', 'delete', 'hotspot_attempt', 'hotspotmulti_attempt'];
-// tracking_get/tracking_set used to live here too, when author.php had its
-// own JS-driven tracking panel - that panel has since moved entirely onto
-// heatmap.php as a plain server-rendered form (confirmed with the user),
-// which calls tracking_repository directly rather than round-tripping
-// through this endpoint, so those two actions were removed rather than
-// left unused.
+// The tracking_get/tracking_set actions used to live here too, when
+// author.php had its own JS-driven tracking panel - that panel has since
+// moved entirely onto heatmap.php as a plain server-rendered form
+// (confirmed with the user), which calls tracking_repository directly
+// rather than round-tripping through this endpoint, so those two actions
+// were removed rather than left unused.
 $heatmapactions = ['heatmap'];
 // The one place in this plugin that reads/writes the actual secret a
 // student is being asked to find - deliberately its own capability, not
@@ -121,12 +121,12 @@ if (in_array($action, $annotateactions, true)) {
 \core\session\manager::write_close();
 
 header('Content-Type: application/json');
-// action=heatmap/list are GETs to an otherwise-identical URL every time
-// they're polled (heatmap-view.js re-fetches action=heatmap on a timer -
-// see js/heatmap-view.js's REFRESH_INTERVAL_MS) - without this, a browser
-// can serve a cached response instead of hitting this endpoint again,
-// silently freezing the heatmap on whatever it first fetched. Confirmed
-// live: this was a real bug, not a hypothetical one.
+// The action=heatmap/list requests are GETs to an otherwise-identical URL
+// every time they're polled (heatmap-view.js re-fetches action=heatmap on
+// a timer - see js/heatmap-view.js's REFRESH_INTERVAL_MS) - without this,
+// a browser can serve a cached response instead of hitting this endpoint
+// again, silently freezing the heatmap on whatever it first fetched.
+// Confirmed live: this was a real bug, not a hypothetical one.
 header('Cache-Control: no-store, must-revalidate');
 
 if ($action === 'list') {

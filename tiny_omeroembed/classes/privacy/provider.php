@@ -24,8 +24,6 @@
 
 namespace tiny_omeroembed\privacy;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * This plugin stores no data of its own - it has no database tables at
  * all. It's a TinyMCE toolbar button that opens local_omeroembed's own

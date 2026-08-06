@@ -117,11 +117,13 @@ class hotspot_multi_repository {
             throw new \moodle_exception('toomanyregions', 'local_omeroembed', '', self::MAX_REGIONS);
         }
         foreach ($regions as $region) {
-            if (!is_array($region)
+            if (
+                !is_array($region)
                     || !isset($region['type'], $region['x'], $region['y'], $region['rx'], $region['ry'])
                     || ($region['type'] !== annotations_repository::TYPE_ELLIPSE
                         && $region['type'] !== annotations_repository::TYPE_RECTANGLE)
-                    || (float) $region['rx'] <= 0 || (float) $region['ry'] <= 0) {
+                    || (float) $region['rx'] <= 0 || (float) $region['ry'] <= 0
+            ) {
                 throw new \moodle_exception('invalidregion', 'local_omeroembed');
             }
         }

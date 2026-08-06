@@ -75,10 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $submittedcolours[] = $hex;
         }
     }
-    // parse_colours() re-validates/caps this the same way proxy.php does
-    // for a teacher's own per-embed choice - this page isn't any more
-    // trusted just because it needs a capability to reach.
-    set_config('annotationcolours', implode(',', annotations_repository::parse_colours(implode(',', $submittedcolours))), 'local_omeroembed');
+    // The parse_colours() function re-validates/caps this the same way
+    // proxy.php does for a teacher's own per-embed choice - this page
+    // isn't any more trusted just because it needs a capability to reach.
+    set_config(
+        'annotationcolours',
+        implode(',', annotations_repository::parse_colours(implode(',', $submittedcolours))),
+        'local_omeroembed'
+    );
 
     $saved = true;
 }
@@ -95,8 +99,12 @@ echo html_writer::start_tag('form', ['method' => 'post', 'action' => $pageurl->o
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
 
 echo html_writer::start_div('form-group', ['style' => 'margin-bottom: 1rem;']);
-echo html_writer::tag('label', get_string('omerobaseurl', 'local_omeroembed'), ['for' => 'id_omerobaseurl', 'class' => 'font-weight-bold']);
-echo html_writer::tag('p', get_string('omerobaseurl_desc', 'local_omeroembed'), ['class' => 'text-muted', 'style' => 'margin-bottom:0.25rem;']);
+echo html_writer::tag('label', get_string('omerobaseurl', 'local_omeroembed'), [
+    'for' => 'id_omerobaseurl', 'class' => 'font-weight-bold',
+]);
+echo html_writer::tag('p', get_string('omerobaseurl_desc', 'local_omeroembed'), [
+    'class' => 'text-muted', 'style' => 'margin-bottom:0.25rem;',
+]);
 echo html_writer::empty_tag('input', [
     'type' => 'text', 'name' => 'omerobaseurl', 'id' => 'id_omerobaseurl',
     'value' => get_config('local_omeroembed', 'omerobaseurl'),
@@ -109,23 +117,39 @@ echo html_writer::tag('p', get_string('overlaysheading_desc', 'local_omeroembed'
 
 foreach ($overlaysettings as $setting) {
     echo html_writer::start_div('form-check', ['style' => 'margin-bottom: 0.75rem;']);
-    echo html_writer::checkbox($setting, 1, (bool) get_config('local_omeroembed', $setting),
-        get_string($setting, 'local_omeroembed'), ['class' => 'form-check-input']);
-    echo html_writer::tag('p', get_string($setting . '_desc', 'local_omeroembed'),
-        ['class' => 'text-muted', 'style' => 'margin-left:1.5rem; margin-top:0.25rem;']);
+    echo html_writer::checkbox(
+        $setting,
+        1,
+        (bool) get_config('local_omeroembed', $setting),
+        get_string($setting, 'local_omeroembed'),
+        ['class' => 'form-check-input']
+    );
+    echo html_writer::tag(
+        'p',
+        get_string($setting . '_desc', 'local_omeroembed'),
+        ['class' => 'text-muted', 'style' => 'margin-left:1.5rem; margin-top:0.25rem;']
+    );
     echo html_writer::end_div();
 }
 
 echo html_writer::tag('h3', get_string('annotationcolours', 'local_omeroembed'), ['style' => 'margin-top:2rem;']);
-echo html_writer::tag('p', get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
-    ['class' => 'text-muted']);
+echo html_writer::tag(
+    'p',
+    get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
+    ['class' => 'text-muted']
+);
 
 $currentcolours = annotations_repository::parse_colours((string) get_config('local_omeroembed', 'annotationcolours'));
 echo html_writer::start_div('', ['id' => 'omero-annotation-colours']);
 foreach (annotations_repository::get_colour_choices() as $hex => $label) {
     echo html_writer::start_div('form-check', ['style' => 'margin-bottom: 0.5rem;']);
-    echo html_writer::checkbox('colour_' . strtolower(ltrim($hex, '#')), 1, in_array($hex, $currentcolours, true),
-        $label . ' (' . $hex . ')', ['class' => 'form-check-input']);
+    echo html_writer::checkbox(
+        'colour_' . strtolower(ltrim($hex, '#')),
+        1,
+        in_array($hex, $currentcolours, true),
+        $label . ' (' . $hex . ')',
+        ['class' => 'form-check-input']
+    );
     echo html_writer::end_div();
 }
 echo html_writer::end_div();
@@ -148,7 +172,8 @@ echo html_writer::script(
 );
 
 echo html_writer::empty_tag('input', [
-    'type' => 'submit', 'value' => get_string('savechanges', 'local_omeroembed'), 'class' => 'btn btn-primary', 'style' => 'margin-top:1rem;',
+    'type' => 'submit', 'value' => get_string('savechanges', 'local_omeroembed'),
+    'class' => 'btn btn-primary', 'style' => 'margin-top:1rem;',
 ]);
 echo html_writer::end_tag('form');
 

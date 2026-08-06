@@ -22,8 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Provides the information to backup omerohotspot questions - modelled on
  * qtype_ddmarker's own backup class (a data-heavy qtype with its own extra
@@ -49,10 +47,12 @@ class backup_qtype_omerohotspot_plugin extends backup_qtype_plugin {
             'subjectid', 'imageid', 'datasetid', 'geometry',
         ]);
         $pluginwrapper->add_child($options);
-        $options->set_source_table('qtype_omerohotspot_options',
-                ['questionid' => backup::VAR_PARENTID]);
+        $options->set_source_table(
+            'qtype_omerohotspot_options',
+            ['questionid' => backup::VAR_PARENTID]
+        );
 
-        // subjectid is a foreign key into local_omeroembed_subjects, owned
+        // The subjectid field is a foreign key into local_omeroembed_subjects, owned
         // by whichever teacher created the connection - not something
         // backup/restore can meaningfully remap across a course restore
         // into a different site/owner, so it's left as a plain value, not

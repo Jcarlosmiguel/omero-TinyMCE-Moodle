@@ -28,8 +28,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Adds an "Embed an OMERO slide" link to a course's own navigation, for anyone
  * who could actually use author.php in that course - mirrors exactly the

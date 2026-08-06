@@ -79,14 +79,16 @@ const PROXY_PATH_PREFIXES = ['/iviewer/', '/webgateway/', '/api/', '/static/'];
  */
 const BODY_REWRITE_PREFIXES = ['/iviewer/', '/static/'];
 
-// courseid/subject travel as slash-arguments (PATH_INFO), not query params, so that
-// the *this proxy's own URL*, embedded whole as the value of OMERO's "host" param
-// below, needs only one query param ("path") and never a literal "&" of its own.
-// OMERO's Django template HTML-escapes that value on the way out (& becomes &amp;)
-// and browsers do NOT decode entities inside <script> text - a raw "&" we relied on
-// as a delimiter would arrive at this script mangled into the 5 literal characters
-// "&amp;" instead of being split into separate params. A single query param sidesteps
-// the whole problem instead of trying to out-guess Django's escaping.
+// The courseid/subject travel as slash-arguments (PATH_INFO), not query
+// params, so that *this proxy's own URL*, embedded whole as the value of
+// OMERO's "host" param below, needs only one query param ("path") and
+// never a literal "&" of its own. OMERO's Django template HTML-escapes
+// that value on the way out (& becomes &amp;) and browsers do NOT decode
+// entities inside <script> text - a raw "&" we relied on as a delimiter
+// would arrive at this script mangled into the 5 literal characters
+// "&amp;" instead of being split into separate params. A single query
+// param sidesteps the whole problem instead of trying to out-guess
+// Django's escaping.
 $pathinfo = trim((string) ($_SERVER['PATH_INFO'] ?? ''), '/');
 [$courseid, $subject] = array_pad(explode('/', $pathinfo, 2), 2, '');
 $courseid = clean_param($courseid, PARAM_INT);
@@ -128,7 +130,7 @@ $authoring = optional_param('authoring', false, PARAM_BOOL);
 // which embed placement an annotation belongs to.
 $embedid = optional_param('embedid', '', PARAM_ALPHANUMEXT);
 
-// 'standalone' (default - local_omeroembed's own hotspot activity, keyed
+// The hotspotmode is 'standalone' (default - local_omeroembed's own hotspot activity, keyed
 // by $embedid, see hotspot_repository.php) or 'qtype' (qtype_omerohotspot's
 // question edit form / attempt renderer - no $embedid at all, since the
 // question itself is the identity; the region round-trips via postMessage
@@ -189,6 +191,8 @@ if (!in_array_prefix($path, PROXY_PATH_PREFIXES)) {
 \core\session\manager::write_close();
 
 /**
+ * Whether $path starts with any of the given prefixes.
+ *
  * @param string $path
  * @param string[] $prefixes
  * @return bool
@@ -282,7 +286,7 @@ $proxybase = (new \moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$subject
 // carry their own real query string in $path itself instead.
 $querystring = '';
 if ($path === '/iviewer/') {
-    // images and dataset are independently optional - all four combinations are
+    // The images and dataset params are independently optional - all four combinations are
     // valid iviewer views: a single image alone, a single starting image inside
     // a dataset, a whole dataset with no starting image, or a dataset with a
     // starting image. At least one of the two has to be given, or there's
@@ -298,7 +302,7 @@ if ($path === '/iviewer/') {
         throw new \moodle_exception('missingimageordataset', 'local_omeroembed');
     }
 
-    // "browsable" is an explicit, independent choice - NOT inferred from whether
+    // The browsable flag is an explicit, independent choice - NOT inferred from whether
     // a dataset is present. iviewer supports a dataset+full_page combination
     // (a single clean starting image that just happens to belong to a dataset,
     // e.g. embedding "the" representative slide from a teaching set) just as
@@ -480,7 +484,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
                 $rewritten = inject_show_rois_script($rewritten);
             }
             if ($enablehotspotmulti && $hotspotmode === 'qtypemulti') {
-                // qtype_omerohotspotmulti's own student-attempt mode - same
+                // This is qtype_omerohotspotmulti's own student-attempt mode - same
                 // reasoning as the single-region qtype's own branch below,
                 // just for the multi-region sibling qtype. Checked before
                 // every $enablehotspot branch, so if a request somehow
@@ -490,21 +494,25 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
                 // the normal authoring UI).
                 $rewritten = inject_hotspot_multi_qtype_attempt_script($rewritten);
             } else if ($enablehotspot && $hotspotmode === 'qtype') {
-                // qtype_omerohotspot's own student-attempt mode - no
+                // This is qtype_omerohotspot's own student-attempt mode - no
                 // $embedid to check existence against at all (the question
                 // itself is the identity, not an embed placement); the
                 // click never triggers an ajax.php call either, it only
                 // ever posts up to the qtype's own hidden form fields (see
                 // that plugin's own renderer.php/amd/src/question.js).
                 $rewritten = inject_hotspot_qtype_attempt_script($rewritten);
-            } else if ($enablehotspotmulti && $embedid !== ''
-                    && \local_omeroembed\hotspot_multi_repository::exists($embedid)) {
+            } else if (
+                $enablehotspotmulti && $embedid !== ''
+                    && \local_omeroembed\hotspot_multi_repository::exists($embedid)
+            ) {
                 // Multi-region sibling of the standalone branch below - same
                 // "existence-checked, not just flag-checked" reasoning,
                 // just checking whether at least one region has been drawn.
                 $rewritten = inject_hotspot_multi_attempt_script($rewritten, $courseid, $embedid);
-            } else if ($enablehotspot && $embedid !== ''
-                    && \local_omeroembed\hotspot_repository::exists($embedid)) {
+            } else if (
+                $enablehotspot && $embedid !== ''
+                    && \local_omeroembed\hotspot_repository::exists($embedid)
+            ) {
                 // Existence-checked, not just flag-checked - a teacher who
                 // turned this on but never actually drew a region has
                 // nothing for a student to click on yet; "simply not
@@ -513,15 +521,19 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
                 // $embedid.
                 $rewritten = inject_hotspot_attempt_script($rewritten, $courseid, $embedid);
             }
-        } else if ($hotspotmode === 'qtypemulti' && $enablehotspotmulti
-                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
-            // qtype_omerohotspotmulti's own question-edit-form preview -
+        } else if (
+            $hotspotmode === 'qtypemulti' && $enablehotspotmulti
+                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))
+        ) {
+            // This is qtype_omerohotspotmulti's own question-edit-form preview -
             // same reasoning as the single-region qtype's own branch below,
             // just posting a whole array of regions instead of one shape.
             $rewritten = inject_hotspot_multi_edit_form_script($rewritten);
-        } else if ($hotspotmode === 'qtype' && $enablehotspot
-                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
-            // qtype_omerohotspot's own question-edit-form preview - draws
+        } else if (
+            $hotspotmode === 'qtype' && $enablehotspot
+                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))
+        ) {
+            // This is qtype_omerohotspot's own question-edit-form preview - draws
             // the hidden region the same way the standalone activity's
             // authoring script does, but posts the finished geometry up
             // via postMessage into the edit form's own hidden field
@@ -530,14 +542,18 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
             // the geometry is just one more field on that form, saved
             // when the whole question is saved).
             $rewritten = inject_hotspot_edit_form_script($rewritten);
-        } else if ($enablehotspotmulti && $embedid !== ''
-                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
+        } else if (
+            $enablehotspotmulti && $embedid !== ''
+                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))
+        ) {
             // The standalone activity's own multi-region authoring preview -
             // same reasoning as the single-region branch below, just
             // drawing/persisting a set of regions instead of one.
             $rewritten = inject_hotspot_multi_author_script($rewritten, $courseid, $embedid);
-        } else if ($enablehotspot && $embedid !== ''
-                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))) {
+        } else if (
+            $enablehotspot && $embedid !== ''
+                && has_capability('local/omeroembed:hotspotauthor', context_course::instance($courseid))
+        ) {
             // The standalone activity's own authoring preview - drawing
             // the hidden region itself, never combined with any of the
             // student-facing scripts above. Capability-checked here too,
@@ -1438,7 +1454,8 @@ function inject_hotspot_multi_attempt_script(string $body, int $courseid, string
  * @return string
  */
 function inject_hotspot_multi_edit_form_script(string $body): string {
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-author.js'))->out(false) . '"></script>';
+    $scripturl = new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-author.js');
+    $srcscript = '<script src="' . $scripturl->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $srcscript);
@@ -1454,7 +1471,8 @@ function inject_hotspot_multi_edit_form_script(string $body): string {
  * @return string
  */
 function inject_hotspot_multi_qtype_attempt_script(string $body): string {
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-attempt.js'))->out(false) . '"></script>';
+    $scripturl = new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-attempt.js');
+    $srcscript = '<script src="' . $scripturl->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $srcscript);

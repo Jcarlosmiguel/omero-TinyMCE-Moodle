@@ -22,8 +22,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Generates the output for OMERO multi-region hotspot questions. Embeds
  * the same locked-down local_omeroembed/proxy.php iframe the standalone
@@ -35,8 +33,18 @@ defined('MOODLE_INTERNAL') || die();
  * attempt form exactly like qtype_omerohotspot's own equivalent.
  */
 class qtype_omerohotspotmulti_renderer extends qtype_renderer {
-    public function formulation_and_controls(question_attempt $qa,
-            question_display_options $options) {
+    /**
+     * Renders the question text, the hidden click-position fields, and the
+     * locked-down proxy.php preview the student clicks on.
+     *
+     * @param question_attempt $qa
+     * @param question_display_options $options
+     * @return string
+     */
+    public function formulation_and_controls(
+        question_attempt $qa,
+        question_display_options $options
+    ) {
 
         /** @var qtype_omerohotspotmulti_question $question */
         $question = $qa->get_question();
@@ -75,7 +83,11 @@ class qtype_omerohotspotmulti_renderer extends qtype_renderer {
         $result .= html_writer::start_div('qtype_omerohotspotmulti_answer', ['id' => $wrapid]);
         if ($clickx !== '' && $clicky !== '') {
             $result .= html_writer::div(
-                get_string('currentanswer', 'qtype_omerohotspotmulti', (object) ['x' => round((float) $clickx), 'y' => round((float) $clicky)]),
+                get_string(
+                    'currentanswer',
+                    'qtype_omerohotspotmulti',
+                    (object) ['x' => round((float) $clickx), 'y' => round((float) $clicky)]
+                ),
                 'qtype_omerohotspotmulti_currentanswer'
             );
         }
@@ -93,26 +105,39 @@ class qtype_omerohotspotmulti_renderer extends qtype_renderer {
         ]);
 
         if ($qa->get_state() == question_state::$invalid) {
-            $result .= html_writer::nonempty_tag('div',
-                    $question->get_validation_error($qa->get_last_qt_data()),
-                    ['class' => 'validationerror']);
+            $result .= html_writer::nonempty_tag(
+                'div',
+                $question->get_validation_error($qa->get_last_qt_data()),
+                ['class' => 'validationerror']
+            );
         }
 
         return $result;
     }
 
+    /**
+     * No per-answer feedback text stored (no question_answers row at all
+     * for this qtype) - only the generic combined feedback
+     * (correctfeedback/incorrectfeedback question-level fields) core
+     * already renders for any question_graded_automatically, which this
+     * class doesn't need to override.
+     *
+     * @param question_attempt $qa
+     * @return string
+     */
     public function specific_feedback(question_attempt $qa) {
-        // No per-answer feedback text stored (no question_answers row at
-        // all for this qtype) - only the generic combined feedback
-        // (correctfeedback/incorrectfeedback question-level fields) core
-        // already renders for any question_graded_automatically, which
-        // this class doesn't need to override.
         return '';
     }
 
+    /**
+     * Deliberately blank - see
+     * qtype_omerohotspotmulti_question::get_correct_response()'s own
+     * docblock for why the regions stay undescribed even here.
+     *
+     * @param question_attempt $qa
+     * @return string
+     */
     public function correct_response(question_attempt $qa) {
-        // Deliberately blank - see qtype_omerohotspotmulti_question::get_correct_response()'s
-        // own docblock for why the regions stay undescribed even here.
         return '';
     }
 }

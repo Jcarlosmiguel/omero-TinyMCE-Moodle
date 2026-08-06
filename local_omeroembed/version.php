@@ -24,7 +24,12 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026080308;         // The current plugin version (Date: YYYYMMDDXX). Bumped: fixes redirect() confirmation messages silently discarded by the 2026080307 session-lock fix, adds the MOODLE_INTERNAL guard to db/upgrade.php.
+// The current plugin version (Date: YYYYMMDDXX). Bumped: fixes redirect()
+// confirmation messages silently discarded by the 2026080307 session-lock
+// fix, and brings the codebase to a clean moodle-plugin-ci run (docblocks,
+// comment/line-length conventions, and dropping MOODLE_INTERNAL guards
+// from files the current sniff says don't need them).
+$plugin->version   = 2026080309;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
 $plugin->release   = '1.3.0';

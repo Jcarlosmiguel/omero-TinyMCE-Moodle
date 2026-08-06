@@ -104,8 +104,10 @@ $settings = tracking_repository::get_settings($embedid);
 // external sourceurl, opened by anyone with :viewheatmap, planted a
 // phishing iframe permanently on this page.
 $proxybaseprefix = (new moodle_url('/local/omeroembed/proxy.php'))->out(false);
-if ($settings['sourceurl'] === '' && $sourceurlparam !== '' && confirm_sesskey()
-        && str_starts_with($sourceurlparam, $proxybaseprefix)) {
+if (
+    $settings['sourceurl'] === '' && $sourceurlparam !== '' && confirm_sesskey()
+        && str_starts_with($sourceurlparam, $proxybaseprefix)
+) {
     // First-ever visit for this embed - seed sourceurl so the page has
     // something to build an iframe from, but deliberately leave tracking
     // switched off until the teacher explicitly starts it below, same
@@ -140,8 +142,12 @@ if ($delete && $confirm && confirm_sesskey()) {
     // rather than deleting live-in-progress data out from under an active
     // session.
     if (tracking_repository::is_active($embedid)) {
-        redirect($pageurl, get_string('cannotdeletewhiletracking', 'local_omeroembed'),
-            null, \core\output\notification::NOTIFY_WARNING);
+        redirect(
+            $pageurl,
+            get_string('cannotdeletewhiletracking', 'local_omeroembed'),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
     }
 
     // Also turns tracking off (see delete_samples()'s own docblock for
@@ -149,8 +155,12 @@ if ($delete && $confirm && confirm_sesskey()) {
     // doesn't quietly start gathering fresh data again right after being
     // cleared.
     $deletedcount = tracking_repository::delete_samples($embedid);
-    redirect($pageurl, get_string('datadeleted', 'local_omeroembed', $deletedcount),
-        null, \core\output\notification::NOTIFY_SUCCESS);
+    redirect(
+        $pageurl,
+        get_string('datadeleted', 'local_omeroembed', $deletedcount),
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
 }
 
 // PERFORMANCE: nothing past this point writes to $_SESSION - see
@@ -203,8 +213,11 @@ echo html_writer::start_div('', ['style' => 'display:flex; align-items:center; g
 if ($currentlytracking) {
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'enabled', 'value' => 0]);
     $minutesleft = (int) ceil(($settings['trackinguntil'] - time()) / MINSECS);
-    echo html_writer::tag('span', get_string('trackingremaining', 'local_omeroembed', $minutesleft),
-        ['class' => 'text-muted']);
+    echo html_writer::tag(
+        'span',
+        get_string('trackingremaining', 'local_omeroembed', $minutesleft),
+        ['class' => 'text-muted']
+    );
     echo html_writer::empty_tag('input', [
         'type' => 'submit', 'value' => get_string('stoptracking', 'local_omeroembed'), 'class' => 'btn btn-outline-danger',
     ]);
@@ -212,7 +225,7 @@ if ($currentlytracking) {
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'enabled', 'value' => 1]);
     echo html_writer::tag('label', get_string('gatherminuteslabel', 'local_omeroembed') . ' ' .
         html_writer::empty_tag('input', [
-            // step is a spinner nicety (nudges by 30), not an enforced
+            // The step attribute is a spinner nicety (nudges by 30), not an enforced
             // constraint - HTML5's step validation would otherwise refuse
             // to submit a manually-typed value that isn't an exact
             // multiple of it (e.g. 70), which is a real value a teacher
@@ -246,11 +259,17 @@ $heatmapsrcurl->param('embedid', $embedid);
 if (!$settings['enabled']) {
     echo $OUTPUT->notification(get_string('heatmaptrackingoff', 'local_omeroembed'), 'warning');
 } else if ($settings['trackinguntil'] && $settings['trackinguntil'] < time()) {
-    echo $OUTPUT->notification(get_string('heatmapgatheringended', 'local_omeroembed',
-        userdate($settings['trackinguntil'])), 'info');
+    echo $OUTPUT->notification(get_string(
+        'heatmapgatheringended',
+        'local_omeroembed',
+        userdate($settings['trackinguntil'])
+    ), 'info');
 } else if ($settings['trackinguntil']) {
-    echo html_writer::tag('p', get_string('heatmapgatheringuntil', 'local_omeroembed',
-        userdate($settings['trackinguntil'])), ['class' => 'text-muted']);
+    echo html_writer::tag('p', get_string(
+        'heatmapgatheringuntil',
+        'local_omeroembed',
+        userdate($settings['trackinguntil'])
+    ), ['class' => 'text-muted']);
 }
 
 echo html_writer::tag('iframe', '', [
@@ -309,18 +328,27 @@ if ($sessionended && $samplecount > 0) {
 echo html_writer::end_div();
 
 if ($currentlytracking) {
-    echo html_writer::tag('p', get_string('availableafterend', 'local_omeroembed'),
-        ['class' => 'text-muted', 'style' => 'margin-top:0.5rem; max-width:1000px;']);
+    echo html_writer::tag(
+        'p',
+        get_string('availableafterend', 'local_omeroembed'),
+        ['class' => 'text-muted', 'style' => 'margin-top:0.5rem; max-width:1000px;']
+    );
 } else if ($samplecount === 0) {
-    echo html_writer::tag('p', get_string('nodatarecorded', 'local_omeroembed'),
-        ['class' => 'text-muted', 'style' => 'margin-top:0.5rem; max-width:1000px;']);
+    echo html_writer::tag(
+        'p',
+        get_string('nodatarecorded', 'local_omeroembed'),
+        ['class' => 'text-muted', 'style' => 'margin-top:0.5rem; max-width:1000px;']
+    );
 }
 
 // Lets a teacher tell whether there's a real video worth downloading yet -
 // frames are only captured every 5 minutes (classes/task/capture_heatmap_frames.php)
 // while tracking is active, so a brand-new session may genuinely have none yet.
-echo html_writer::tag('p', get_string('framecount', 'local_omeroembed', $framecount),
-    ['class' => 'text-muted', 'style' => 'margin-top:0.5rem; max-width:1000px;']);
+echo html_writer::tag(
+    'p',
+    get_string('framecount', 'local_omeroembed', $framecount),
+    ['class' => 'text-muted', 'style' => 'margin-top:0.5rem; max-width:1000px;']
+);
 
 // Surfaces the *already-enforced* site-wide retention setting (Site
 // administration > Plugins > Local plugins > OMERO slide embed > "Data
@@ -330,8 +358,11 @@ echo html_writer::tag('p', get_string('framecount', 'local_omeroembed', $frameco
 // cutoff.
 $retentionperiod = (int) get_config('local_omeroembed', 'retentionperiod');
 if ($retentionperiod > 0) {
-    echo html_writer::tag('p', get_string('retentionreminder', 'local_omeroembed', format_time($retentionperiod)),
-        ['class' => 'text-muted', 'style' => 'margin-top:0.75rem; max-width:1000px;']);
+    echo html_writer::tag(
+        'p',
+        get_string('retentionreminder', 'local_omeroembed', format_time($retentionperiod)),
+        ['class' => 'text-muted', 'style' => 'margin-top:0.75rem; max-width:1000px;']
+    );
 }
 
 echo $OUTPUT->footer();

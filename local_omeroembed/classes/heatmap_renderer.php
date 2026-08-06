@@ -127,9 +127,9 @@ class heatmap_renderer {
         if (empty($query['images'])) {
             return null;
         }
-        // 'images' can be a comma-separated PARAM_SEQUENCE (author.php's
-        // own browsable-dataset case) - a video frame can only show one
-        // base image, so just take the first.
+        // The images param can be a comma-separated PARAM_SEQUENCE
+        // (author.php's own browsable-dataset case) - a video frame can
+        // only show one base image, so just take the first.
         $imageid = (int) explode(',', (string) $query['images'])[0];
         if ($imageid <= 0) {
             return null;
@@ -139,6 +139,8 @@ class heatmap_renderer {
     }
 
     /**
+     * Fetches an image's pixel dimensions from OMERO's webgateway.
+     *
      * @param string $baseurl
      * @param array{cookie: string, csrftoken: string} $session
      * @param int $imageid
@@ -157,6 +159,8 @@ class heatmap_renderer {
     }
 
     /**
+     * Issues an authenticated GET against OMERO using a captured session.
+     *
      * @param string $url
      * @param array{cookie: string, csrftoken: string} $session
      * @return string|null Response body, or null on any non-200/curl failure.
@@ -268,9 +272,16 @@ class heatmap_renderer {
         $transparent2 = imagecolorallocatealpha($overlayscaled, 0, 0, 0, 127);
         imagefill($overlayscaled, 0, 0, $transparent2);
         imagecopyresampled(
-            $overlayscaled, $overlay,
-            0, 0, 0, 0,
-            $displaywidth, $displayheight, $gridwidth, $gridheight
+            $overlayscaled,
+            $overlay,
+            0,
+            0,
+            0,
+            0,
+            $displaywidth,
+            $displayheight,
+            $gridwidth,
+            $gridheight
         );
 
         // Real alpha compositing onto the base image (blending ON on the

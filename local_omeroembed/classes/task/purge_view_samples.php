@@ -37,6 +37,8 @@ use local_omeroembed\heatmap_frame_repository;
  */
 class purge_view_samples extends \core\task\scheduled_task {
     /**
+     * The task's name, shown in the admin scheduled tasks list.
+     *
      * @return string
      */
     public function get_name(): string {
@@ -44,6 +46,8 @@ class purge_view_samples extends \core\task\scheduled_task {
     }
 
     /**
+     * Deletes heatmap view samples older than the configured retention period.
+     *
      * @return void
      */
     public function execute(): void {

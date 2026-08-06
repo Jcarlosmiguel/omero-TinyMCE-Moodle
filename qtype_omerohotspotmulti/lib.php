@@ -27,8 +27,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Rotates a point into a shape's own unrotated local frame - identical
  * formula to qtype_omerohotspot's own qtype_omerohotspot_unrotate() (itself

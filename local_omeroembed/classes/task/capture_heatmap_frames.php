@@ -40,6 +40,8 @@ use local_omeroembed\heatmap_renderer;
  */
 class capture_heatmap_frames extends \core\task\scheduled_task {
     /**
+     * The task's name, shown in the admin scheduled tasks list.
+     *
      * @return string
      */
     public function get_name(): string {
@@ -47,6 +49,8 @@ class capture_heatmap_frames extends \core\task\scheduled_task {
     }
 
     /**
+     * Captures one heatmap frame for every embed currently being tracked.
+     *
      * @return void
      */
     public function execute(): void {

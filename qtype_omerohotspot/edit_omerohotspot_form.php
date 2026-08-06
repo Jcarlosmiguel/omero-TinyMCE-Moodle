@@ -38,6 +38,14 @@ require_once($CFG->dirroot . '/question/type/edit_question_form.php');
  * question form is submitted, same as every other field on this form.
  */
 class qtype_omerohotspot_edit_form extends question_edit_form {
+    /**
+     * Builds the subject/image pickers and the hidden geometry field, plus
+     * the live proxy.php preview used to draw the hidden correct-answer
+     * region (see this class's own docblock for why there's no server
+     * round-trip during authoring itself).
+     *
+     * @param MoodleQuickForm $mform
+     */
     protected function definition_inner($mform) {
         global $OUTPUT, $PAGE;
 
@@ -66,15 +74,29 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
             // No course to build a locked-down proxy.php URL against (this
             // question category isn't scoped to a course/activity) - refuse
             // to render a broken preview rather than a confusing one.
-            $mform->addElement('static', 'nopreview', '',
-                    $OUTPUT->notification(get_string('needscoursecontext', 'qtype_omerohotspot'), 'warning'));
+            $mform->addElement(
+                'static',
+                'nopreview',
+                '',
+                $OUTPUT->notification(get_string('needscoursecontext', 'qtype_omerohotspot'), 'warning')
+            );
         } else {
-            $mform->addElement('static', 'preview', get_string('regionpreview', 'qtype_omerohotspot'),
-                    \html_writer::tag('div', '',
-                            ['id' => 'qtype_omerohotspot_preview_wrap', 'data-courseid' => $courseid,
-                             'style' => 'width:100%; max-width:900px; height:550px; border:1px solid #ccc;']));
-            $PAGE->requires->js_call_amd('qtype_omerohotspot/editform', 'init',
-                    ['qtype_omerohotspot_preview_wrap']);
+            $mform->addElement(
+                'static',
+                'preview',
+                get_string('regionpreview', 'qtype_omerohotspot'),
+                \html_writer::tag(
+                    'div',
+                    '',
+                    ['id' => 'qtype_omerohotspot_preview_wrap', 'data-courseid' => $courseid,
+                    'style' => 'width:100%; max-width:900px; height:550px; border:1px solid #ccc;']
+                )
+            );
+            $PAGE->requires->js_call_amd(
+                'qtype_omerohotspot/editform',
+                'init',
+                ['qtype_omerohotspot_preview_wrap']
+            );
         }
     }
 
@@ -94,6 +116,8 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
     }
 
     /**
+     * The current user's id, as used to scope the subject picker.
+     *
      * @return int
      */
     protected function qtypeobj_userid(): int {
@@ -101,6 +125,13 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
         return (int) $USER->id;
     }
 
+    /**
+     * Copies the saved subject/image/dataset/geometry options onto the
+     * question object so the form fields above pre-fill on edit.
+     *
+     * @param object $question
+     * @return object
+     */
     public function data_preprocessing($question) {
         $question = parent::data_preprocessing($question);
 
@@ -114,6 +145,14 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
         return $question;
     }
 
+    /**
+     * Requires a subject, an image or dataset, and a drawn geometry before
+     * the question can be saved.
+     *
+     * @param array $data
+     * @param array $files
+     * @return array
+     */
     public function validation($data, $files) {
         $errors = parent::validation($data, $files);
 
@@ -131,6 +170,11 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
         return $errors;
     }
 
+    /**
+     * The question type name this form edits.
+     *
+     * @return string
+     */
     public function qtype() {
         return 'omerohotspot';
     }

@@ -84,12 +84,17 @@ $browsable = optional_param('browsable', 0, PARAM_BOOL);
 // Rotate isn't included - always hidden, not a real choice (see
 // proxy.php's inject_overlay_hide_css() for why).
 $overlaysettings = [];
-foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations'] as $key) {
+foreach (
+    [
+    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline',
+    'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
+    ] as $key
+) {
     $submitted = optional_param($key, null, PARAM_BOOL);
     $overlaysettings[$key] = $submitted ?? (bool) get_config('local_omeroembed', $key);
 }
 
-// enablehotspot/enablehotspotmulti are presented as a single dropdown
+// The enablehotspot/enablehotspotmulti settings are presented as a single dropdown
 // ('', 'single', 'multi') rather than two independent checkboxes -
 // confirmed with the user: two checkboxes could reach an ambiguous
 // "both checked" state that meant nothing real (proxy.php's own dispatch
@@ -215,7 +220,7 @@ $proxyurl = null;
 $iframename = '';
 
 if ($hasslide) {
-    // courseid/subject travel as slash-arguments, not query params - see the
+    // The courseid/subject travel as slash-arguments, not query params - see the
     // matching comment in proxy.php for why (OMERO's "host" mechanism needs this
     // script's own URL to carry only a single query param).
     $proxyparams = [];
@@ -308,8 +313,8 @@ echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('authortitle', 'local_omeroembed'));
 echo html_writer::tag('p', get_string('authorintro', 'local_omeroembed'), ['class' => 'text-muted']);
 
-// --- Setup form - always visible, pre-filled from the current GET params so
-// reloading/bookmarking the page with a slide already loaded works naturally. ---
+// Setup form - always visible, pre-filled from the current GET params so
+// reloading/bookmarking the page with a slide already loaded works naturally.
 echo html_writer::start_tag('form', ['method' => 'get', 'action' => $pageurl->out(false), 'id' => 'omero-setup-form']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
 if ($embedded) {
@@ -348,8 +353,10 @@ echo html_writer::tag('label', get_string('datasetidlabel', 'local_omeroembed') 
     html_writer::empty_tag('input', ['type' => 'text', 'name' => 'dataset', 'value' => $dataset,
         'inputmode' => 'numeric', 'pattern' => '[0-9]*', 'class' => 'form-control', 'style' => 'width:8em;']));
 
-echo html_writer::tag('label',
-    html_writer::checkbox('browsable', 1, (bool) $browsable, get_string('browsablelabel', 'local_omeroembed')));
+echo html_writer::tag(
+    'label',
+    html_writer::checkbox('browsable', 1, (bool) $browsable, get_string('browsablelabel', 'local_omeroembed'))
+);
 
 echo html_writer::end_div();
 
@@ -366,8 +373,11 @@ foreach ($layoutoptions as $value => $stringkey) {
     if ($layout === $value) {
         $attrs['checked'] = 'checked';
     }
-    echo html_writer::tag('label', html_writer::empty_tag('input', $attrs) . ' ' . get_string($stringkey, 'local_omeroembed'),
-        ['style' => 'margin-right: 1rem;']);
+    echo html_writer::tag(
+        'label',
+        html_writer::empty_tag('input', $attrs) . ' ' . get_string($stringkey, 'local_omeroembed'),
+        ['style' => 'margin-right: 1rem;']
+    );
 }
 echo html_writer::end_tag('fieldset');
 
@@ -391,12 +401,19 @@ echo html_writer::end_tag('fieldset');
 // "1" if checked) so the field is always present either way.
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('overlaysheading', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations'] as $key) {
+foreach (
+    [
+    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline',
+    'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
+    ] as $key
+) {
     $style = ($key === 'enableannotations') ? 'display:block; margin-top:0.5rem;' : 'display:block;';
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $key, 'value' => 0]);
-    echo html_writer::tag('label',
+    echo html_writer::tag(
+        'label',
         html_writer::checkbox($key, 1, $overlaysettings[$key], get_string($key, 'local_omeroembed')),
-        ['style' => $style]);
+        ['style' => $style]
+    );
 }
 // Single dropdown, not two independent checkboxes - see $hotspotmode's
 // own comment above for why. js/author.js greys out (and unchecks) the
@@ -405,8 +422,11 @@ foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'h
 // active anyway (see its own $hotspotoverridesstudentview comment) -
 // this just makes the form honest about that rather than letting a
 // teacher believe both are active at once.
-echo html_writer::tag('label', get_string('hotspotmodelabel', 'local_omeroembed'),
-    ['style' => 'display:block; margin-top:0.5rem;', 'for' => 'id_hotspotmode']);
+echo html_writer::tag(
+    'label',
+    get_string('hotspotmodelabel', 'local_omeroembed'),
+    ['style' => 'display:block; margin-top:0.5rem;', 'for' => 'id_hotspotmode']
+);
 echo html_writer::select(
     [
         '' => get_string('hotspotmodenone', 'local_omeroembed'),
@@ -427,8 +447,11 @@ echo html_writer::end_tag('fieldset');
 // $overlaycolours' own comment above.
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('annotationcolours', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-echo html_writer::tag('p', get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
-    ['class' => 'text-muted', 'style' => 'margin-top:0;']);
+echo html_writer::tag(
+    'p',
+    get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
+    ['class' => 'text-muted', 'style' => 'margin-top:0;']
+);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'colours_submitted', 'value' => 1]);
 echo html_writer::start_div('', ['id' => 'omero-annotation-colours', 'style' => 'display:flex; flex-wrap:wrap; gap:0.75rem;']);
 foreach (annotations_repository::get_colour_choices() as $hex => $label) {
@@ -446,13 +469,15 @@ foreach (annotations_repository::get_colour_choices() as $hex => $label) {
     // reads this back directly rather than reconstructing it from the name,
     // since COLOUR_PALETTE/parse_colours() are case-sensitive and a
     // reconstructed lowercase hex would silently fail to match.
-    echo html_writer::tag('label',
+    echo html_writer::tag(
+        'label',
         $swatch . html_writer::checkbox($paramname, 1, $overlaycolours[$hex], '', ['data-hex' => $hex]) . ' ' . s($label),
-        ['style' => 'display:flex; align-items:center; white-space:nowrap;']);
+        ['style' => 'display:flex; align-items:center; white-space:nowrap;']
+    );
 }
 echo html_writer::end_div();
 echo html_writer::end_tag('fieldset');
-// parse_colours() (see its own docblock) already caps a submission at
+// The parse_colours() function (see its own docblock) already caps a submission at
 // MAX_COLOURS server-side, but silently, by truncating in palette order -
 // without this, a teacher could tick 6 boxes here, save, and have no idea
 // which 4 actually survived. Disabling the remaining unchecked boxes once
@@ -481,7 +506,9 @@ echo html_writer::tag('label', get_string('heightlabel', 'local_omeroembed') . '
     html_writer::empty_tag('input', ['type' => 'text', 'name' => 'height', 'value' => $height,
         'class' => 'form-control', 'style' => 'width:8em;']));
 echo html_writer::end_div();
-echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), ['class' => 'text-muted', 'style' => 'margin-top:-0.5rem;']);
+echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), [
+    'class' => 'text-muted', 'style' => 'margin-top:-0.5rem;',
+]);
 
 echo html_writer::empty_tag('input', [
     'type' => 'submit', 'value' => get_string('loadslide', 'local_omeroembed'), 'class' => 'btn btn-primary',

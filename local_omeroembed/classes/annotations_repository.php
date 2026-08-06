@@ -145,6 +145,8 @@ class annotations_repository {
     }
 
     /**
+     * Creates a new annotation row.
+     *
      * @param int $courseid
      * @param int $userid
      * @param string $embedid

@@ -107,7 +107,7 @@ if ($edit && !$editing) {
     throw new \moodle_exception('invalidsubjectform', 'local_omeroembed');
 }
 
-// --- List of this teacher's own entries - never their passwords. ---
+// List of this teacher's own entries - never their passwords.
 $subjects = subject_repository::get_for_user($USER->id);
 if ($subjects) {
     $table = new html_table();
@@ -131,7 +131,7 @@ if ($subjects) {
     echo $OUTPUT->notification(get_string('nosubjectsyet', 'local_omeroembed'), 'info');
 }
 
-// --- Add/edit form - a plain GET-reachable page, POSTs to itself. ---
+// Add/edit form - a plain GET-reachable page, POSTs to itself.
 echo html_writer::tag('h5', get_string($editing ? 'editsubjectheading' : 'addsubjectheading', 'local_omeroembed'));
 
 echo html_writer::start_tag('form', ['method' => 'post', 'action' => $pageurl->out(false), 'style' => 'max-width:30em;']);
@@ -159,7 +159,8 @@ echo html_writer::end_div();
 
 echo html_writer::start_div('form-group');
 echo html_writer::tag('label', get_string(
-    $editing ? 'subjectpasswordlabeledit' : 'subjectpasswordlabel', 'local_omeroembed'
+    $editing ? 'subjectpasswordlabeledit' : 'subjectpasswordlabel',
+    'local_omeroembed'
 ));
 echo html_writer::empty_tag('input', [
     'type' => 'password', 'name' => 'omeropassword', 'class' => 'form-control',
@@ -177,6 +178,8 @@ if ($editing) {
 echo html_writer::end_tag('form');
 
 $authorurl = new moodle_url('/local/omeroembed/author.php', ['courseid' => $courseid]);
-echo html_writer::link($authorurl, get_string('backtoauthoring', 'local_omeroembed'), ['style' => 'display:inline-block; margin-top:1.5rem;']);
+echo html_writer::link($authorurl, get_string('backtoauthoring', 'local_omeroembed'), [
+    'style' => 'display:inline-block; margin-top:1.5rem;',
+]);
 
 echo $OUTPUT->footer();
