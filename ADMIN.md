@@ -157,6 +157,55 @@ containers fully paused) to rule out resource contention as a confound.
   what the `retentionperiod` setting is actually holding back from
   accumulating indefinitely.
 
+## Security
+
+A per-file audit of every web-reachable entry point (`ajax.php`,
+`author.php`, `export.php`, `heatmap.php`, `video.php`, `proxy.php`) ahead
+of Marketplace submission, 2026-08-06. Two real, exploitable issues were
+found and fixed; two broader checks came back clean.
+
+**Fixed - stored XSS in the generated embed HTML.** `author.js`'s
+`generateEmbed()` built the final embed HTML (the string saved into course
+content and rendered to every student who views it) by string
+concatenation, and the width/height form fields flowed into `style="..."`
+attributes unescaped. A crafted link with a malicious width/height value
+could inject a real `<script>` tag into persisted, student-facing content.
+Fixed in two layers: `author.js` now HTML-escapes every value it
+concatenates into the generated markup, and `author.php` independently
+validates width/height against a genuine CSS-length pattern server-side.
+Verified against the actual attack payload, not just asserted clean.
+
+**Fixed - cross-course broken access control.** Every privileged action
+(`hotspot_get`/`save`/`clear`, the multi-region siblings, `heatmap.php`,
+`export.php`, `video.php`) checked the requester's capability against
+whichever `courseid` was declared in the request, then read or wrote data
+keyed by `embedid` alone - with no check that the embedid actually
+belonged to that course. Anyone holding `hotspotauthor` or `viewheatmap`
+in *any* course could, given another course's embedid, read a hidden
+quiz answer region, overwrite or delete it outright, or view/export
+another course's gathered student tracking data. Fixed by verifying each
+embedid's real, stored courseid matches the declared one before any
+operation proceeds. Verified end-to-end against live production with real
+cross-course test data - the exploit attempt, the read case, and the
+sabotage-by-overwrite case were all confirmed blocked, with legitimate
+same-course access continuing to work normally throughout.
+
+**Checked, no issues found - SQL injection.** Every database interaction
+in the codebase (90 call sites across 14 files) goes through Moodle's
+parameterised DML API or, in the Privacy API implementation, raw SQL with
+named placeholders - the sanctioned pattern for that specific API. Zero
+instances of a variable concatenated directly into a query string.
+
+**Checked, no issues found - encryption at rest.** OMERO subject account
+passwords (`local_omeroembed_subjects.omeropassword`) are encrypted via
+Moodle core's `\core\encryption` class, which uses libsodium. The key is
+a 32-byte file stored entirely outside the database
+(`$CFG->dataroot/secret/key/sodium.key`), permissioned `-r--------`
+(owner-only, not even writable after creation) - a database-only
+compromise (a leaked backup, a leaked DB credential) is not sufficient on
+its own to decrypt any stored password; separate filesystem access to the
+Moodle dataroot is required too.
+
 ## Known limitations
 
 ### A stale session costs one extra request, not more than that
