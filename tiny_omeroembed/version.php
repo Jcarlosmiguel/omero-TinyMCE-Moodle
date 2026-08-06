@@ -24,7 +24,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026080301;
+$plugin->version   = 2026080302;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
 $plugin->supported = [405, 502];
@@ -35,11 +35,11 @@ $plugin->maturity  = MATURITY_STABLE;
 // the same way qtype_omerohotspot/qtype_omerohotspotmulti depend on it
 // for rendering via local_omeroembed/proxy.php. Their own version.php
 // files already declare this; this one didn't, which was a real gap.
-// Pinned to 2026080307 specifically (not just "any version") because
+// Pinned to 2026080308 specifically (not just "any version") because
 // that's the release with the stored-XSS/cross-course-IDOR/session-lock
 // fixes - this plugin's own ui.js opens author.php directly, so an older
 // local_omeroembed here would leave the XSS path reachable regardless of
 // this plugin's own version.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026080307,
+    'local_omeroembed' => 2026080308,
 ];
