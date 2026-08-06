@@ -151,15 +151,13 @@ worth re-confirming against any significantly newer iviewer version.
 
 ## Installing
 
-This one repository bundles **four** separate Moodle plugins - the local
-plugin itself, a TinyMCE editor button, and two quiz question types - each
-of which Moodle requires in its own fixed location. Cloning the whole repo
-straight into `local/omeroembed` (as earlier versions of this document
-said to) only installs the local plugin: the other three end up as inert
-subfolders nested inside it, with no error to explain why the TinyMCE
-button or either hotspot question type never appears. Clone once to a
-staging directory, then copy each piece to where Moodle actually expects
-it:
+This one repository bundles **four** separate Moodle plugins, as four
+sibling directories - the local plugin itself (`local_omeroembed/`), a
+TinyMCE editor button (`tiny_omeroembed/`), and two quiz question types
+(`qtype_omerohotspot/`, `qtype_omerohotspotmulti/`) - each of which Moodle
+requires in its own fixed location elsewhere in your codebase. Clone once
+to a staging directory, then copy each of the four to where Moodle
+actually expects it:
 
 ```bash
 # 1. Clone to a staging checkout - not directly into your Moodle install.
@@ -170,19 +168,20 @@ cd omero-tinymce-moodle
 #    Moodle codebase ($MOODLE_DIR below - adjust to your actual path).
 MOODLE_DIR=/path/to/your/moodle
 
-mkdir -p "$MOODLE_DIR/local/omeroembed"
-cp -r ajax.php author.php classes db export.php heatmap.php js lang \
-      lib.php manage.php mysubjects.php proxy.php settings.php \
-      version.php video.php LICENSE \
-      "$MOODLE_DIR/local/omeroembed/"
-cp -r tiny_omeroembed        "$MOODLE_DIR/lib/editor/tiny/plugins/omeroembed"
-cp -r qtype_omerohotspot     "$MOODLE_DIR/question/type/omerohotspot"
+cp -r local_omeroembed        "$MOODLE_DIR/local/omeroembed"
+cp -r tiny_omeroembed         "$MOODLE_DIR/lib/editor/tiny/plugins/omeroembed"
+cp -r qtype_omerohotspot      "$MOODLE_DIR/question/type/omerohotspot"
 cp -r qtype_omerohotspotmulti "$MOODLE_DIR/question/type/omerohotspotmulti"
 
 # 3. Install all four in one pass.
 cd "$MOODLE_DIR"
 php admin/cli/upgrade.php --non-interactive
 ```
+
+**Moodle 5.1+**: the web-servable code lives under `public/` - each `cp`
+target above needs a `public/` prefix (e.g.
+`"$MOODLE_DIR/public/local/omeroembed"`). See
+[MOODLE_5.2_COMPAT.md](MOODLE_5.2_COMPAT.md) for the full detail.
 
 Confirm all four actually installed before moving on - each of these
 should print a version number, not "NOT INSTALLED":
