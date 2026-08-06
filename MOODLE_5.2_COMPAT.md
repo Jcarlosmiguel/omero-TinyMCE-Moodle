@@ -1,11 +1,25 @@
-# Moodle 4.5 → 5.2 compatibility: findings and open questions
+# Moodle 4.5 → 5.2 compatibility: findings and history
 
-Submission order: **Moodle 4.5 to Moodle Marketplace first, 5.2 to follow.**
-This doc consolidates: a colleague's (Eric Davies) 4.5→5.2 developer notes,
-a cross-check against the official Moodle Marketplace plugin requirements
-page, and direct verification against this plugin's own code and three
-locally-run test environments (4.5 on MariaDB, 5.2 on MariaDB, 4.5 on
-PostgreSQL).
+One codebase, one branch (`main`), all four components declaring
+`$plugin->supported = [405, 502]`. This doc consolidates: a colleague's
+(Eric Davies) 4.5→5.2 developer notes, a cross-check against the official
+Moodle Marketplace plugin requirements page, and direct verification
+against this plugin's own code and three locally-run test environments
+(4.5 on MariaDB, 5.2 on MariaDB, 4.5 on PostgreSQL) - since torn down,
+their job done; the findings below are what they were for.
+
+**This was originally tracked on a separate `moodle-5.2-compat` branch,
+submitting 4.5 first and 5.2 to follow as a second release.** That branch
+is gone now: once the actual content delta between the two branches
+turned out to be a handful of files - none of them version-specific, all
+either docs or general correctness fixes (the privacy API gap, a missing
+plugin dependency declaration) that just happened to be made while
+working on this branch - keeping them stranded there was a branching-model
+problem waiting to repeat with the next fix, not a reason to keep the
+split. Collapsed into `main`, `$plugin->supported = [405, 502]` added to
+all four `version.php` files, verified against live production
+(`core_plugin_manager::instance()->all_plugins_ok()` confirms the whole
+dependency graph still resolves), branch deleted.
 
 ## Summary
 
