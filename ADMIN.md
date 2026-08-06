@@ -104,6 +104,35 @@ This must be assigned at the **system context**, not a course or category
 - these are site-wide settings, and the check happens at system context
 specifically.
 
+## Performance overhead
+
+Measured directly (2026-08-05, re-verified as still valid 2026-08-06 after
+the privacy fix, the `$plugin->supported`/`$plugin->dependencies`
+declarations, and the 4.5/5.2 branch collapse - none of that touches page
+rendering, only install/upgrade-time checks and GDPR export/delete
+requests): the cost of rendering a page containing the OMERO `<iframe>`
+tag, versus an otherwise-identical page without one.
+
+| | Overhead | 95% CI | Page weight |
+|---|---|---|---|
+| Moodle 4.5.12 | +0.3ms (not significant) | [-0.2, +0.9] | +0.7KB |
+| Moodle 5.2.1  | +1.0ms (barely significant) | [+0.1, +1.6] | +0.7KB |
+
+Both negligible, and statistically indistinguishable from each other (the
+two confidence intervals overlap) - no evidence the plugin got more
+expensive on 5.2. Method: paired A/B on the same course, interleaved
+sampling, bootstrap confidence intervals, each Moodle instance isolated
+with pinned CPU/memory and tested one at a time to rule out resource
+contention as a confound.
+
+**What this figure doesn't cover**: `proxy.php`'s own round-trip cost to
+the real OMERO server. A page's initial load never fetches its own
+`<iframe>`'s `src` - only a real browser does, once the page is in front
+of a student - so this number is specifically "does having the plugin on
+a page cost anything," not "how fast is a slide once opened." No local
+test environment could reach the real OMERO server to measure that
+half separately (network topology, not a plugin limitation).
+
 ## Known limitations
 
 ### A stale session costs one extra request, not more than that
