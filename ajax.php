@@ -109,6 +109,17 @@ if (in_array($action, $annotateactions, true)) {
     throw new \moodle_exception('invalidaction', 'local_omeroembed', '', $action);
 }
 
+// PERFORMANCE: nothing below writes to $_SESSION - every action's actual
+// data write goes through $DB, entirely unaffected by releasing PHP's
+// session lock early. Without this, action=sample (posted every 5 seconds
+// per actively-tracked student, see track.js's SAMPLE_INTERVAL_MS) and
+// every other concurrent request from the same browser session - not
+// least the tile requests proxy.php is handling at the same time - queue
+// behind whichever one of them happens to be running. See proxy.php's own
+// write_close() comment for the full reasoning and a direct measurement
+// of the effect.
+\core\session\manager::write_close();
+
 header('Content-Type: application/json');
 // action=heatmap/list are GETs to an otherwise-identical URL every time
 // they're polled (heatmap-view.js re-fetches action=heatmap on a timer -

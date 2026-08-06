@@ -43,6 +43,10 @@ use local_omeroembed\annotations_repository;
 require_login();
 $context = context_system::instance();
 require_capability('local/omeroembed:managesettings', $context);
+// PERFORMANCE: nothing below writes to $_SESSION - see proxy.php's own
+// write_close() comment. set_config() writes are ordinary DB/MUC cache
+// writes, unaffected by the session lock.
+\core\session\manager::write_close();
 
 $pageurl = new moodle_url('/local/omeroembed/manage.php');
 $PAGE->set_url($pageurl);

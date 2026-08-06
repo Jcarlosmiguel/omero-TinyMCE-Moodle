@@ -52,6 +52,9 @@ require_capability('local/omeroembed:viewheatmap', $context);
 // teacher export another course's gathered student behavioural data by
 // supplying that course's embedid alongside their own courseid.
 tracking_repository::verify_course($embedid, $courseid);
+// PERFORMANCE: nothing below writes to $_SESSION - see proxy.php's own
+// write_close() comment.
+\core\session\manager::write_close();
 
 $samples = tracking_repository::get_all_samples_for_export($embedid);
 

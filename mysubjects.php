@@ -45,6 +45,9 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('moodle/course:manageactivities', $context);
+// PERFORMANCE: nothing below writes to $_SESSION - see proxy.php's own
+// write_close() comment.
+\core\session\manager::write_close();
 
 $pageurl = new moodle_url('/local/omeroembed/mysubjects.php', ['courseid' => $courseid]);
 $PAGE->set_url($pageurl);

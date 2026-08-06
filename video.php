@@ -54,6 +54,10 @@ require_capability('local/omeroembed:viewheatmap', $context);
 // table heatmap.php/export.php already trust as the authoritative
 // embedid-to-course mapping.
 tracking_repository::verify_course($embedid, $courseid);
+// PERFORMANCE: nothing below writes to $_SESSION - see proxy.php's own
+// write_close() comment. GIF assembly (gif_encoder::assemble()) is
+// non-trivial work; no reason to hold the session lock through it.
+\core\session\manager::write_close();
 
 $frames = heatmap_frame_repository::get_frames_for_embed($embedid);
 if (empty($frames)) {

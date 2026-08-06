@@ -56,6 +56,11 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('moodle/course:manageactivities', $context);
+// PERFORMANCE: nothing below writes to $_SESSION. This page's own live
+// preview iframe hits proxy.php on the same session concurrently with
+// this request - see proxy.php's own write_close() comment for why
+// holding the lock any longer than necessary matters.
+\core\session\manager::write_close();
 
 $subject = optional_param('subject', '', PARAM_ALPHANUMEXT);
 $images = optional_param('images', '', PARAM_SEQUENCE);
