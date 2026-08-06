@@ -113,25 +113,49 @@ rendering, only install/upgrade-time checks and GDPR export/delete
 requests): the cost of rendering a page containing the OMERO `<iframe>`
 tag, versus an otherwise-identical page without one.
 
-| | Overhead | 95% CI | Page weight |
-|---|---|---|---|
-| Moodle 4.5.12 | +0.3ms (not significant) | [-0.2, +0.9] | +0.7KB |
-| Moodle 5.2.1  | +1.0ms (barely significant) | [+0.1, +1.6] | +0.7KB |
+| | Overhead | 95% CI | Page weight | Paired samples |
+|---|---|---|---|---|
+| Moodle 4.5.12 | +0.3ms (not significant) | [-0.2, +0.9] | +0.7KB | 45 |
+| Moodle 5.2.1  | +1.0ms (barely significant) | [+0.1, +1.6] | +0.7KB | 45 |
 
 Both negligible, and statistically indistinguishable from each other (the
 two confidence intervals overlap) - no evidence the plugin got more
 expensive on 5.2. Method: paired A/B on the same course, interleaved
-sampling, bootstrap confidence intervals, each Moodle instance isolated
-with pinned CPU/memory and tested one at a time to rule out resource
-contention as a confound.
+sampling, bootstrap confidence intervals (5000 iterations), each Moodle
+instance isolated with 8 CPU / 16GB pinned to its webserver and 4 CPU /
+8GB to its database, tested one at a time (the other instance's
+containers fully paused) to rule out resource contention as a confound.
 
-**What this figure doesn't cover**: `proxy.php`'s own round-trip cost to
-the real OMERO server. A page's initial load never fetches its own
-`<iframe>`'s `src` - only a real browser does, once the page is in front
-of a student - so this number is specifically "does having the plugin on
-a page cost anything," not "how fast is a slide once opened." No local
-test environment could reach the real OMERO server to measure that
-half separately (network topology, not a plugin limitation).
+**What this figure doesn't cover, and why - two separate things, not one:**
+
+- `proxy.php`'s own round-trip cost to the real OMERO server. A page's
+  initial load never fetches its own `<iframe>`'s `src` - only a real
+  browser does, once the page is in front of a student. No local test
+  environment could reach the real OMERO server to measure that half
+  separately (network topology, not a plugin limitation).
+- **Viewport tracking (the heatmap feature's sampling).** For the same
+  reason as the OMERO round-trip: `js/track.js` runs *inside* the
+  `<iframe>`, posting samples via the browser during an open viewing
+  session - never triggered by a page's initial render, on or off. Unlike
+  the OMERO round-trip, this half genuinely is measurable locally - it's
+  a plain Moodle-side DB write, no external server involved - and it's
+  the number that matters most for capacity planning, since it scales
+  directly with concurrent students, not with page views.
+
+  Measured directly (as a real student account, not a Manager - tracking
+  intentionally never records for anyone with
+  `moodle/course:manageactivities`, so testing as a teacher/manager
+  account would silently hit the no-op path instead of the real write):
+  one `action=sample` POST, tracking genuinely active, real `INSERT` into
+  `local_omeroembed_view_samples` confirmed (`recorded: true` on every
+  request) - **median 25.0ms** (30 samples, stdev 0.4ms). Sampling runs
+  every `SAMPLE_INTERVAL_MS` (5000ms) while a student's tab is visible and
+  tracking is active for that embed - **12 rows per actively-tracked
+  student per minute**. For a class of 50 students all viewing a tracked
+  embed simultaneously for a 10-minute session, that's 6,000 rows and
+  roughly 150 seconds of aggregate write time spread across that window -
+  what the `retentionperiod` setting is actually holding back from
+  accumulating indefinitely.
 
 ## Known limitations
 
