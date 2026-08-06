@@ -25,15 +25,19 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'qtype_omerohotspot';
-$plugin->version   = 2026080300;
+$plugin->version   = 2026080301;
 $plugin->requires  = 2024100100;
-$plugin->maturity  = MATURITY_ALPHA;
+$plugin->maturity  = MATURITY_STABLE;
+$plugin->release   = '1.0.0';
 $plugin->supported = [405, 502];
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
 // embedding mechanism) and subject_repository.php (OMERO connections)
 // rather than duplicating either - see this plugin's own README/plan doc
-// for why. Can never be installed without it.
+// for why. Can never be installed without it. Pinned to 2026080307
+// specifically - the release with the stored-XSS/cross-course-IDOR/
+// session-lock fixes, all in files this qtype's own rendering path
+// depends on directly.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026080303,
+    'local_omeroembed' => 2026080307,
 ];
