@@ -29,3 +29,4 @@ $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
 $plugin->release   = '1.3.0';
 $plugin->maturity  = MATURITY_STABLE;
+$plugin->supported = [405, 502];         // One codebase tested against both 4.5 and 5.2 - see MOODLE_5.2_COMPAT.md.

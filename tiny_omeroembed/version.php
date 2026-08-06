@@ -27,3 +27,12 @@ defined('MOODLE_INTERNAL') || die();
 $plugin->version   = 2026080300;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
+$plugin->supported = [405, 502];
+// Hard runtime dependency, not just thematic bundling - ui.js opens
+// local_omeroembed's own author.php by URL directly (see amd/src/ui.js),
+// the same way qtype_omerohotspot/qtype_omerohotspotmulti depend on it
+// for rendering via local_omeroembed/proxy.php. Their own version.php
+// files already declare this; this one didn't, which was a real gap.
+$plugin->dependencies = [
+    'local_omeroembed' => 2026080306,
+];

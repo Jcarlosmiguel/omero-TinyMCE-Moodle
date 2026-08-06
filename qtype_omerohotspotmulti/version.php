@@ -28,6 +28,7 @@ $plugin->component = 'qtype_omerohotspotmulti';
 $plugin->version   = 2026080400;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_ALPHA;
+$plugin->supported = [405, 502];
 
 // A sibling of qtype_omerohotspot, not a mode of it - a click is correct
 // against ANY one of several teacher-marked regions instead of one single

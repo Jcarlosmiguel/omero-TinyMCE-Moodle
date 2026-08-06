@@ -28,6 +28,7 @@ $plugin->component = 'qtype_omerohotspot';
 $plugin->version   = 2026080300;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_ALPHA;
+$plugin->supported = [405, 502];
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
 // embedding mechanism) and subject_repository.php (OMERO connections)

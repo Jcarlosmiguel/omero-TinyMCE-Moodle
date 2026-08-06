@@ -52,6 +52,15 @@ URLs are ever exposed to the browser.
   are linked from Moodle's own navigation (course nav and primary nav
   respectively), each gated by the exact same capability check the target
   page itself makes.
+- **Click-to-answer hotspot questions**, single- or multi-region, as both a
+  standalone embed feature and two Moodle quiz question types - see
+  [Hotspot questions](#hotspot-questions) below.
+- **Student point/shape annotations** on an embed (pins, ellipses,
+  rectangles, free-form shapes) - see [Student
+  annotations](#student-annotations) below.
+- **A heatmap of where students actually looked**, built from periodic
+  viewport samples while tracking is on - see [Heatmap of student
+  viewing](#heatmap-of-student-viewing) below.
 
 ## Subject accounts, not personal OMERO logins
 
@@ -66,6 +75,60 @@ Moodle session and checks enrolment against the real course on every
 single request - it cannot be bypassed by editing the embed's URL, since
 the course ID only selects *which* course to check enrolment against, not
 whether that check happens.
+
+## Hotspot questions
+
+A student answers by clicking directly on the whole-slide image, not by
+picking from a list - the correct region is a shape the teacher drew, never
+revealed to the student, including in review. This mirrors a real feature
+from Leica/Slidepath's discontinued Digital Image Hub, and exists because
+picking from a list doesn't test whether a student can actually *find* the
+thing on a real slide.
+
+Two independent modes, both available in two forms:
+
+- **Single-region** - one correct region; a click anywhere inside it is
+  correct, everywhere else is not.
+- **Multi-region** - one or more acceptable regions; a click inside *any*
+  of them is correct. Built for cases where a single "one true spot" answer
+  is unfair - e.g. asking a student to find a cell with carcinogenic
+  characteristics on a slide that legitimately contains several equally
+  correct examples. No partial credit either way - a click is simply
+  correct or not.
+
+**As a standalone embed feature** - toggle `enablehotspot` or
+`enablehotspotmulti` in the authoring tool (mutually exclusive; enabling
+either automatically disables student annotations for that embed, since a
+hidden-answer region and free student markup on the same image don't mix).
+The teacher draws the region(s) directly on the live preview; a small
+drawing toolbar appears while either mode is active.
+
+**As a quiz question type** - `qtype_omerohotspot` (single-region) and
+`qtype_omerohotspotmulti` (multi-region) plug into Moodle's normal question
+bank, gradebook, and quiz review flow like any other question type, with
+the same region-drawing authoring UI embedded in the question editing form.
+
+## Student annotations
+
+Students can mark up an embed themselves - pins, ellipses, rectangles, and
+free-form shapes (`local/omeroembed:annotate`) - useful for asking a
+student to point out or outline something on their own copy of the view,
+independent of any teacher-authored hotspot. Automatically disabled
+whenever hotspot mode is active on the same embed, since a real hidden
+answer region and free-form student drawing on top of it don't mix.
+
+## Heatmap of student viewing
+
+Turn on viewport tracking for an embed and Moodle periodically records
+where each student's view was centred while they had it open (roughly
+every 5 minutes) - not clicks or annotations, just where they actually
+looked. Students see a small on-screen notice while tracking is active.
+Once you've gathered enough, an aggregate heatmap shows what parts of the
+slide actually got attention versus what didn't, gated by
+`local/omeroembed:viewheatmap`. Tracking continues even if the teacher
+closes the page - it's driven by the embed's own setting, not by keeping a
+browser tab open. Gathered data has a configurable retention period
+(`retentionperiod` setting) and can be deleted per-embed at any time.
 
 ## Requirements
 
