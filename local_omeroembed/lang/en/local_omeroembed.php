@@ -61,6 +61,7 @@ $string['hotspottoolbar_clear'] = 'Clear';
 $string['hotspot_saved'] = 'Saved';
 $string['hotspot_correct'] = 'Correct!';
 $string['hotspot_incorrect'] = 'Not quite - try again';
+$string['hotspotqtype_drawstatus'] = 'Draw the correct answer region';
 
 // Multi-region sibling of the click-to-answer hotspot feature above - a
 // click is correct against ANY one of several teacher-marked regions
@@ -79,6 +80,7 @@ $string['hotspotmodenone'] = 'None';
 $string['hotspotmodesingle'] = 'Single region (one correct spot)';
 $string['hotspotmodemulti'] = 'Multiple regions (any one of several is correct)';
 $string['hotspotmultitoolbar_delete'] = 'Delete region';
+$string['hotspotmultiqtype_drawstatus'] = 'Draw one or more correct answer regions';
 $string['invalidregion'] = 'One of the submitted regions is missing a required field, has an invalid type, or has a non-positive radius.';
 $string['toomanyregions'] = 'Too many regions submitted at once (maximum {$a}) - this is almost certainly not something drawn by hand, so the request was refused.';
 

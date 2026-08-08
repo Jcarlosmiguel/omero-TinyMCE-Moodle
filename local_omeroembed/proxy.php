@@ -1350,10 +1350,21 @@ function inject_hotspot_attempt_script(string $body, int $courseid, string $embe
  * @return string
  */
 function inject_hotspot_edit_form_script(string $body): string {
+    $config = [
+        'strings' => [
+            'drawellipse' => get_string('hotspottoolbar_ellipse', 'local_omeroembed'),
+            'drawrectangle' => get_string('hotspottoolbar_rectangle', 'local_omeroembed'),
+            'constrainshape' => get_string('annotatetoolbar_constrain', 'local_omeroembed'),
+            'clear' => get_string('hotspottoolbar_clear', 'local_omeroembed'),
+            'drawstatus' => get_string('hotspotqtype_drawstatus', 'local_omeroembed'),
+        ],
+    ];
+    $configscript = '<script id="omero-hotspot-qtype-author-config" type="application/json">'
+        . json_encode($config) . '</script>';
     $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-qtype-author.js'))->out(false) . '"></script>';
 
-    $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
-    return $withscript !== null ? $withscript : ($body . $srcscript);
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
 }
 
 /**
@@ -1454,11 +1465,23 @@ function inject_hotspot_multi_attempt_script(string $body, int $courseid, string
  * @return string
  */
 function inject_hotspot_multi_edit_form_script(string $body): string {
+    $config = [
+        'strings' => [
+            'drawellipse' => get_string('hotspottoolbar_ellipse', 'local_omeroembed'),
+            'drawrectangle' => get_string('hotspottoolbar_rectangle', 'local_omeroembed'),
+            'constrainshape' => get_string('annotatetoolbar_constrain', 'local_omeroembed'),
+            'clear' => get_string('hotspottoolbar_clear', 'local_omeroembed'),
+            'deleteregion' => get_string('hotspotmultitoolbar_delete', 'local_omeroembed'),
+            'drawstatus' => get_string('hotspotmultiqtype_drawstatus', 'local_omeroembed'),
+        ],
+    ];
+    $configscript = '<script id="omero-hotspotmulti-qtype-author-config" type="application/json">'
+        . json_encode($config) . '</script>';
     $scripturl = new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-author.js');
     $srcscript = '<script src="' . $scripturl->out(false) . '"></script>';
 
-    $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
-    return $withscript !== null ? $withscript : ($body . $srcscript);
+    $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
 }
 
 /**

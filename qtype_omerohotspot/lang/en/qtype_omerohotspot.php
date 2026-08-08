@@ -33,6 +33,7 @@ $string['pluginnamesummary'] = 'The student clicks a location on a whole-slide O
 
 $string['imageidlabel'] = 'Image ID';
 $string['datasetidlabel'] = 'Dataset ID (optional)';
+$string['loadslide'] = 'Load slide';
 $string['loadslidehelp'] = 'Choose a subject account and image, click "Load slide" below, then drag an ellipse or rectangle over the correct answer directly on the slide.';
 $string['regionpreview'] = 'Correct answer region';
 $string['needscoursecontext'] = 'This question needs to be created inside a course (or activity) question bank - the slide preview needs a real course to check permissions against.';

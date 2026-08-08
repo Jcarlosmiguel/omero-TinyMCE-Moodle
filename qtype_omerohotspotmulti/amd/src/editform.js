@@ -36,11 +36,12 @@
  */
 
 import Config from 'core/config';
+import {getString} from 'core/str';
 
 /**
  * @param {String} wrapId id of the empty <div> the edit form left for the preview.
  */
-export const init = (wrapId) => {
+export const init = async(wrapId) => {
     const wrap = document.getElementById(wrapId);
     if (!wrap) {
         return;
@@ -57,7 +58,7 @@ export const init = (wrapId) => {
     const loadButton = document.createElement('button');
     loadButton.type = 'button';
     loadButton.className = 'btn btn-secondary mb-2';
-    loadButton.textContent = 'Load slide';
+    loadButton.textContent = await getString('loadslide', 'qtype_omerohotspotmulti');
     wrap.parentNode.insertBefore(loadButton, wrap);
 
     /**

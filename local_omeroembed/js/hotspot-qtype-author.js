@@ -35,6 +35,12 @@
 (function() {
     'use strict';
 
+    var configEl = document.getElementById('omero-hotspot-qtype-author-config');
+    var config = configEl ? JSON.parse(configEl.textContent) : null;
+    if (!config) {
+        return;
+    }
+
     var TYPE_ELLIPSE = 'ellipse';
     var TYPE_RECTANGLE = 'rectangle';
     var HIT_RADIUS = 12;
@@ -231,13 +237,13 @@
             return btn;
         }
 
-        toolbar.appendChild(makeToolButton('Ellipse', TYPE_ELLIPSE));
-        toolbar.appendChild(makeToolButton('Rectangle', TYPE_RECTANGLE));
+        toolbar.appendChild(makeToolButton(config.strings.drawellipse, TYPE_ELLIPSE));
+        toolbar.appendChild(makeToolButton(config.strings.drawrectangle, TYPE_RECTANGLE));
 
         var constrainBtn = document.createElement('button');
         constrainBtn.type = 'button';
-        constrainBtn.textContent = '○=□';
-        constrainBtn.title = 'Constrain to a circle/square';
+        constrainBtn.textContent = '○=□'; // circle=square, a plain-text stand-in icon
+        constrainBtn.title = config.strings.constrainshape;
         constrainBtn.style.cssText = 'cursor:pointer; border:1px solid #ffffff; border-radius:3px; '
             + 'padding:0.3rem 0.6rem; font-size:0.8rem; color:#ffffff; background:transparent;';
         constrainBtn.addEventListener('click', function() {
@@ -249,8 +255,8 @@
 
         var clearBtn = document.createElement('button');
         clearBtn.type = 'button';
-        clearBtn.textContent = 'Clear';
-        clearBtn.title = 'Clear';
+        clearBtn.textContent = config.strings.clear;
+        clearBtn.title = config.strings.clear;
         clearBtn.style.cssText = 'cursor:pointer; border:1px solid #ffffff; border-radius:3px; '
             + 'padding:0.3rem 0.6rem; font-size:0.8rem; color:#ffffff; background:transparent;';
         clearBtn.addEventListener('click', function() {
@@ -263,7 +269,7 @@
         var statusEl = document.createElement('span');
         statusEl.id = 'omero-hotspot-status';
         statusEl.style.cssText = 'color:#2ecc71; font-size:0.8rem;';
-        statusEl.textContent = 'Draw the correct answer region';
+        statusEl.textContent = config.strings.drawstatus;
         toolbar.appendChild(statusEl);
 
         viewportEl.parentNode.insertBefore(toolbar, viewportEl.nextSibling);
