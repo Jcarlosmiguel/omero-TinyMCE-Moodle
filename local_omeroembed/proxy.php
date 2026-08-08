@@ -467,6 +467,11 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
 
         $rewritten = inject_overlay_hide_css($rewritten, $hideflags);
         $rewritten = inject_disable_rotate_interaction($rewritten);
+        // Disabled for now - comparing raw, unmodified iviewer behaviour
+        // across cases before deciding what (if anything) to fix here vs
+        // upstream. inject_fit_padding_view_script() itself is untouched
+        // below, just not called.
+        // $rewritten = inject_fit_padding_view_script($rewritten);
         if ($heatmap) {
             // Its own mode, like $authoring - never combined with the
             // context-menu blocker/annotate/tracking scripts below.
@@ -828,6 +833,111 @@ function inject_disable_rotate_interaction(string $body): string {
         });
     }
     init();
+})();
+</script>
+JS;
+
+    $withscript = preg_replace('#(</head>)#i', $script . '$1', $body, 1);
+    return $withscript !== null ? $withscript : ($body . $script);
+}
+
+/**
+ * EXPERIMENTAL - adds a visual margin around the whole-image default view
+ * only, by zooming out slightly from its own centre, rather than
+ * re-fitting to the image's full extent.
+ *
+ * Deliberately does NOT touch a teacher's saved "opening view" (x/y/zm on
+ * this same proxy.php URL, applied natively by iviewer itself on load) at
+ * all - confirmed live twice, for two different reasons, both now fixed
+ * the same way (skip entirely rather than reconcile):
+ * - An early version always re-fit to the whole image regardless of any
+ *   saved view, which fought it outright - the correct custom view
+ *   flashed in, then jumped back to the padded whole-image fit a moment
+ *   later.
+ * - A later version zoomed out from *whatever* view was current (custom
+ *   or default) instead of re-fitting, which no longer fought the saved
+ *   framing's centre, but still cost every custom view a slice of zoom
+ *   precision it never asked for - confirmed live: a close-up saved deep
+ *   in tissue shows no visible margin (nothing near the slide's edge for
+ *   the extra space to reveal), so that cost bought nothing there, while
+ *   still silently framing every custom view slightly wider than composed.
+ * Padding is a default-view nicety, not something worth spending a
+ * teacher's precision on for a view they deliberately composed.
+ *
+ * A plain resolution change can silently do nothing here: confirmed live
+ * that iviewer's view is on a discrete zoom-level ladder (resolutions_),
+ * and the whole-image default fit already sits at minZoom (the coarsest
+ * available resolution) - there is no coarser resolution to reach for.
+ * Prepending one coarser resolution to that ladder (and dropping minZoom
+ * to match) gives the view room to actually zoom out further. Mutates the
+ * view's own "private" resolutions_/minZoom_ properties directly - there
+ * is no public API for extending them after construction - so this is
+ * inherently fragile against an iviewer update changing that internal
+ * shape, which is part of why this is still marked experimental.
+ *
+ * @param string $body
+ * @return string
+ */
+function inject_fit_padding_view_script(string $body): string {
+    $zoomoutfactor = 1.08;
+    $script = <<<JS
+<script>
+(function() {
+    var requestedView = new URLSearchParams(window.location.search);
+    if (requestedView.has('x') || requestedView.has('y') || requestedView.has('zm')) {
+        return;
+    }
+
+    function init(attempt) {
+        var viewerEl = document.querySelector('ol3-viewer');
+        if (!viewerEl || !viewerEl.au || !viewerEl.au.controller) {
+            window.setTimeout(function() { init(attempt + 1); }, 300);
+            return;
+        }
+        var viewer = viewerEl.au.controller.viewModel.viewer;
+        if (!viewer || !viewer.viewer_) {
+            window.setTimeout(function() { init(attempt + 1); }, 300);
+            return;
+        }
+        var map = viewer.viewer_;
+        var view = map.getView();
+
+        function padCurrentView() {
+            if (!view.resolutions_) {
+                return;
+            }
+            if (view.resolutions_.omeroembedPaddedAt === view.getResolution()) {
+                // Already padded from exactly this base resolution - a
+                // stray second call (the settle re-check below) landing
+                // after nothing actually changed. Applying the same
+                // zoom-out again would compound it.
+                return;
+            }
+            var target = view.getResolution() * {$zoomoutfactor};
+            if (view.resolutions_ && target > view.resolutions_[0]) {
+                view.resolutions_.unshift(target);
+                view.minZoom_ = view.minZoom_ - 1;
+            }
+            view.setResolution(target);
+            // Read back the actual (possibly snapped-to-ladder) resolution
+            // rather than trusting the computed target - the settle
+            // re-check compares against this to tell "nothing moved since
+            // we padded" from "iviewer changed it again", and comparing
+            // computed-to-actual would always read as changed.
+            view.resolutions_.omeroembedPaddedAt = view.getResolution();
+        }
+
+        // iviewer applies its own positioning (the whole-image default
+        // fit, or a saved x/y/zm) asynchronously, sometimes after this
+        // script's own polling above already found a live viewer instance
+        // - settling once, then re-checking once more shortly after,
+        // rather than guessing a single "safe" delay.
+        window.setTimeout(function() {
+            padCurrentView();
+            window.setTimeout(padCurrentView, 1000);
+        }, 500);
+    }
+    init(0);
 })();
 </script>
 JS;
