@@ -25,10 +25,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'qtype_omerohotspot';
-$plugin->version   = 2026080302;
+$plugin->version   = 2026081000;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0.0';
+$plugin->release   = '1.0.1';
 $plugin->supported = [405, 502];
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
