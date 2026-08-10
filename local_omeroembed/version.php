@@ -24,14 +24,13 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// The current plugin version (Date: YYYYMMDDXX). Bumped: fixes redirect()
-// confirmation messages silently discarded by the 2026080307 session-lock
-// fix, and brings the codebase to a clean moodle-plugin-ci run (docblocks,
-// comment/line-length conventions, and dropping MOODLE_INTERNAL guards
-// from files the current sniff says don't need them).
-$plugin->version   = 2026080309;
+// The current plugin version (Date: YYYYMMDDXX). Bumped: hardcoded-English
+// fix in the qtype hotspot-authoring toolbars (now translatable via the
+// existing config/strings bridge every other injector already used). No
+// database or functional/behavioural changes otherwise.
+$plugin->version   = 2026081000;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.3.0';
+$plugin->release   = '1.3.1';
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->supported = [405, 502];         // One codebase tested against both 4.5 and 5.2 - see MOODLE_5.2_COMPAT.md.
