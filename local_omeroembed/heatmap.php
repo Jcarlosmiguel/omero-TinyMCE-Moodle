@@ -125,9 +125,14 @@ if ($savetracking && confirm_sesskey()) {
         throw new \moodle_exception('invalidgatherminutes', 'local_omeroembed', '', $gatherminutes);
     }
     // A freshly-arrived sourceurl (teacher re-generated the embed with a
-    // different image, then followed author.php's updated link) wins over
-    // whatever was already stored - otherwise just keep what's there.
-    $sourceurl = $sourceurlparam !== '' ? $sourceurlparam : $settings['sourceurl'];
+    // different image or OMERO connection, then followed the embed's own
+    // updated "View heatmap" link) wins over whatever was already stored -
+    // otherwise just keep what's there. SECURITY: same str_starts_with()
+    // origin check as the first-visit branch above, for the same reason -
+    // PARAM_URL alone doesn't restrict this to the site's own proxy.php.
+    $sourceurl = ($sourceurlparam !== '' && str_starts_with($sourceurlparam, $proxybaseprefix))
+        ? $sourceurlparam
+        : $settings['sourceurl'];
 
     tracking_repository::set_settings($courseid, $embedid, $enabled, $gatherminutes, $sourceurl);
     $message = $enabled ? get_string('trackingstarted', 'local_omeroembed') : get_string('trackingstopped', 'local_omeroembed');
@@ -207,6 +212,15 @@ echo html_writer::tag('p', get_string('trackingheading_desc', 'local_omeroembed'
 echo html_writer::start_tag('form', ['method' => 'post', 'action' => $pageurl->out(false)]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'savetracking', 'value' => 1]);
+if ($sourceurlparam !== '') {
+    // Carries a freshly-arrived sourceurl (see this file's own comment on
+    // $sourceurlparam) through this form's POST, same as the other hidden
+    // fields above - without this, the $savetracking block below never
+    // actually sees it, since $pageurl (this form's action) never includes
+    // it. That silently defeated the "freshly-arrived sourceurl wins" logic
+    // there entirely - this is the missing wiring for it.
+    echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sourceurl', 'value' => $sourceurlparam]);
+}
 
 echo html_writer::start_div('', ['style' => 'display:flex; align-items:center; gap:1rem; flex-wrap:wrap;']);
 
