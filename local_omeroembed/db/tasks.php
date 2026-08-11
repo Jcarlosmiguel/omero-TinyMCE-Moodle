@@ -50,4 +50,16 @@ $tasks = [
         'dayofweek' => '*',
         'disabled' => 0,
     ],
+    [
+        'classname' => 'local_omeroembed\task\purge_orphaned_embed_tracking',
+        // Daily, offset 30 minutes after purge_view_samples so the two
+        // don't contend for the same tables at the same moment - not that
+        // either is slow, just avoids the coincidence.
+        'minute' => '30',
+        'hour' => '3',
+        'day' => '*',
+        'month' => '*',
+        'dayofweek' => '*',
+        'disabled' => 0,
+    ],
 ];

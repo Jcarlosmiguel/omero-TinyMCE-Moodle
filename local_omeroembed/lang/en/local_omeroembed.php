@@ -224,6 +224,7 @@ $string['retentionperiod_desc'] = 'How long a viewing sample is kept before the 
 
 $string['task_purgeviewsamples'] = 'Purge old heatmap viewing data';
 $string['task_captureheatmapframes'] = 'Capture heatmap video frames';
+$string['task_purgeorphanedembedtracking'] = 'Purge tracking for removed embeds';
 
 $string['privacy:metadata:local_omeroembed_view_samples'] = 'One periodic sample of a student\'s viewport position on a tracked embedded OMERO slide, for the teacher heatmap feature.';
 $string['privacy:metadata:local_omeroembed_view_samples:userid'] = 'The ID of the user this sample belongs to.';

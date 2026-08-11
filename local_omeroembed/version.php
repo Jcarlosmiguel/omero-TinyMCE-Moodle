@@ -24,13 +24,17 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// The current plugin version (Date: YYYYMMDDXX). Bumped: hardcoded-English
-// fix in the qtype hotspot-authoring toolbars (now translatable via the
-// existing config/strings bridge every other injector already used). No
-// database or functional/behavioural changes otherwise.
-$plugin->version   = 2026081000;
+// The current plugin version (Date: YYYYMMDDXX). Bumped: adds garbage
+// collection for this plugin's own data - a course_deleted event observer
+// (classes/observer.php, db/events.php) that purges everything scoped to a
+// deleted course, and a daily purge_orphaned_embed_tracking scheduled task
+// (db/tasks.php) that sweeps for individual embeds no longer referenced
+// anywhere in their course's content. No schema changes. Also carries the
+// prior sourceurl fix (82c0aa3) that landed after the 1.3.1/v1.3.2
+// Marketplace tag without its own version bump.
+$plugin->version   = 2026081100;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.3.1';
+$plugin->release   = '1.3.2';
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->supported = [405, 502];         // One codebase tested against both 4.5 and 5.2 - see MOODLE_5.2_COMPAT.md.
