@@ -189,8 +189,11 @@ class omero_session {
     }
 
     /**
-     * Minimal curl wrapper that also captures Set-Cookie response headers - PHP's
-     * curl extension doesn't expose these directly, only via a header callback.
+     * Thin wrapper around Moodle's \curl class that also extracts Set-Cookie
+     * response headers - \curl::getResponse() exposes them as a plain header
+     * name/value map (or an array of values when the same header name
+     * appears more than once, e.g. multiple Set-Cookie lines), so this just
+     * picks out and parses those.
      *
      * @param string $url
      * @param string $method 'GET' or 'POST'.
@@ -205,32 +208,32 @@ class omero_session {
         ?string $postfields = null,
         array $extraheaders = []
     ): array {
+        $curl = new \curl();
+        $curl->setHeader($extraheaders);
+        $curl->setopt([
+            'CURLOPT_FOLLOWLOCATION' => false,
+            'CURLOPT_TIMEOUT' => 15,
+        ]);
+
+        $body = $method === 'POST' ? $curl->post($url, (string) $postfields) : $curl->get($url);
+
+        if ($curl->get_errno()) {
+            throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $curl->error);
+        }
+
         $cookies = [];
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $extraheaders);
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curlhandle, $headerline) use (&$cookies) {
-            if (preg_match('/^Set-Cookie:\s*([^=]+)=([^;]+)/i', $headerline, $m)) {
-                $cookies[trim($m[1])] = trim($m[2]);
+        foreach ($curl->getResponse() as $name => $value) {
+            if (strtolower($name) !== 'set-cookie') {
+                continue;
             }
-            return strlen($headerline);
-        });
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $postfields);
+            foreach ((array) $value as $onesetcookie) {
+                if (preg_match('/^\s*([^=]+)=([^;]+)/', (string) $onesetcookie, $m)) {
+                    $cookies[trim($m[1])] = trim($m[2]);
+                }
+            }
         }
 
-        $body = curl_exec($ch);
-        if ($body === false) {
-            $error = curl_error($ch);
-            curl_close($ch);
-            throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $error);
-        }
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        return ['body' => $body, 'cookies' => $cookies, 'status' => $status];
+        $info = $curl->get_info();
+        return ['body' => $body, 'cookies' => $cookies, 'status' => (int) ($info['http_code'] ?? 0)];
     }
 }

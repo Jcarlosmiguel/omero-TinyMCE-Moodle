@@ -226,6 +226,14 @@ $string['task_purgeviewsamples'] = 'Purge old heatmap viewing data';
 $string['task_captureheatmapframes'] = 'Capture heatmap video frames';
 $string['task_purgeorphanedembedtracking'] = 'Purge tracking for removed embeds';
 
+$string['mtrace_purgedviewsamples'] = 'Purged {$a->count} local_omeroembed_view_samples row(s) older than {$a->date}.';
+$string['mtrace_purgedheatmapframes'] = 'Purged {$a->count} local_omeroembed_heatmap_frames row(s) older than {$a->date}.';
+$string['mtrace_notrackedembeds'] = 'No tracked embeds - nothing to sweep.';
+$string['mtrace_purgedorphanedembeds'] = 'Checked {$a->checked} tracked embed(s), purged {$a->purged} whose embedid no longer appears anywhere in their course\'s content.';
+$string['mtrace_noactivetracking'] = 'No active tracking sessions - nothing to capture.';
+$string['mtrace_capturedheatmapframes'] = 'Captured {$a->captured} heatmap frame(s), skipped {$a->skipped}, across {$a->total} active session(s).';
+$string['mtrace_purgedcoursedata'] = 'local_omeroembed: purged {$a->total} row(s) across {$a->tables} table(s) for deleted course {$a->courseid}.';
+
 $string['privacy:metadata:local_omeroembed_view_samples'] = 'One periodic sample of a student\'s viewport position on a tracked embedded OMERO slide, for the teacher heatmap feature.';
 $string['privacy:metadata:local_omeroembed_view_samples:userid'] = 'The ID of the user this sample belongs to.';
 $string['privacy:metadata:local_omeroembed_view_samples:courseid'] = 'The course the tracked embed belongs to.';

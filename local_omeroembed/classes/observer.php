@@ -62,7 +62,11 @@ class observer {
         }
 
         if ($total > 0) {
-            mtrace("local_omeroembed: purged {$total} row(s) across " . count($tables) . " table(s) for deleted course {$courseid}.");
+            mtrace(get_string('mtrace_purgedcoursedata', 'local_omeroembed', (object) [
+                'total' => $total,
+                'tables' => count($tables),
+                'courseid' => $courseid,
+            ]));
         }
     }
 }

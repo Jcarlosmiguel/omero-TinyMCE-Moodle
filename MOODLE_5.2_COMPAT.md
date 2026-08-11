@@ -1,12 +1,17 @@
 # Moodle 4.5 → 5.2 compatibility: findings and history
 
-One codebase, one branch (`main`), all four components declaring
-`$plugin->supported = [405, 502]`. This doc consolidates: a colleague's
+One codebase, one branch (`main`), all four components currently
+declaring `$plugin->supported = [405, 502]` - 5.0 and 5.1 have since
+also been verified clean (see "5. Fresh install, Moodle 5.0 and 5.1,
+MariaDB" below) but that array has deliberately NOT been updated yet;
+whether/when to add 500 and 501 and resubmit all four components is a
+separate decision, not made here. This doc consolidates: a colleague's
 (Eric Davies) 4.5→5.2 developer notes, a cross-check against the official
 Moodle Marketplace plugin requirements page, and direct verification
-against this plugin's own code and three locally-run test environments
-(4.5 on MariaDB, 5.2 on MariaDB, 4.5 on PostgreSQL) - since torn down,
-their job done; the findings below are what they were for.
+against this plugin's own code across five locally-run test environments
+(4.5 on MariaDB, 5.0 on MariaDB, 5.1 on MariaDB, 5.2 on MariaDB, 4.5 on
+PostgreSQL) - all since torn down, their job done; the findings below are
+what they were for.
 
 **This was originally tracked on a separate `moodle-5.2-compat` branch,
 submitting 4.5 first and 5.2 to follow as a second release.** That branch
@@ -26,6 +31,10 @@ dependency graph still resolves), branch deleted.
 - Core install/upgrade to 5.2 works with **zero code changes** — the only
   fix needed was relocating the four components under Moodle 5.2's new
   `public/` webroot split (see below).
+- **5.0 and 5.1 also verified clean**, zero code changes needed. The
+  `public/` split's exact boundary is now pinned down precisely: absent
+  in 5.0, present in 5.1 (previously only known as "5.1+" from
+  moodledev.io's own docs).
 - A DEVELOPER-debug sweep (all four components, both Moodle versions)
   produced **zero PHP notices, warnings, or deprecation messages** across
   every real page/action exercised.
@@ -42,17 +51,18 @@ dependency graph still resolves), branch deleted.
   question — `local_omeroembed_subjects` (teacher OMERO credentials)
   excluded from Privacy API coverage — is now **fixed**, see below.
 
-## Environment requirements (moodledev.io, verified directly)
+## Environment requirements (moodledev.io + each version's own environment.xml, verified directly)
 
-| | Moodle 4.5 | Moodle 5.2 |
-|---|---|---|
-| PHP | 8.1–8.4 (this project runs 8.2) | **8.3.0 minimum**, 8.3.x/8.4.x only |
-| MariaDB | — | 10.11.0 minimum |
-| PostgreSQL | — | 16 minimum |
-| MySQL | — | 8.4 minimum |
-| Oracle | unsupported since 5.0 | unsupported |
-| sodium extension | required | required |
-| `max_input_vars` | ≥ 5000 | ≥ 5000 |
+| | Moodle 4.5 | Moodle 5.0 | Moodle 5.1 | Moodle 5.2 |
+|---|---|---|---|---|
+| PHP | 8.1–8.4 (this project runs 8.2) | **8.2.0 minimum** (own environment.xml) | **8.2.0 minimum** (own environment.xml) | **8.3.0 minimum**, 8.3.x/8.4.x only |
+| MariaDB | — | — | — | 10.11.0 minimum |
+| PostgreSQL | — | — | — | 16 minimum |
+| MySQL | — | — | — | 8.4 minimum |
+| Oracle | unsupported since 5.0 | unsupported | unsupported | unsupported |
+| sodium extension | required | required | required | required |
+| `max_input_vars` | ≥ 5000 | ≥ 5000 | ≥ 5000 | ≥ 5000 |
+| `public/` webroot split | no | **no** | **yes** | yes |
 
 Note: an earlier verbal figure of "PHP 8.2 minimum" for 5.2 doesn't match
 moodledev.io's own release page, which states 8.3.0. Resolved without
@@ -114,6 +124,50 @@ All five requests succeeded with no errors — the strongest practical
 evidence available (short of testing on the real Marketplace review
 infrastructure) that the cross-database compatibility requirement is met.
 
+### 5. Fresh install, Moodle 5.0 and 5.1, MariaDB
+
+The gap between the two versions actually tested above (4.5 and 5.2) -
+`$plugin->supported = [405, 502]` deliberately never claimed 5.0 or 5.1,
+since neither had been verified. Both now have been, in two fully
+isolated docker-compose stacks (own Moodle core checkout, own DB
+container, own ports - nothing shared with any other running
+environment), each torn down (containers, volumes, networks) once done.
+
+**5.0 does not have the `public/` split; 5.1 does.** This pins down the
+exact boundary precisely, rather than just "5.1+" from moodledev.io's own
+docs: a first pass at 5.1 placed the four components at the old top-level
+paths (matching 5.0's layout) and `admin/cli/upgrade.php` reported "No
+upgrade needed" - a false negative, not a real result, because
+`core_component::get_plugin_list('local')` returned nothing at all
+(confirmed directly) until the components were moved under `public/`, at
+which point all four installed and upgraded cleanly. 5.0 needed no such
+move.
+
+**PHP requirement**: checked each version's own `admin/environment.xml`
+directly (not assumed from the 4.5/5.2 figures already in the table
+above) - both 5.0 and 5.1 declare **PHP 8.2.0** as their own minimum
+(the jump to 8.3.0 only starts at the 5.2 block). Both stacks were built
+on PHP 8.2, matching production and correctly meeting each version's own
+declared floor.
+
+For each version: core + all four components installed cleanly via
+`admin/cli/upgrade.php` (fresh install), `core_plugin_manager`-reported
+versions matched disk exactly with `uptodate` status for all four, a
+second `admin/cli/upgrade.php` run confirmed a clean no-op, web server
+logs showed zero fatal/exception/undefined-function/parse-error lines,
+and - beyond just installing - a real authenticated login followed by
+loading `local_omeroembed`'s own admin settings page returned HTTP 200
+with the plugin's real settings content present (`retentionperiod`,
+`omerobaseurl`) and no error text, on both versions.
+
+**Not yet done for 5.0/5.1** (unlike the 5.2 pass): the DEVELOPER-debug
+sweep across every plugin-facing page/action, a real 4.5→5.0/5.1 upgrade
+path against production-shaped data, and the PostgreSQL round trip. This
+pass confirms clean install/upgrade and no runtime errors on the pages
+checked - a real, positive result - but is narrower in coverage than
+verification #3 and #4 above until/unless someone repeats that fuller
+pass for these two versions specifically.
+
 ## Cross-checked against the Moodle Marketplace plugin requirements
 
 The Marketplace has replaced the old moodle.org plugins directory as the
@@ -150,7 +204,21 @@ as before as part of the review.
 
 ## Open questions — need real answers, not assumptions
 
-1. **Repo structure for Marketplace submission.** The naming convention
+1. **Repo structure for Marketplace submission — RESOLVED 2026-08-11.**
+   The Marketplace reviewer (Volodymyr Dovhan, MMR-101, issue #1) has
+   answered this definitively: split required, one repository per
+   plugin. Not a guess or an inferred convention - a direct instruction
+   from the actual reviewer. The reasoning below for why we'd have
+   preferred not to split is kept as the decision record for *why the
+   split happens last* in the implementation sequence (see the reviewer
+   response plan), not as an argument against complying - it isn't one.
+   The dependency coupling described below is unaffected by the split
+   (`$plugin->dependencies` continues to do the real work across
+   repos, exactly as reasoned here before the answer came back).
+
+   Original open-question text, preserved for context:
+
+   The naming convention
    (`moodle-{plugintype}_{pluginname}`) assumes one plugin per repo. This
    repo bundles four - but not as four unrelated plugins that happen to
    share a repo. They're a genuinely coupled system: `tiny_omeroembed`'s

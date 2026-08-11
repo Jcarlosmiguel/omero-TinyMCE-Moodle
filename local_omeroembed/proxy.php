@@ -224,26 +224,32 @@ function in_array_prefix(string $path, array $prefixes): bool {
  * @throws \moodle_exception On a curl-level failure (network/DNS/TLS).
  */
 function fetch_from_omero(string $url, array $session): array {
-    $locationheader = null;
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cookie: ' . $session['cookie']]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curlhandle, $headerline) use (&$locationheader) {
-        if (preg_match('/^Location:\s*(.+)$/i', trim($headerline), $m)) {
-            $locationheader = trim($m[1]);
-        }
-        return strlen($headerline);
-    });
-    $body = curl_exec($ch);
-    if ($body === false) {
-        $error = curl_error($ch);
-        curl_close($ch);
-        throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $error);
+    $curl = new \curl();
+    $curl->setHeader(['Cookie: ' . $session['cookie']]);
+    $curl->setopt([
+        'CURLOPT_FOLLOWLOCATION' => false,
+        'CURLOPT_TIMEOUT' => 30,
+    ]);
+
+    $body = $curl->get($url);
+
+    if ($curl->get_errno()) {
+        throw new \moodle_exception('omeroconnectionfailed', 'local_omeroembed', '', null, $curl->error);
     }
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $contenttype = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-    curl_close($ch);
+
+    $locationheader = null;
+    foreach ($curl->getResponse() as $name => $value) {
+        if (strtolower($name) === 'location') {
+            // Only ever one Location header per response - take the last if
+            // getResponse() ever returned an array (see \curl::formatHeader()).
+            $locationheader = trim((string) (is_array($value) ? end($value) : $value));
+            break;
+        }
+    }
+
+    $info = $curl->get_info();
+    $status = (int) ($info['http_code'] ?? 0);
+    $contenttype = $info['content_type'] ?? null;
 
     return ['status' => $status, 'contenttype' => $contenttype, 'body' => $body, 'location' => $locationheader];
 }

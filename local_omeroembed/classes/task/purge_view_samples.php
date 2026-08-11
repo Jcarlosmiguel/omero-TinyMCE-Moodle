@@ -63,9 +63,15 @@ class purge_view_samples extends \core\task\scheduled_task {
         $cutoff = time() - $retentionseconds;
 
         $deletedsamples = tracking_repository::purge_older_than($cutoff);
-        mtrace("Purged {$deletedsamples} local_omeroembed_view_samples row(s) older than " . userdate($cutoff) . '.');
+        mtrace(get_string('mtrace_purgedviewsamples', 'local_omeroembed', (object) [
+            'count' => $deletedsamples,
+            'date' => userdate($cutoff),
+        ]));
 
         $deletedframes = heatmap_frame_repository::purge_frames_older_than($cutoff);
-        mtrace("Purged {$deletedframes} local_omeroembed_heatmap_frames row(s) older than " . userdate($cutoff) . '.');
+        mtrace(get_string('mtrace_purgedheatmapframes', 'local_omeroembed', (object) [
+            'count' => $deletedframes,
+            'date' => userdate($cutoff),
+        ]));
     }
 }

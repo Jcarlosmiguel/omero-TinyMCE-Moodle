@@ -63,7 +63,7 @@ class capture_heatmap_frames extends \core\task\scheduled_task {
         );
 
         if (!$active) {
-            mtrace('No active tracking sessions - nothing to capture.');
+            mtrace(get_string('mtrace_noactivetracking', 'local_omeroembed'));
             return;
         }
 
@@ -90,6 +90,10 @@ class capture_heatmap_frames extends \core\task\scheduled_task {
             $captured++;
         }
 
-        mtrace("Captured {$captured} heatmap frame(s), skipped {$skipped}, across " . count($active) . ' active session(s).');
+        mtrace(get_string('mtrace_capturedheatmapframes', 'local_omeroembed', (object) [
+            'captured' => $captured,
+            'skipped' => $skipped,
+            'total' => count($active),
+        ]));
     }
 }

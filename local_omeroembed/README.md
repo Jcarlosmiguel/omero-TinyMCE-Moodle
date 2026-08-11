@@ -56,7 +56,35 @@ at the repository root.
   [MOODLE_5.2_COMPAT.md](https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle/blob/main/MOODLE_5.2_COMPAT.md))
 - OMERO.web with omero-iviewer installed (developed and tested against
   OMERO 5.22.1 / omero-iviewer v0.17.0)
-- PHP curl extension (used for all server-to-server OMERO requests)
+- PHP curl extension (used for all server-to-server OMERO requests - see
+  [External services](#external-services) below)
+
+## External services
+
+This plugin makes outbound HTTP(S) requests to the OMERO server address
+configured by the site administrator (Site administration > Plugins >
+Local plugins > OMERO slide embed). No other third-party or external
+service is contacted. There are three call sites:
+
+- **Authentication** (`classes/omero_session.php`) - on session start, the
+  plugin logs in to `{omerobaseurl}/webclient/login/` as a single shared
+  subject service account (Django CSRF token fetch, then a login POST),
+  and reuses the resulting session cookie for subsequent requests. This
+  is how the plugin obtains permission to serve slide imagery without
+  asking each Moodle user to hold their own OMERO credentials.
+- **Slide viewer reverse proxy** (`proxy.php`) - passes browser requests
+  for `/iviewer/`, `/webgateway/`, `/api/` and `/static/` through to the
+  same OMERO server and returns the response, rewriting URLs as needed.
+  This is what actually renders the slide viewer and serves image tiles
+  to students and staff.
+- **Heatmap rendering** (`classes/heatmap_renderer.php`) - a server-side
+  scheduled task (no browser involved) fetches image metadata and
+  thumbnails from `{omerobaseurl}/webgateway/imgData/{imageid}/` and
+  `{omerobaseurl}/webgateway/render_thumbnail/{imageid}/1200/` to build
+  view-activity heatmap video frames.
+
+No data is sent to any service other than the administrator-configured
+OMERO server.
 
 ## Installing
 

@@ -81,7 +81,7 @@ class purge_orphaned_embed_tracking extends \core\task\scheduled_task {
 
         $tracked = $DB->get_records('local_omeroembed_embed_tracking', null, '', 'id, courseid, embedid');
         if (!$tracked) {
-            mtrace('No tracked embeds - nothing to sweep.');
+            mtrace(get_string('mtrace_notrackedembeds', 'local_omeroembed'));
             return;
         }
 
@@ -108,7 +108,10 @@ class purge_orphaned_embed_tracking extends \core\task\scheduled_task {
             }
         }
 
-        mtrace("Checked {$checked} tracked embed(s), purged {$purged} whose embedid no longer appears anywhere in their course's content.");
+        mtrace(get_string('mtrace_purgedorphanedembeds', 'local_omeroembed', (object) [
+            'checked' => $checked,
+            'purged' => $purged,
+        ]));
     }
 
     /**

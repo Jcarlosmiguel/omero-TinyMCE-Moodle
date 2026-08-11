@@ -166,15 +166,22 @@ class heatmap_renderer {
      * @return string|null Response body, or null on any non-200/curl failure.
      */
     private static function curl_get(string $url, array $session): ?string {
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Cookie: ' . $session['cookie']]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        $body = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        $curl = new \curl();
+        $curl->setHeader(['Cookie: ' . $session['cookie']]);
+        $curl->setopt([
+            // Matches the original raw curl_init() behaviour, which never
+            // enabled CURLOPT_FOLLOWLOCATION - Moodle's \curl class defaults
+            // to following redirects, which would silently treat a
+            // redirect-to-login-page response as a 200 (the redirect
+            // target's own status) instead of correctly returning null here.
+            'CURLOPT_FOLLOWLOCATION' => false,
+            'CURLOPT_TIMEOUT' => 30,
+        ]);
 
-        if ($body === false || $status !== 200) {
+        $body = $curl->get($url);
+        $status = (int) ($curl->get_info()['http_code'] ?? 0);
+
+        if ($curl->get_errno() || $status !== 200) {
             return null;
         }
         return $body;

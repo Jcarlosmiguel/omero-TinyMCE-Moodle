@@ -24,17 +24,26 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// The current plugin version (Date: YYYYMMDDXX). Bumped: adds garbage
-// collection for this plugin's own data - a course_deleted event observer
-// (classes/observer.php, db/events.php) that purges everything scoped to a
-// deleted course, and a daily purge_orphaned_embed_tracking scheduled task
-// (db/tasks.php) that sweeps for individual embeds no longer referenced
-// anywhere in their course's content. No schema changes. Also carries the
-// prior sourceurl fix (82c0aa3) that landed after the 1.3.1/v1.3.2
-// Marketplace tag without its own version bump.
-$plugin->version   = 2026081100;
+// The current plugin version (Date: YYYYMMDDXX). Bumped: MMR-101 reviewer
+// feedback, answer-independent package - README "External services"
+// disclosure (#7), GitHub Actions CI (#2), remaining hardcoded mtrace()
+// strings wrapped in get_string() (#9), all 3 raw curl_init() call sites
+// converted to Moodle's \curl class (#5 - omero_session.php, proxy.php,
+// heatmap_renderer.php; live-verified against the real OMERO server,
+// including a real behavioural fix: \curl defaults to following redirects
+// unlike raw curl_init(), which would have silently treated a
+// redirect-to-login response as valid image data in heatmap_renderer.php),
+// and course backup/restore support for all 8 courseid-scoped tables (#3 -
+// backup/moodle2/{backup,restore}_local_omeroembed_plugin.class.php, via
+// core's generic backup_local_plugin/restore_local_plugin course
+// connectionpoint; live-verified with a real seeded course backup/restore
+// round-trip, including a real bug found and fixed along the way - a
+// site-wide UNIQUE-on-embedid collision that would abort the whole course
+// restore when the original course still exists, e.g. "Duplicate this
+// course" - now defensively skipped instead). No schema changes.
+$plugin->version   = 2026081200;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.3.2';
+$plugin->release   = '1.4.0';
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->supported = [405, 502];         // One codebase tested against both 4.5 and 5.2 - see MOODLE_5.2_COMPAT.md.
+$plugin->supported = [405, 500, 501, 502]; // One codebase, live-verified against 4.5-5.2 - see MOODLE_5.2_COMPAT.md.

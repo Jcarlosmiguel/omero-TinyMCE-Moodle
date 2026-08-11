@@ -1,0 +1,156 @@
+name: Moodle Plugin CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+# This repository currently bundles four plugins (local_omeroembed and its
+# three dependants) in one checkout - see MOODLE_5.2_COMPAT.md's "Open
+# questions" section for the reviewer-confirmed plan to split them into
+# separate repositories. Until that split lands, each matrix job tests one
+# plugin directory, installing the other three alongside it via
+# --extra-plugins so that tiny_omeroembed/qtype_omerohotspot/
+# qtype_omerohotspotmulti (which all declare local_omeroembed as a
+# dependency) resolve correctly.
+#
+# The moodle-branch/php/database combinations below are chosen to cover
+# both ends of $plugin->supported ([405, 500, 501, 502]: 4.5 through 5.2)
+# and both ends of each branch's own PHP range, rather than the full cross
+# product, to keep total job count reasonable - see MOODLE_5.2_COMPAT.md
+# for the source of these PHP/DB minimums.
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: ${{ matrix.database == 'pgsql' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_USER: 'postgres'
+          POSTGRES_HOST_AUTH_METHOD: 'trust'
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+
+      mariadb:
+        image: ${{ matrix.database == 'mariadb' && 'mariadb:11' || '' }}
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+          MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
+          MYSQL_COLLATION_SERVER: "utf8mb4_unicode_ci"
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval 10s --health-timeout 5s --health-retries 3
+
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: [local_omeroembed, tiny_omeroembed, qtype_omerohotspot, qtype_omerohotspotmulti]
+        include:
+          - moodle-branch: 'MOODLE_405_STABLE'
+            php: '8.1'
+            database: pgsql
+          - moodle-branch: 'MOODLE_405_STABLE'
+            php: '8.4'
+            database: mariadb
+          - moodle-branch: 'MOODLE_502_STABLE'
+            php: '8.3'
+            database: mariadb
+          - moodle-branch: 'MOODLE_502_STABLE'
+            php: '8.4'
+            database: pgsql
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          path: code
+          persist-credentials: false
+
+      - name: Stage the other three plugins as dependencies
+        run: |
+          mkdir -p extra-plugins
+          for dir in code/*/; do
+            name=$(basename "$dir")
+            if [ "$name" != "${{ matrix.plugin }}" ] && [ -f "$dir/version.php" ]; then
+              cp -r "$dir" "extra-plugins/$name"
+            fi
+          done
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ${{ matrix.extensions }}
+          ini-values: max_input_vars=5000, opcache.enable_cli=1
+          coverage: none
+
+      - name: Initialise moodle-plugin-ci
+        run: |
+          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
+          echo $(cd ci/bin; pwd) >> $GITHUB_PATH
+          echo $(cd ci/vendor/bin; pwd) >> $GITHUB_PATH
+          sudo locale-gen en_AU.UTF-8
+          echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
+
+      - name: Install moodle-plugin-ci
+        run: moodle-plugin-ci install --plugin ./code/${{ matrix.plugin }} --extra-plugins ./extra-plugins --db-host=127.0.0.1
+        env:
+          DB: ${{ matrix.database }}
+          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+
+      - name: PHP Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phplint
+
+      - name: PHP Mess Detector
+        continue-on-error: true # This step will show errors but will not fail
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpmd
+
+      - name: Moodle Code Checker
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpcs --max-warnings 0
+
+      - name: Moodle PHPDoc Checker
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpdoc --max-warnings 0
+
+      - name: Validating
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci validate
+
+      - name: Check upgrade savepoints
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci savepoints
+
+      - name: Mustache Lint
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci mustache
+
+      - name: Grunt
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci grunt --max-lint-warnings 0
+
+      - name: PHPUnit tests
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci phpunit --fail-on-warning
+
+      - name: Behat features
+        id: behat
+        if: ${{ !cancelled() }}
+        run: moodle-plugin-ci behat --profile chrome --scss-deprecations
+
+      - name: Upload Behat Faildump
+        if: ${{ failure() && steps.behat.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: Behat Faildump (${{ matrix.plugin }}, ${{ join(matrix.*, ', ') }})
+          path: ${{ github.workspace }}/moodledata/behat_dump
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Mark cancelled jobs as failed.
+        if: ${{ cancelled() }}
+        run: exit 1
