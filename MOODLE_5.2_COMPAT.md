@@ -1,11 +1,20 @@
 # Moodle 4.5 → 5.2 compatibility: findings and history
 
-One codebase, one branch (`main`), all four components currently
-declaring `$plugin->supported = [405, 502]` - 5.0 and 5.1 have since
-also been verified clean (see "5. Fresh install, Moodle 5.0 and 5.1,
-MariaDB" below) but that array has deliberately NOT been updated yet;
-whether/when to add 500 and 501 and resubmit all four components is a
-separate decision, not made here. This doc consolidates: a colleague's
+One codebase, one branch (`main`), all four components declaring
+`$plugin->supported = [405, 502]` - **this is already an inclusive
+range** ("4.5 through 5.2"), not a discrete list of individually-supported
+versions; Moodle core requires `supported` to be exactly a `[min, max]`
+pair (`lib/classes/plugininfo/base.php` throws a `coding_exception` -
+fatal for the whole site's plugin manager, not just this plugin - for
+anything else). A 2026-08-11 resubmission briefly changed this to
+`[405, 500, 501, 502]` on the mistaken belief that 500/501 needed to be
+added explicitly to be "included" - caught via a real `admin/cli/
+upgrade.php` run before it shipped, reverted back to `[405, 502]`, which
+was correct (and already covered 5.0/5.1) the whole time. 5.0 and 5.1
+have since also been verified clean (see "5. Fresh install, Moodle 5.0
+and 5.1, MariaDB" below), so the existing declaration's range is now
+fully backed by direct testing across its whole span, not just its two
+endpoints. This doc consolidates: a colleague's
 (Eric Davies) 4.5→5.2 developer notes, a cross-check against the official
 Moodle Marketplace plugin requirements page, and direct verification
 against this plugin's own code across five locally-run test environments
@@ -127,9 +136,14 @@ infrastructure) that the cross-database compatibility requirement is met.
 ### 5. Fresh install, Moodle 5.0 and 5.1, MariaDB
 
 The gap between the two versions actually tested above (4.5 and 5.2) -
-`$plugin->supported = [405, 502]` deliberately never claimed 5.0 or 5.1,
-since neither had been verified. Both now have been, in two fully
-isolated docker-compose stacks (own Moodle core checkout, own DB
+at the time, only the two endpoints of the `[405, 502]` range had been
+directly verified, so 5.0/5.1 were an unverified assumption riding along
+inside the declared range, not something the declaration could exclude on
+its own (see this doc's own top-of-file correction - `supported` is a
+`[min, max]` range, not a discrete list, so there was never a way to
+declare "4.5 and 5.2 but not 5.0/5.1" in the first place). Both are now
+directly verified too, in two fully isolated docker-compose stacks (own
+Moodle core checkout, own DB
 container, own ports - nothing shared with any other running
 environment), each torn down (containers, volumes, networks) once done.
 

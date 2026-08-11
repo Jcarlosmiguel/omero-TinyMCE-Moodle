@@ -29,7 +29,7 @@ $plugin->version   = 2026081000;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->release   = '1.0.1';
-$plugin->supported = [405, 500, 501, 502];
+$plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
 // embedding mechanism) and subject_repository.php (OMERO connections)

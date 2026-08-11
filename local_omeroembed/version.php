@@ -41,9 +41,33 @@ defined('MOODLE_INTERNAL') || die();
 // site-wide UNIQUE-on-embedid collision that would abort the whole course
 // restore when the original course still exists, e.g. "Duplicate this
 // course" - now defensively skipped instead). No schema changes.
-$plugin->version   = 2026081200;
+//
+// 2026081201: a pre-submission re-test run (real admin/cli/upgrade.php,
+// real Moodle Code Checker, real backup/restore round-trips against a
+// seeded course) caught a fatal bug in 2026081200 before it shipped:
+// $plugin->supported had been "bumped" to [405, 500, 501, 502], which
+// core rejects outright (supported must be a strict [min, max] pair, see
+// the comment on that line below) - upgrade.php threw a coding_exception
+// and would have broken plugin_manager for the whole site, not just this
+// plugin. Reverted to [405, 502], which was correct - and already
+// covered 5.0/5.1 - the whole time. Also fixes the resulting phpcs
+// findings in the new backup/restore classes and lang file (missing
+// one-line docblock summaries, a few line-length/comment-style issues,
+// and the new mtrace_* string keys' own alphabetical ordering) surfaced
+// by that same re-test pass.
+$plugin->version   = 2026081201;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.4.0';
+$plugin->release   = '1.4.1';
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->supported = [405, 500, 501, 502]; // One codebase, live-verified against 4.5-5.2 - see MOODLE_5.2_COMPAT.md.
+// Supported must be a strict [min, max] pair (core validates count()==2
+// in lib/classes/plugininfo/base.php - anything else throws a
+// coding_exception that breaks plugin_manager for the whole site, not just
+// this plugin) - it is already an INCLUSIVE RANGE, so [405, 502] means
+// "4.5 through 5.2", which already covered 5.0/5.1 all along. An earlier
+// version of this comment claimed [405, 500, 501, 502] was needed to
+// "include" 5.0/5.1 explicitly - that was wrong (confused this with a
+// discrete version list, which this field can't express) and is fatal;
+// caught via a real admin/cli/upgrade.php run. Now live-verified across
+// the whole range - see MOODLE_5.2_COMPAT.md.
+$plugin->supported = [405, 502];

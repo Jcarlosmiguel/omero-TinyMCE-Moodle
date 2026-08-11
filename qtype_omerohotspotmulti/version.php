@@ -29,7 +29,7 @@ $plugin->version   = 2026081000;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->release   = '1.0.1';
-$plugin->supported = [405, 500, 501, 502];
+$plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
 
 // A sibling of qtype_omerohotspot, not a mode of it - a click is correct
 // against ANY one of several teacher-marked regions instead of one single

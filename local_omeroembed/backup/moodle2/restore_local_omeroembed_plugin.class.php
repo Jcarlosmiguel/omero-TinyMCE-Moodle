@@ -55,13 +55,28 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     protected function define_course_plugin_structure() {
         $paths = [];
 
-        $paths[] = new restore_path_element('local_omeroembed_embed_tracking', $this->get_pathfor('/embed_trackings/embed_tracking'));
-        $paths[] = new restore_path_element('local_omeroembed_heatmap_frame', $this->get_pathfor('/heatmap_frames/heatmap_frame'));
+        $paths[] = new restore_path_element(
+            'local_omeroembed_embed_tracking',
+            $this->get_pathfor('/embed_trackings/embed_tracking')
+        );
+        $paths[] = new restore_path_element(
+            'local_omeroembed_heatmap_frame',
+            $this->get_pathfor('/heatmap_frames/heatmap_frame')
+        );
         $paths[] = new restore_path_element('local_omeroembed_hotspot', $this->get_pathfor('/hotspots/hotspot'));
-        $paths[] = new restore_path_element('local_omeroembed_hotspot_multi', $this->get_pathfor('/hotspot_multis/hotspot_multi'));
+        $paths[] = new restore_path_element(
+            'local_omeroembed_hotspot_multi',
+            $this->get_pathfor('/hotspot_multis/hotspot_multi')
+        );
         $paths[] = new restore_path_element('local_omeroembed_annotation', $this->get_pathfor('/annotations/annotation'));
-        $paths[] = new restore_path_element('local_omeroembed_view_sample', $this->get_pathfor('/view_samples/view_sample'));
-        $paths[] = new restore_path_element('local_omeroembed_hotspot_attempt', $this->get_pathfor('/hotspot_attempts/hotspot_attempt'));
+        $paths[] = new restore_path_element(
+            'local_omeroembed_view_sample',
+            $this->get_pathfor('/view_samples/view_sample')
+        );
+        $paths[] = new restore_path_element(
+            'local_omeroembed_hotspot_attempt',
+            $this->get_pathfor('/hotspot_attempts/hotspot_attempt')
+        );
         $paths[] = new restore_path_element(
             'local_omeroembed_hotspot_multi_attempt',
             $this->get_pathfor('/hotspot_multi_attempts/hotspot_multi_attempt')
@@ -71,6 +86,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_embed_tracking row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_embed_tracking($data) {
@@ -78,7 +95,7 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
 
         $data = (object) $data;
         if ($DB->record_exists('local_omeroembed_embed_tracking', ['embedid' => $data->embedid])) {
-            // embedid has a site-wide UNIQUE index (one tracking row per
+            // Embedid has a site-wide UNIQUE index (one tracking row per
             // embed placement) - see this class's own SCOPE NOTE for why it
             // is never remapped. Confirmed live: restoring/duplicating a
             // course whose original (still-present) copy has the same
@@ -97,6 +114,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_heatmap_frames row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_heatmap_frame($data) {
@@ -108,6 +127,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_hotspots row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_hotspot($data) {
@@ -129,6 +150,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_hotspot_multi row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_hotspot_multi($data) {
@@ -150,6 +173,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_annotations row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_annotation($data) {
@@ -166,6 +191,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_view_samples row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_view_sample($data) {
@@ -182,6 +209,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_hotspot_attempts row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_hotspot_attempt($data) {
@@ -198,6 +227,8 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     }
 
     /**
+     * Process one restored local_omeroembed_hotspot_multi_attempts row.
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_hotspot_multi_attempt($data) {
