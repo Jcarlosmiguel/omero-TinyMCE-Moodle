@@ -67,12 +67,32 @@ jobs:
         # strict CI checking - and matches the *official* moodle-plugin-ci
         # gha.dist.yml template, which likewise only tests 4.5 against PHP
         # 8.1-8.3, never 8.4. 8.3 is the real upper bound for 4.5 here.
+        #
+        # MOODLE_500_STABLE/MOODLE_501_STABLE: both declare PHP 8.2.0 as
+        # their own real minimum (each branch's own environment.xml,
+        # verified directly - see MOODLE_5.2_COMPAT.md). Whether they share
+        # 4.5's E_STRICT-on-8.4 issue or not was deliberately not assumed
+        # either way - both ends of the range are tested for real below and
+        # the matrix corrected from actual results if 8.4 turns out to
+        # break either branch the same way it does for 4.5.
         combo:
           - moodle-branch: 'MOODLE_405_STABLE'
             php: '8.1'
             database: pgsql
           - moodle-branch: 'MOODLE_405_STABLE'
             php: '8.3'
+            database: mariadb
+          - moodle-branch: 'MOODLE_500_STABLE'
+            php: '8.2'
+            database: mariadb
+          - moodle-branch: 'MOODLE_500_STABLE'
+            php: '8.4'
+            database: pgsql
+          - moodle-branch: 'MOODLE_501_STABLE'
+            php: '8.2'
+            database: pgsql
+          - moodle-branch: 'MOODLE_501_STABLE'
+            php: '8.4'
             database: mariadb
           - moodle-branch: 'MOODLE_502_STABLE'
             php: '8.3'
