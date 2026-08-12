@@ -58,12 +58,21 @@ jobs:
         # `combo` matrix dimension makes it a real second axis, so it
         # genuinely crosses against `plugin` (4 plugins x 4 combos = 16
         # jobs) - reference as matrix.combo.<key> throughout this file.
+        # PHP 8.4 is deliberately NOT paired with MOODLE_405_STABLE below -
+        # confirmed via a real failing run that Moodle 4.5 core itself
+        # (lib/setup.php, lib/phpunit/bootstrap.php) still references the
+        # PHP-8.4-deprecated E_STRICT constant, and moodle-plugin-ci's own
+        # phpunit installer treats any PHP deprecation notice as fatal.
+        # This isn't a plugin bug - it's core not being clean on 8.4 under
+        # strict CI checking - and matches the *official* moodle-plugin-ci
+        # gha.dist.yml template, which likewise only tests 4.5 against PHP
+        # 8.1-8.3, never 8.4. 8.3 is the real upper bound for 4.5 here.
         combo:
           - moodle-branch: 'MOODLE_405_STABLE'
             php: '8.1'
             database: pgsql
           - moodle-branch: 'MOODLE_405_STABLE'
-            php: '8.4'
+            php: '8.3'
             database: mariadb
           - moodle-branch: 'MOODLE_502_STABLE'
             php: '8.3'
