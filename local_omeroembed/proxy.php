@@ -1163,6 +1163,11 @@ function inject_annotation_script(
         'embedid' => $embedid,
         'sesskey' => sesskey(),
         'ajaxurl' => (new \moodle_url('/local/omeroembed/ajax.php'))->out(false),
+        // First slice of the ajax.php -> External Services migration
+        // (issue #8) - only the read-only 'list' call uses this so far,
+        // see js/annotate.js's init() and classes/external/
+        // get_annotations.php's own docblock for why.
+        'servicecallurl' => (new \moodle_url('/lib/ajax/service.php'))->out(false),
         'colours' => $annotationcolours,
         'strings' => [
             'placepin' => get_string('annotatetoolbar_point', 'local_omeroembed'),

@@ -86,6 +86,13 @@ service is contacted. There are three call sites:
 No data is sent to any service other than the administrator-configured
 OMERO server.
 
+*(Not to be confused with Moodle's own "External Services" (Web
+services) API, `db/services.php` - a different, unrelated meaning of
+"external" - that's an in-progress internal migration of `ajax.php`'s
+own endpoints onto Moodle's standard web-services layer, still entirely
+internal to this Moodle site; it has nothing to do with third-party
+services and isn't part of this section.)*
+
 ## Installing
 
 This plugin is one of four bundled together in a single repository - see

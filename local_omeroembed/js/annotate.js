@@ -218,6 +218,31 @@
         });
     }
 
+    // First slice of the ajax.php -> External Services migration (issue
+    // #8) - calls Moodle's real /lib/ajax/service.php endpoint directly
+    // (there's no core/ajax AMD module available here - see this file's
+    // own load context, proxy.php's reverse-proxied page has no Moodle
+    // AMD/RequireJS bootstrap at all). Only used for the one-time 'list'
+    // call in init() below; create/update/delete still go through the
+    // local ajax() helper above, unchanged.
+    function callService(methodname, args) {
+        var url = new URL(config.servicecallurl, window.location.href);
+        url.searchParams.set('sesskey', config.sesskey);
+        return fetch(url.toString(), {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify([{index: 0, methodname: methodname, args: args}])
+        }).then(function(r) {
+            return r.json();
+        }).then(function(responses) {
+            var response = responses[0];
+            if (response.error) {
+                throw response.exception || new Error('service call failed: ' + methodname);
+            }
+            return response.data;
+        });
+    }
+
     function resizeOverlay() {
         var rect = viewportEl.getBoundingClientRect();
         if (overlayCanvas.width !== rect.width || overlayCanvas.height !== rect.height) {
@@ -1347,10 +1372,21 @@
 
         buildToolbar();
 
-        ajax('list', {}, 'GET').then(function(existing) {
-            annotations = existing;
-            redraw();
-        });
+        callService('local_omeroembed_get_annotations', {courseid: config.courseid, embedid: config.embedid})
+            .then(function(existing) {
+                // Unlike the old ajax.php action=list response (which
+                // json_decode()s geometry server-side before sending),
+                // the service response leaves it as the raw JSON string
+                // from the DB column - see get_annotations::execute()'s
+                // own comment - so it's parsed back into an object here,
+                // once, at this one call site. Everything downstream
+                // (a.geometry.x/.rx/.points/etc.) is otherwise unchanged.
+                annotations = existing.map(function(a) {
+                    a.geometry = JSON.parse(a.geometry);
+                    return a;
+                });
+                redraw();
+            });
     }
 
     init();
