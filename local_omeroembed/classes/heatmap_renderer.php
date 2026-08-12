@@ -142,7 +142,7 @@ class heatmap_renderer {
      * Fetches an image's pixel dimensions from OMERO's webgateway.
      *
      * @param string $baseurl
-     * @param array{cookie: string, csrftoken: string} $session
+     * @param array $session {cookie: string, csrftoken: string} - as returned by omero_session::get_session().
      * @param int $imageid
      * @return array{width: int, height: int}|null
      */
@@ -162,7 +162,7 @@ class heatmap_renderer {
      * Issues an authenticated GET against OMERO using a captured session.
      *
      * @param string $url
-     * @param array{cookie: string, csrftoken: string} $session
+     * @param array $session {cookie: string, csrftoken: string} - as returned by omero_session::get_session().
      * @return string|null Response body, or null on any non-200/curl failure.
      */
     private static function curl_get(string $url, array $session): ?string {

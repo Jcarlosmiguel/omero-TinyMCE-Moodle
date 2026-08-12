@@ -219,7 +219,7 @@ function in_array_prefix(string $path, array $prefixes): bool {
  * response could resolve wrong.
  *
  * @param string $url
- * @param array{cookie: string, csrftoken: string} $session
+ * @param array $session {cookie: string, csrftoken: string} - as returned by omero_session::get_session().
  * @return array{status: int, contenttype: ?string, body: string, location: ?string}
  * @throws \moodle_exception On a curl-level failure (network/DNS/TLS).
  */
@@ -273,7 +273,7 @@ function fetch_from_omero(string $url, array $session): array {
  *   and a genuinely-missing image just 404s again on the retry, at the cost of
  *   one extra request only on a path that was already failing.
  *
- * @param array{status: int, location: ?string} $result
+ * @param array $result {status: int, location: ?string} - as returned by fetch_from_omero().
  * @return bool
  */
 function looks_like_stale_session(array $result): bool {
@@ -476,8 +476,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
         // Disabled for now - comparing raw, unmodified iviewer behaviour
         // across cases before deciding what (if anything) to fix here vs
         // upstream. inject_fit_padding_view_script() itself is untouched
-        // below, just not called.
-        // $rewritten = inject_fit_padding_view_script($rewritten);
+        // below, just not called from here.
         if ($heatmap) {
             // Its own mode, like $authoring - never combined with the
             // context-menu blocker/annotate/tracking scripts below.
@@ -738,7 +737,7 @@ function resolve_annotation_colours(): array {
  * combined CSS override is enough, no JS needed.
  *
  * @param string $body
- * @param array<string, bool> $hideflags Keyed the same as the class map below, resolved by the caller.
+ * @param array $hideflags string setting name => bool. Keyed the same as the class map below, resolved by the caller.
  * @return string
  */
 function inject_overlay_hide_css(string $body, array $hideflags): string {

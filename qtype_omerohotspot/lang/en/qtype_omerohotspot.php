@@ -24,6 +24,17 @@
 
 defined('MOODLE_INTERNAL') || die();
 
+$string['clickedat'] = 'Clicked at ({$a->x}, {$a->y})';
+$string['clickedinregion'] = 'Clicked inside the marked region';
+$string['clickedoutsideregion'] = 'Clicked outside the marked region';
+$string['currentanswer'] = 'Your answer: clicked at ({$a->x}, {$a->y})';
+$string['datasetidlabel'] = 'Dataset ID (optional)';
+$string['imageidlabel'] = 'Image ID';
+$string['loadslide'] = 'Load slide';
+$string['loadslidehelp'] = 'Choose a subject account and image, click "Load slide" below, then drag an ellipse or rectangle over the correct answer directly on the slide.';
+$string['missinggeometry'] = 'No correct-answer region has been drawn yet - load the slide below and drag out the correct region before saving.';
+$string['needscoursecontext'] = 'This question needs to be created inside a course (or activity) question bank - the slide preview needs a real course to check permissions against.';
+$string['pleaseclickimage'] = 'Please click a location on the image.';
 $string['pluginname'] = 'OMERO hotspot';
 $string['pluginname_help'] = 'The student answers by clicking directly on a whole-slide OMERO image - correct if the click lands inside a region you mark as the answer, which stays hidden from students at all times, including in review.';
 $string['pluginname_link'] = 'question/type/omerohotspot';
@@ -31,18 +42,5 @@ $string['pluginnameadding'] = 'Adding an OMERO hotspot question';
 $string['pluginnameediting'] = 'Editing an OMERO hotspot question';
 $string['pluginnamesummary'] = 'The student clicks a location on a whole-slide OMERO image; correct if the click lands inside a region the teacher marked as hidden and never revealed.';
 
-$string['imageidlabel'] = 'Image ID';
-$string['datasetidlabel'] = 'Dataset ID (optional)';
-$string['loadslide'] = 'Load slide';
-$string['loadslidehelp'] = 'Choose a subject account and image, click "Load slide" below, then drag an ellipse or rectangle over the correct answer directly on the slide.';
-$string['regionpreview'] = 'Correct answer region';
-$string['needscoursecontext'] = 'This question needs to be created inside a course (or activity) question bank - the slide preview needs a real course to check permissions against.';
-
-$string['clickedat'] = 'Clicked at ({$a->x}, {$a->y})';
-$string['currentanswer'] = 'Your answer: clicked at ({$a->x}, {$a->y})';
-$string['clickedinregion'] = 'Clicked inside the marked region';
-$string['clickedoutsideregion'] = 'Clicked outside the marked region';
-$string['pleaseclickimage'] = 'Please click a location on the image.';
-$string['missinggeometry'] = 'No correct-answer region has been drawn yet - load the slide below and drag out the correct region before saving.';
-
 $string['privacy:metadata'] = 'The OMERO hotspot question type does not store any personal data itself - a student\'s clicked coordinates and grade are recorded by Moodle\'s own question engine (question_attempt_step_data), already covered by that subsystem\'s own privacy provider.';
+$string['regionpreview'] = 'Correct answer region';

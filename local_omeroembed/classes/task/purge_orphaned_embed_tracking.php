@@ -94,7 +94,7 @@ class purge_orphaned_embed_tracking extends \core\task\scheduled_task {
         $checked = 0;
         foreach ($bycourse as $courseid => $rows) {
             if (!$DB->record_exists('course', ['id' => $courseid])) {
-                // observer::course_deleted() should already have caught
+                // Observer::course_deleted() should already have caught
                 // this course's rows - belt-and-braces only, in case some
                 // other deletion route didn't fire that event.
                 continue;
@@ -199,7 +199,13 @@ class purge_orphaned_embed_tracking extends \core\task\scheduled_task {
      * @param string $needle
      * @return bool
      */
-    private static function table_contains(string $table, string $coursecol, int $courseid, string $contentcol, string $needle): bool {
+    private static function table_contains(
+        string $table,
+        string $coursecol,
+        int $courseid,
+        string $contentcol,
+        string $needle
+    ): bool {
         global $DB;
 
         $select = "{$coursecol} = :courseid AND " . $DB->sql_like($contentcol, ':needle');
@@ -207,6 +213,8 @@ class purge_orphaned_embed_tracking extends \core\task\scheduled_task {
     }
 
     /**
+     * Builds the bound-parameter array for table_contains()'s LIKE query.
+     *
      * @param int $courseid
      * @param string $needle
      * @return array{courseid: int, needle: string}

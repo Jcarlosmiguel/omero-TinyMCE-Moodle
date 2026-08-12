@@ -24,8 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$string['pluginname'] = 'OMERO embed';
 $string['buttontitle'] = 'Insert OMERO slide';
-$string['omeroembed:embed'] = 'Insert an OMERO slide embed';
 $string['modaltitle'] = 'Insert an OMERO slide';
+$string['omeroembed:embed'] = 'Insert an OMERO slide embed';
+$string['pluginname'] = 'OMERO embed';
 $string['privacy:metadata'] = 'The OMERO embed TinyMCE plugin does not store any personal data itself - it has no database tables of its own, it only opens local_omeroembed\'s own authoring tool in a modal, and any actual data (embeds, annotations, tracking) belongs to that plugin\'s own privacy provider.';

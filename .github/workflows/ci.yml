@@ -25,7 +25,7 @@ jobs:
 
     services:
       postgres:
-        image: ${{ matrix.database == 'pgsql' && 'postgres:17' || '' }}
+        image: ${{ matrix.combo.database == 'pgsql' && 'postgres:17' || '' }}
         env:
           POSTGRES_USER: 'postgres'
           POSTGRES_HOST_AUTH_METHOD: 'trust'
@@ -34,7 +34,7 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
 
       mariadb:
-        image: ${{ matrix.database == 'mariadb' && 'mariadb:11' || '' }}
+        image: ${{ matrix.combo.database == 'mariadb' && 'mariadb:11' || '' }}
         env:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
           MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
@@ -47,7 +47,18 @@ jobs:
       fail-fast: false
       matrix:
         plugin: [local_omeroembed, tiny_omeroembed, qtype_omerohotspot, qtype_omerohotspotmulti]
-        include:
+        # A plain `include:` list here (with keys disjoint from `plugin`)
+        # does NOT cross-multiply against `plugin` - GitHub Actions only
+        # applies the *last* matching include entry to every combination,
+        # silently collapsing this to 4 jobs (one per plugin, all on the
+        # same single branch/php/db) instead of the intended 16. Confirmed
+        # via a real run: all 4 jobs came back MOODLE_BRANCH=MOODLE_502_
+        # STABLE, php 8.4 - the last entry in the old include list, and
+        # nothing else. Nesting the combinations as a single object-valued
+        # `combo` matrix dimension makes it a real second axis, so it
+        # genuinely crosses against `plugin` (4 plugins x 4 combos = 16
+        # jobs) - reference as matrix.combo.<key> throughout this file.
+        combo:
           - moodle-branch: 'MOODLE_405_STABLE'
             php: '8.1'
             database: pgsql
@@ -78,10 +89,10 @@ jobs:
             fi
           done
 
-      - name: Setup PHP ${{ matrix.php }}
+      - name: Setup PHP ${{ matrix.combo.php }}
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: ${{ matrix.combo.php }}
           extensions: ${{ matrix.extensions }}
           ini-values: max_input_vars=5000, opcache.enable_cli=1
           coverage: none
@@ -97,8 +108,12 @@ jobs:
       - name: Install moodle-plugin-ci
         run: moodle-plugin-ci install --plugin ./code/${{ matrix.plugin }} --extra-plugins ./extra-plugins --db-host=127.0.0.1
         env:
-          DB: ${{ matrix.database }}
-          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
+          DB: ${{ matrix.combo.database }}
+          # Bracket notation, not dot notation - matrix.combo.moodle-branch
+          # is ambiguous to the expressions parser (hyphen reads as
+          # subtraction) once it's nested two levels deep; this is the
+          # unambiguous form.
+          MOODLE_BRANCH: ${{ matrix.combo['moodle-branch'] }}
 
       - name: PHP Lint
         if: ${{ !cancelled() }}
@@ -146,7 +161,10 @@ jobs:
         if: ${{ failure() && steps.behat.outcome == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
-          name: Behat Faildump (${{ matrix.plugin }}, ${{ join(matrix.*, ', ') }})
+          # Explicit fields, not join(matrix.*, ...) - that expands to
+          # include the whole `combo` object now that it's nested, which
+          # doesn't stringify usefully.
+          name: Behat Faildump (${{ matrix.plugin }}, ${{ matrix.combo['moodle-branch'] }}, php${{ matrix.combo.php }}, ${{ matrix.combo.database }})
           path: ${{ github.workspace }}/moodledata/behat_dump
           retention-days: 7
           if-no-files-found: ignore
