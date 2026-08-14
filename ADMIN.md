@@ -104,6 +104,53 @@ This must be assigned at the **system context**, not a course or category
 - these are site-wide settings, and the check happens at system context
 specifically.
 
+## Restricting who sees the "OMERO embed" button in TinyMCE
+
+This plugin is a niche one - most teachers on a given site may never use
+it, so you may not want its button cluttering every TinyMCE toolbar. You
+already have three levers for this, all built on Moodle's own permission
+system - no plugin setting to configure.
+
+**The default**: the button is already teacher/manager-only. It's gated
+by a dedicated capability, `tiny/omeroembed:embed`, which by default is
+allowed only for the Teacher (editing) and Manager roles - students never
+see it, out of the box.
+
+**Narrowing to specific courses or categories**: `tiny/omeroembed:embed`
+is checked at the course-module context, so a permission override applied
+at a category or course context (that category/course's own
+**Permissions** page, or Site administration's own permissions screen for
+that context) hides the button everywhere below it, without touching the
+Teacher role site-wide. Useful for e.g. "only courses in the Pathology
+category should ever see this."
+
+**Narrowing to specific people**: the same pattern already used above for
+`local/omeroembed:managesettings` works here too, with one difference -
+this capability can be assigned at **system, category, or course**
+context (not system-only):
+
+1. Site administration > Users > Permissions > Define roles > Add a new
+   role, based on **"No roles"**.
+2. Set `tiny/omeroembed:embed` to **Allow**.
+3. Assign the new role to specific people, at whichever context is
+   appropriate - a whole category, one course, or site-wide.
+
+**Turning it off entirely**: if you want the button gone for absolutely
+everyone, including Managers, that's a plugin-level toggle rather than a
+permission - Site administration > Plugins > Text editors > TinyMCE
+editor > General settings lists every installed TinyMCE subplugin with
+an enable/disable switch; "OMERO embed" is one of them.
+
+**What restricting the button does and doesn't affect**: this only
+controls who can *author new* embeds via the toolbar. It has no effect on
+embeds already published - those keep rendering for every student exactly
+as before, regardless of who can currently see the authoring button. It's
+also cosmetic decluttering, not this plugin's actual security boundary:
+the authoring tool the button opens independently requires
+`moodle/course:manageactivities` regardless of `tiny/omeroembed:embed`,
+so there's no risk of under-restricting by adjusting this capability
+alone.
+
 ## Performance overhead
 
 Measured directly (2026-08-05, re-verified as still valid 2026-08-06 after
