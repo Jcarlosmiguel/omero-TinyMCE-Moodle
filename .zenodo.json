@@ -1,0 +1,27 @@
+{
+    "upload_type": "software",
+    "title": "omero-TinyMCE-Moodle: enrolment-gated OMERO slide embedding for Moodle",
+    "version": "1.4.1",
+    "language": "eng",
+    "access_right": "open",
+    "license": "gpl-3.0",
+    "creators": [
+        {
+            "name": "Miguel, J Carlos",
+            "orcid": "0000-0002-3371-5630",
+            "affiliation": "Glasgow Dental School, University of Glasgow"
+        }
+    ],
+    "keywords": [
+        "Moodle",
+        "OMERO",
+        "virtual microscopy",
+        "digital pathology",
+        "histology",
+        "TinyMCE",
+        "dental education",
+        "quiz question type",
+        "e-learning"
+    ],
+    "description": "<p>omero-TinyMCE-Moodle lets teachers embed enrolment-gated OMERO.iviewer whole-slide microscopy images directly into Moodle course content &mdash; Labels, Pages, Books, quiz questions, anywhere the normal Moodle content editor works &mdash; with no HTML or URL typing, no OMERO account for students, and no public/unauthenticated OMERO access.</p><p><strong>Why it was needed.</strong> The previous approach, OMERO's own public-account iframe embeds, meant anyone with the URL could view course slide material whether enrolled or not. This plugin reverse-proxies OMERO.iviewer through Moodle itself: every request re-checks the student's real Moodle session and course enrolment server-side, and no OMERO credentials, session cookies, or direct OMERO URLs are ever exposed to the browser.</p><ul><li><strong>No HTML or URLs to hand-type.</strong> A live, pannable/zoomable authoring tool generates ready-to-paste embed HTML.</li><li><strong>Multi-view slides.</strong> Select text in a write-up and insert a link that jumps the slide to a specific pan/zoom position.</li><li><strong>Click-to-answer hotspot questions,</strong> single- or multi-region, as both a standalone embed feature and two real graded Moodle quiz question types.</li><li><strong>Student point/shape annotations</strong> on an embed.</li><li><strong>A teacher-facing heatmap</strong> of where students actually looked, built from periodic viewport samples while tracking is on.</li><li><strong>Subject accounts</strong> (shared OMERO service-account credentials) are teacher-owned, not a site-wide admin setting, and encrypted at rest.</li></ul><p>Four components in one repository: <code>local_omeroembed</code> (the core plugin, works standalone), <code>tiny_omeroembed</code> (a TinyMCE editor button), and <code>qtype_omerohotspot</code>/<code>qtype_omerohotspotmulti</code> (quiz question types built on it). Reviewed and approved for the Moodle Plugins directory under Marketplace ticket MMR-101.</p><p>Developed at Glasgow Dental School, University of Glasgow, in support of the MVLS virtual microscopy teaching platform.</p>"
+}

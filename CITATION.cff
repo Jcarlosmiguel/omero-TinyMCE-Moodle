@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "omero-TinyMCE-Moodle"
+version: "1.4.1"
+date-released: "2026-08-12"
+authors:
+  - family-names: "Miguel"
+    given-names: "J Carlos"
+    orcid: "https://orcid.org/0000-0002-3371-5630"
+    affiliation: "Glasgow Dental School, University of Glasgow"
+license: "GPL-3.0-or-later"
+repository-code: "https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle"
+url: "https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle"
+abstract: "A four-component Moodle plugin suite (local_omeroembed, tiny_omeroembed, qtype_omerohotspot, qtype_omerohotspotmulti) that lets teachers embed enrolment-gated OMERO.iviewer whole-slide microscopy images directly into course content, with student annotations, click-to-answer hotspot quiz questions, and a teacher-facing view-activity heatmap - with no HTML or URL typing, no OMERO account for students, and no public/unauthenticated OMERO access."
+keywords:
+  - Moodle
+  - OMERO
+  - "virtual microscopy"
+  - "digital pathology"
+  - histology
+  - TinyMCE
+  - "dental education"
+  - "quiz question type"
+  - "e-learning"
