@@ -25,10 +25,13 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'qtype_omerohotspotmulti';
-$plugin->version   = 2026081000;
+// 2026081300 (1.0.2): patch only - lang.php re-sorted into strict
+// alphabetical order (phpcs LangFilesOrdering cleanup). Same string
+// keys, same string values, no behaviour change.
+$plugin->version   = 2026081300;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0.1';
+$plugin->release   = '1.0.2';
 $plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
 
 // A sibling of qtype_omerohotspot, not a mode of it - a click is correct

@@ -55,10 +55,20 @@ defined('MOODLE_INTERNAL') || die();
 // one-line docblock summaries, a few line-length/comment-style issues,
 // and the new mtrace_* string keys' own alphabetical ordering) surfaced
 // by that same re-test pass.
-$plugin->version   = 2026081201;
+// 2026081300 (1.5.0): first slice of issue #8 (Ajax -> External Services
+// migration) - the 'list' annotations action moves to a real
+// db/services.php + classes/external/get_annotations.php pair, called
+// from js/annotate.js via a hand-rolled fetch() (no core/ajax AMD module
+// available inside proxy.php's reverse-proxied, bootstrap-free OMERO
+// page). Minor bump, not a patch: genuinely new server-side capability,
+// not just a fix. The other 13 ajax.php actions are untouched - see
+// classes/external/get_annotations.php's own docblock for why 'list'
+// was chosen first (a real session write-lock regression risk found in
+// core source, not a guess).
+$plugin->version   = 2026081300;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.4.1';
+$plugin->release   = '1.5.0';
 $plugin->maturity  = MATURITY_STABLE;
 // Supported must be a strict [min, max] pair (core validates count()==2
 // in lib/classes/plugininfo/base.php - anything else throws a
