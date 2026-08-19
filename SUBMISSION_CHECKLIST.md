@@ -74,6 +74,35 @@ not just the working tree.**
   - Anything else: use judgement, but it must be a real execution
     against a real target, not a read-through.
 
+## Tag and GitHub Release (if this build gets one)
+
+- [ ] Tag pushed, GitHub Release created from it.
+- [ ] **Zenodo webhook actually fired - don't assume it did because the
+      Release page looks normal.** `gh api repos/<owner>/<repo>/hooks`
+      must return a non-empty array with a `zenodo.org` entry, and that
+      entry's `last_response` must show a real success code for the
+      `published` event, not `403` and not simply be absent. Two
+      independent failures have now happened this way, on two different
+      releases in a row, and **both looked completely normal on
+      GitHub** - no error, no warning, nothing to catch by reading the
+      Release page itself:
+  - **v1.5.0**: the webhook's token had expired/rotated Zenodo-side.
+    GitHub delivered the `published` event; Zenodo rejected it with
+    `403`. The webhook existed and looked fine in a casual glance -
+    only the delivery's own response code showed the failure.
+  - **v1.6.0**: the Zenodo integration had been switched off for the
+    repo entirely, so GitHub never even had a webhook to deliver to -
+    `gh api .../hooks` returned `[]`. No delivery, no error, nothing.
+  - **Recovery, both times**: fix it Zenodo-side first (re-enable the
+    GitHub integration for the repo / re-authorize), **then delete and
+    re-create the GitHub Release from the same tag** - never move or
+    re-create the tag itself. Zenodo archives on a `published` event
+    and never back-fills from history, so editing the existing
+    Release's title/notes achieves nothing; only a fresh publish fires
+    a new delivery. Confirm the fix the same way: re-check
+    `gh api .../hooks` and the new delivery's response code before
+    trusting it.
+
 ## Before uploading
 
 - [ ] Release notes are written, describe the actual diff (not last
@@ -118,3 +147,19 @@ caught by an actual execution:
 Static checks (lint, phpcs, code review) kept passing while real runs
 kept failing - three times in one week. This list exists so the next
 packaging run doesn't need a fourth incident to relearn the same lesson.
+
+Two more incidents, same pattern, different layer - the "static check"
+that kept passing wasn't a linter this time, it was the GitHub Release
+page itself looking normal:
+
+- **Zenodo webhook token expired/rotated** (v1.5.0) - the `published`
+  event was delivered and rejected with `403`. The Release existed, had
+  the right tag, the right notes - nothing about it suggested archival
+  had failed.
+- **Zenodo integration switched off entirely** (v1.6.0) - no webhook
+  existed at all, so no event was ever sent. Same outcome: a completely
+  normal-looking Release, silently not archived.
+
+Both needed the same real check to catch: querying the webhook and its
+actual delivery response, not reading the Release page - see "Tag and
+GitHub Release" above.
