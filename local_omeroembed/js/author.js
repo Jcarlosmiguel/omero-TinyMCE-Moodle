@@ -246,8 +246,25 @@
         return settings;
     }
 
-    /** @return {string} '', 'single', or 'multi' - see author.php's own $hotspotmode comment. */
+    /**
+     * @return {string} '', 'single', or 'multi' - see author.php's own
+     *                  $hotspotmode comment. Always '' unless the current
+     *                  layout is text-below, regardless of what the (now
+     *                  hidden, not reset) dropdown itself still says - this
+     *                  is the one place that rule is actually enforced, not
+     *                  just visually hidden. Deliberately not resetting the
+     *                  dropdown's own value when a teacher switches layout
+     *                  away from text-below: it comes back correctly if
+     *                  they switch back, rather than losing a choice just
+     *                  for exploring layouts. Every caller (generateEmbed(),
+     *                  applyHotspotModeUI(), the preview-reload logic below)
+     *                  goes through this function rather than reading the
+     *                  select directly, so the rule can't be half-applied.
+     */
     function currentHotspotMode() {
+        if (currentLayout() !== 'textbelow') {
+            return '';
+        }
         var select = document.querySelector('select[name="hotspotmode"]');
         return select ? select.value : '';
     }
@@ -288,6 +305,26 @@
         var insertBtn = document.getElementById('omero-insert-link-btn');
         var removeBtn = document.getElementById('omero-remove-link-btn');
         var iframeWrap = document.getElementById('omero-iframe-wrap');
+        // Defence in depth, not the actual fix: author.php now renders the
+        // layout radios themselves disabled until a slide is loaded (the
+        // real fix - a disabled radio can't fire a change event at all), so
+        // this should be unreachable in practice. Kept anyway in case that
+        // ever regresses - every element above lives inside author.php's own
+        // $hasslide-gated block, so all of them are null before a slide
+        // loads, and the old behaviour here was an uncaught exception on
+        // whichever line touched one first, not a clean no-op.
+        if (!pane || !writeup || !insertBtn || !removeBtn || !iframeWrap) {
+            return;
+        }
+
+        // Keeps the :empty::before placeholder (see author.php's own CSS
+        // rule and the div's initial data-placeholder, both near
+        // #omero-writeup) in sync with whichever layout is now current -
+        // doesn't matter that image-only never shows this box at all, the
+        // attribute is harmless either way.
+        writeup.dataset.placeholder = (layout === 'textbelow')
+            ? config.strings.questiontextplaceholder
+            : config.strings.writeupplaceholder;
 
         if (layout === 'imageonly') {
             writeup.style.display = 'none';
@@ -320,6 +357,21 @@
             iframeWrap.style.minWidth = '0';
             pane.style.flexDirection = layout === 'slideright' ? 'row-reverse' : 'row';
         }
+
+        // Hotspot mode only applies to the text-below layout (see
+        // author.php's own comment on #omero-hotspot-mode-wrap for why) -
+        // show/hide the control itself here, then re-run the two functions
+        // that depend on currentHotspotMode()'s resolved value (defined
+        // further below in this file - safe to call from here regardless of
+        // definition order, both are function declarations, not
+        // expressions, so they're hoisted) so the annotations checkbox and
+        // the live preview both catch up immediately, not just on the next
+        // time the dropdown itself happens to change.
+        if (hotspotModeWrap) {
+            hotspotModeWrap.style.display = (layout === 'textbelow') ? '' : 'none';
+        }
+        applyHotspotModeUI();
+        reloadPreviewForHotspotMode();
     }
 
     function insertViewLink() {
@@ -436,6 +488,27 @@
 
     function generateEmbed() {
         var layout = currentLayout();
+
+        // Every layout except image-only shows the write-up box (see
+        // author.php's own $writeupextrastyle) - blank is very likely an
+        // oversight rather than a deliberate choice in any of the other
+        // three, whether it's meant to hold a full write-up (slide-left/
+        // slide-right) or a short quiz-style question (text-below, see
+        // #omero-hotspot-mode-wrap's own comment for why that layout exists
+        // at all). .textContent, not .innerHTML - a contenteditable div
+        // that's visually empty can still contain a stray empty <p></p> or
+        // <br> depending on what the browser left behind after deleting
+        // everything, which .innerHTML would count as "not blank" but a
+        // reader would still see as empty.
+        if (layout !== 'imageonly') {
+            var writeupcheck = document.getElementById(config.writeupId);
+            if (writeupcheck && writeupcheck.textContent.trim() === '') {
+                window.alert(config.strings.needwriteuptext);
+                writeupcheck.focus();
+                return;
+            }
+        }
+
         // Escaped once here, reused everywhere below instead of the raw
         // values - see escapeHtmlAttr()'s own docblock for why every value
         // concatenated into this function's generated HTML goes through it,
@@ -626,6 +699,7 @@
     // generateEmbed() already relies on, so it can never go stale that
     // way again.
     var hotspotModeSelect = document.querySelector('select[name="hotspotmode"]');
+    var hotspotModeWrap = document.getElementById('omero-hotspot-mode-wrap');
     // proxy.php unconditionally forces enableannotations off on the actual
     // student-facing view whenever any hotspot mode is active (see its own
     // $hotspotoverridesstudentview comment - "no sensible way to want both
@@ -634,8 +708,15 @@
     // a teacher believe it's still an active, independent choice.
     var annotationsCheckbox = document.querySelector('input[type="checkbox"][name="enableannotations"]');
 
+    // "Active" goes through currentHotspotMode(), not hotspotModeSelect.value
+    // directly - the dropdown itself lives inside author.php's
+    // #omero-hotspot-mode-wrap, hidden (but not reset) by applyLayout()
+    // below whenever the layout isn't text-below, so its raw .value can
+    // still say 'single'/'multi' from before a teacher switched away. Going
+    // through currentHotspotMode() is what actually enforces "only applies
+    // to text-below" here too, not just in generateEmbed().
     function applyHotspotModeUI() {
-        var active = !!(hotspotModeSelect && hotspotModeSelect.value !== '');
+        var active = (currentHotspotMode() !== '');
         if (annotationsCheckbox) {
             annotationsCheckbox.disabled = active;
             if (active) {
@@ -644,39 +725,76 @@
         }
     }
 
+// Tracks what the live preview iframe's src was last actually built for,
+    // seeded from the page's own initial state right after applyHotspotModeUI()'s
+    // own first call below (the server already baked the correct
+    // enablehotspot(multi) params into that initial src from $hotspotmode -
+    // see author.php - so this starts in sync with it, not with a sentinel
+    // that would force a spurious reload the first time anything at all
+    // changes).
+    var lastAppliedHotspotMode = null;
+
+    /**
+     * Reloads the live preview iframe to match whatever currentHotspotMode()
+     * currently resolves to - '' (including "a mode is picked but the
+     * layout isn't text-below") reloads it back to a plain read-only
+     * preview; 'single'/'multi' reloads it into the drawing toolbar mode.
+     * Called both when the dropdown itself changes and when *any* layout
+     * change happens (applyLayout() calls this unconditionally, since
+     * switching to/from text-below is exactly the case that needs it) - but
+     * only actually reloads the iframe if the resolved mode genuinely
+     * changed, via lastAppliedHotspotMode above. Without that check, every
+     * layout switch would reload the preview even between two layouts that
+     * have nothing to do with hotspot mode at all (e.g. slide-left <->
+     * slide-right), losing whatever pan/zoom position the teacher had for
+     * no reason.
+     */
+    function reloadPreviewForHotspotMode() {
+        var mode = currentHotspotMode();
+        if (mode === lastAppliedHotspotMode) {
+            return;
+        }
+        lastAppliedHotspotMode = mode;
+
+        var previewIframe = document.getElementById(config.iframeId);
+        if (!previewIframe) {
+            return;
+        }
+        var url = new URL(config.baseProxyUrl, window.location.href);
+        var overlaySettings = currentOverlaySettings();
+        Object.keys(overlaySettings).forEach(function(key) {
+            url.searchParams.set(key, overlaySettings[key] ? '1' : '0');
+        });
+        url.searchParams.set('enablehotspot', mode === 'single' ? '1' : '0');
+        url.searchParams.set('enablehotspotmulti', mode === 'multi' ? '1' : '0');
+        url.searchParams.set('embedid', getOrMintAnnotateId());
+        if (mode !== '') {
+            // config.baseProxyUrl (the pristine, page-load base this
+            // reload is rebuilt from every time) never has this set on
+            // its own - the old two-checkbox version's own reload set
+            // it explicitly for exactly this reason, and this rewrite
+            // dropped it by mistake. Without it proxy.php has no way
+            // to know it should inject the drawing toolbar/overlay at
+            // all, so the preview looks like a plain read-only slide
+            // with no way to mark a region.
+            url.searchParams.set('authoring', '1');
+        }
+        previewIframe.src = url.toString();
+    }
+
     if (hotspotModeSelect) {
         // Runs once on page load too - editing an existing hotspot embed
         // should start with annotations already greyed out, not just
         // after the teacher next touches the dropdown.
         applyHotspotModeUI();
+        // Seeds lastAppliedHotspotMode (declared above reloadPreviewForHotspotMode())
+        // to match what the server already baked into the preview iframe's
+        // initial src, so the first real layout/dropdown change compares
+        // against the true starting state instead of an empty sentinel.
+        lastAppliedHotspotMode = currentHotspotMode();
         hotspotModeSelect.addEventListener('change', function() {
             applyHotspotModeUI();
-
-            var previewIframe = document.getElementById(config.iframeId);
-            if (!previewIframe) {
-                return;
-            }
-            var mode = hotspotModeSelect.value;
-            var url = new URL(config.baseProxyUrl, window.location.href);
-            var overlaySettings = currentOverlaySettings();
-            Object.keys(overlaySettings).forEach(function(key) {
-                url.searchParams.set(key, overlaySettings[key] ? '1' : '0');
-            });
-            url.searchParams.set('enablehotspot', mode === 'single' ? '1' : '0');
-            url.searchParams.set('enablehotspotmulti', mode === 'multi' ? '1' : '0');
-            url.searchParams.set('embedid', getOrMintAnnotateId());
-            if (mode !== '') {
-                // config.baseProxyUrl (the pristine, page-load base this
-                // reload is rebuilt from every time) never has this set on
-                // its own - the old two-checkbox version's own reload set
-                // it explicitly for exactly this reason, and this rewrite
-                // dropped it by mistake. Without it proxy.php has no way
-                // to know it should inject the drawing toolbar/overlay at
-                // all, so the preview looks like a plain read-only slide
-                // with no way to mark a region.
-                url.searchParams.set('authoring', '1');
-            }
-            previewIframe.src = url.toString();
+            reloadPreviewForHotspotMode();
         });
     }
 

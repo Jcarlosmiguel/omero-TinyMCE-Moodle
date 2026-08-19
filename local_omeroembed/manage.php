@@ -112,8 +112,13 @@ echo html_writer::empty_tag('input', [
 ]);
 echo html_writer::end_div();
 
-echo html_writer::tag('h3', get_string('overlaysheading', 'local_omeroembed'), ['style' => 'margin-top:2rem;']);
-echo html_writer::tag('p', get_string('overlaysheading_desc', 'local_omeroembed'), ['class' => 'text-muted']);
+// Only the overlay checkboxes, not the site-wide default width/height
+// added alongside them in settings.php's own same-named section - this
+// page deliberately exposes only a subset of the full admin form (see its
+// own file docblock), and size defaults are minor/cosmetic enough not to
+// be worth extending that subset for.
+echo html_writer::tag('h3', get_string('viewingoptionsheading', 'local_omeroembed'), ['style' => 'margin-top:2rem;']);
+echo html_writer::tag('p', get_string('viewingoptionsheading_desc', 'local_omeroembed'), ['class' => 'text-muted']);
 
 foreach ($overlaysettings as $setting) {
     echo html_writer::start_div('form-check', ['style' => 'margin-bottom: 0.75rem;']);

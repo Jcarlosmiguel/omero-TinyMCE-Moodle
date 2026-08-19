@@ -82,14 +82,17 @@ if ($hassiteconfig) {
     // the live viewer in a browser - not anything OMERO-specific.
     //
     // These are now just the *defaults* - author.php lets a teacher
-    // override any of them per embed (see that file's own overlaysheading
-    // fieldset and proxy.php's resolve_overlay_setting()). These settings
-    // still apply as-is to every embed generated before that existed, and
-    // seed the pre-checked state a teacher sees when building a new one.
+    // override any of them per embed (see that file's own
+    // #omero-viewingoptions-collapse section, renamed from its original
+    // "Embedded viewer overlays" once the size defaults below moved in
+    // alongside it, and proxy.php's resolve_overlay_setting()). These
+    // settings still apply as-is to every embed generated before that
+    // existed, and seed the pre-checked/pre-filled state a teacher sees
+    // when building a new one.
     $settings->add(new admin_setting_heading(
-        'local_omeroembed/overlaysheading',
-        get_string('overlaysheading', 'local_omeroembed'),
-        get_string('overlaysheading_desc', 'local_omeroembed')
+        'local_omeroembed/viewingoptionsheading',
+        get_string('viewingoptionsheading', 'local_omeroembed'),
+        get_string('viewingoptionsheading_desc', 'local_omeroembed')
     ));
 
     $settings->add(new admin_setting_configcheckbox(
@@ -144,6 +147,30 @@ if ($hassiteconfig) {
         get_string('showomerorois', 'local_omeroembed'),
         get_string('showomerorois_desc', 'local_omeroembed'),
         0
+    ));
+
+    // Same "just the default, teacher can still override" relationship to
+    // author.php's own width/height fields as every checkbox above has to
+    // its own - previously two hardcoded literals ('800px'/'500px') inside
+    // author.php itself with no admin control at all. PARAM_TEXT, not
+    // PARAM_INT, since these are genuine CSS length values (author.php
+    // already sanitises/escapes them at the point they're written into
+    // generated HTML - see escapeHtmlAttr() in js/author.js - not this
+    // setting's own job to restrict the format further).
+    $settings->add(new admin_setting_configtext(
+        'local_omeroembed/defaultwidth',
+        get_string('defaultwidth', 'local_omeroembed'),
+        get_string('defaultwidth_desc', 'local_omeroembed'),
+        '800px',
+        PARAM_TEXT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_omeroembed/defaultheight',
+        get_string('defaultheight', 'local_omeroembed'),
+        get_string('defaultheight_desc', 'local_omeroembed'),
+        '500px',
+        PARAM_TEXT
     ));
 
     // Off by default - see proxy.php's inject_contextmenu_blocker() for what

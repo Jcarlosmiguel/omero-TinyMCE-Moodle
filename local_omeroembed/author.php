@@ -73,6 +73,21 @@ if ($dataset === 0) {
 }
 $browsable = optional_param('browsable', 0, PARAM_BOOL);
 
+// Whether the option controls below (viewer display, annotations/hotspot,
+// colours) were actually interactive - not disabled - on the page that
+// produced whatever request this is. Real, load-bearing distinction, not
+// a nicety: a disabled form control is excluded from submission entirely
+// (standard browser behaviour), so the very first "Load slide" click
+// (submitted from a page where these were disabled, per $layoutdisabledattrs
+// further down) would otherwise silently lose every checkbox's true state -
+// only each one's non-disabled hidden "0" companion would survive, forcing
+// every overlay/colour setting to read back as "off" regardless of the
+// real site default. Rendered as a hidden field once $hasslide is known
+// (see the "Load slide" section below), read back here on the next
+// request to tell "genuinely submitted, trust it" apart from "was inert,
+// this submission's values for these fields are meaningless."
+$optionswereunlocked = (bool) optional_param('options_unlocked', 0, PARAM_BOOL);
+
 // Per-embed overrides of the site-wide overlay/annotation defaults (Site
 // administration > Plugins > Local plugins > OMERO slide embed) - null
 // means "not yet chosen" (first visit to this form), in which case the
@@ -90,7 +105,7 @@ foreach (
     'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
     ] as $key
 ) {
-    $submitted = optional_param($key, null, PARAM_BOOL);
+    $submitted = $optionswereunlocked ? optional_param($key, null, PARAM_BOOL) : null;
     $overlaysettings[$key] = $submitted ?? (bool) get_config('local_omeroembed', $key);
 }
 
@@ -148,9 +163,13 @@ $overlaysettings['enablehotspotmulti'] = ($hotspotmode === 'multi');
 // not per-checkbox) is what distinguishes "first visit, nothing chosen
 // yet" from "resubmitted with everything intentionally unchecked",
 // since a set of 8 individual null-vs-bool checks can't tell those apart
-// on its own the way a single boolean's null can.
+// on its own the way a single boolean's null can. Also gated on
+// $optionswereunlocked, same reasoning as $overlaysettings above - a
+// "submitted" request whose swatches were actually disabled at the time
+// carries no real information about what was checked, only the hidden
+// "0" companions each swatch also has.
 $coloursformsubmitted = optional_param('colours_submitted', 0, PARAM_BOOL);
-if ($coloursformsubmitted) {
+if ($coloursformsubmitted && $optionswereunlocked) {
     $overlaycolours = [];
     foreach (annotations_repository::COLOUR_PALETTE as $hex) {
         $overlaycolours[$hex] = (bool) optional_param('colour_' . strtolower(ltrim($hex, '#')), 0, PARAM_BOOL);
@@ -163,13 +182,49 @@ if ($coloursformsubmitted) {
     }
 }
 
+// Both the viewer-display checkboxes and the annotation colours are tucked
+// behind a collapsed-by-default toggle further down (see their own
+// html_writer::start_div(['class' => 'collapse ...']) calls) - most
+// teachers never touch either, so hiding them by default is a real win for
+// how much of this page fits on screen without scrolling. But this form is
+// reused for *editing* an already-generated embed too (reloading with the
+// embed's own stored params - see this file's own "reloading/bookmarking"
+// comment near $pageurl), not just building a brand new one - if a
+// previous teacher already moved either setting away from the site
+// default, defaulting to collapsed would hide that fact entirely, not just
+// declutter it. So: collapsed only when everything in that section still
+// matches the site default; expanded automatically the moment anything in
+// it doesn't, so an existing customisation is never silently out of view.
+$viewerdisplaycustomised = false;
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois'] as $key) {
+    if ($overlaysettings[$key] !== (bool) get_config('local_omeroembed', $key)) {
+        $viewerdisplaycustomised = true;
+        break;
+    }
+}
+$sitedefaultcolourset = annotations_repository::parse_colours((string) get_config('local_omeroembed', 'annotationcolours'));
+sort($sitedefaultcolourset);
+$currentcolourset = array_keys(array_filter($overlaycolours));
+sort($currentcolourset);
+$colourscustomised = ($currentcolourset !== $sitedefaultcolourset);
+
 $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
-// Default matches the actual measured width of this Moodle instance's own
-// content column (mod/page's #region-main, ~814px at a 1920px window) - NOT
-// "100%", which only reflects how wide THIS tool's own page happens to be,
-// not the much narrower column a Label/Page/Book will actually render the
-// final embed inside. This is a max-width on the preview/output, not a fixed
-// iframe width - see where it's used below.
+// Site-wide defaults (Site administration > Plugins > Local plugins >
+// OMERO slide embed > Viewing options - local_omeroembed/defaultwidth(height)),
+// same "just the starting point, teacher can still override per embed"
+// relationship as every overlay checkbox already has to its own site
+// setting. '800px'/'500px' here are only the last-resort fallback if the
+// config value itself is somehow missing or malformed - the real default
+// used to be these two literals hardcoded directly here with no admin
+// control at all.
+//
+// The site default's own original reasoning, still true: it matches the
+// actual measured width of this Moodle instance's own content column
+// (mod/page's #region-main, ~814px at a 1920px window) - NOT "100%", which
+// only reflects how wide THIS tool's own page happens to be, not the much
+// narrower column a Label/Page/Book will actually render the final embed
+// inside. This is a max-width on the preview/output, not a fixed iframe
+// width - see where it's used below.
 // PARAM_TEXT alone doesn't restrict format - both values end up
 // string-concatenated into the final generated embed HTML client-side
 // (js/author.js's generateEmbed(), which separately HTML-escapes them as
@@ -177,15 +232,34 @@ $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
 // Restricting to genuine CSS-length syntax here too, defense in depth:
 // closes the hole even if some future code path forgets to escape, and
 // rejects nonsensical values outright rather than accepting them and
-// producing a visibly broken embed.
+// producing a visibly broken embed. Applied to the config-sourced default
+// too, not just the submitted override - admin_setting_configtext doesn't
+// itself enforce CSS-length syntax, so a malformed site setting shouldn't
+// be able to reach generateEmbed() unvalidated either.
 $cssunitpattern = '/^\d+(\.\d+)?(px|%|em|rem|vh|vw)$/';
-$width = optional_param('width', '800px', PARAM_TEXT);
-if (!preg_match($cssunitpattern, $width)) {
-    $width = '800px';
+$defaultwidth = (string) get_config('local_omeroembed', 'defaultwidth');
+if (!preg_match($cssunitpattern, $defaultwidth)) {
+    $defaultwidth = '800px';
 }
-$height = optional_param('height', '500px', PARAM_TEXT);
+$width = optional_param('width', $defaultwidth, PARAM_TEXT);
+if (!preg_match($cssunitpattern, $width)) {
+    $width = $defaultwidth;
+}
+$defaultheight = (string) get_config('local_omeroembed', 'defaultheight');
+if (!preg_match($cssunitpattern, $defaultheight)) {
+    $defaultheight = '500px';
+}
+$height = optional_param('height', $defaultheight, PARAM_TEXT);
 if (!preg_match($cssunitpattern, $height)) {
-    $height = '500px';
+    $height = $defaultheight;
+}
+// Folded into the same $viewerdisplaycustomised flag computed above (that
+// comment's own reasoning applies identically here, now that width/height
+// live in the same collapsed-by-default section) - a size override is
+// exactly the kind of thing re-editing an existing embed shouldn't hide
+// behind a collapsed toggle either.
+if ($width !== $defaultwidth || $height !== $defaultheight) {
+    $viewerdisplaycustomised = true;
 }
 // Set only when re-opening an *existing* embed for editing (tiny_omeroembed's
 // ui.js reads it back from the wrapper's own data-omero-annotate-id - see
@@ -215,6 +289,23 @@ $PAGE->set_heading($course->fullname);
 
 $mysubjects = subject_repository::get_for_user($USER->id);
 $hasslide = ($subject !== '') && ($images !== '' || $dataset !== '');
+
+// Real, reported gap: clicking "Load slide" with a required field still
+// missing used to just reload this same page with nothing visibly
+// different - no error, no highlighted field, nothing to tell a teacher
+// why the preview never appeared. $coloursformsubmitted (computed above)
+// already distinguishes "form genuinely submitted" from "fresh page load,
+// nothing filled in yet" - reused here for the same reason it exists at
+// all, not colour-specific despite the name: it's a plain hidden field
+// present on every submission regardless of what else was filled in, so
+// it's already exactly the right submitted-vs-untouched signal this needs
+// too, without adding a second one that would have to be kept in sync.
+if ($coloursformsubmitted && !$hasslide) {
+    $missingmessage = ($subject === '')
+        ? get_string('needsubject', 'local_omeroembed')
+        : get_string('needimageordataset', 'local_omeroembed');
+    \core\notification::add($missingmessage, \core\output\notification::NOTIFY_ERROR);
+}
 
 $proxyurl = null;
 $iframename = '';
@@ -304,6 +395,9 @@ if ($hasslide) {
             'copied' => get_string('copied', 'local_omeroembed'),
             'openingviewset' => get_string('openingviewset', 'local_omeroembed'),
             'resetview' => get_string('resetview', 'local_omeroembed'),
+            'needwriteuptext' => get_string('needwriteuptext', 'local_omeroembed'),
+            'writeupplaceholder' => get_string('writeupplaceholder', 'local_omeroembed'),
+            'questiontextplaceholder' => get_string('questiontextplaceholder', 'local_omeroembed'),
         ],
     ];
     $PAGE->requires->js(new moodle_url('/local/omeroembed/js/author.js'));
@@ -315,6 +409,19 @@ echo html_writer::tag('p', get_string('authorintro', 'local_omeroembed'), ['clas
 
 // Setup form - always visible, pre-filled from the current GET params so
 // reloading/bookmarking the page with a slide already loaded works naturally.
+//
+// Section order below is deliberate, not just "load first because it looks
+// tidier": Load (this teacher's own action, always available) -> Layout
+// (how the embed is arranged - meaningless with no slide loaded to arrange,
+// see $hasslide's disabled-until-loaded handling below) -> Viewer display
+// (purely cosmetic on-image controls - safe to set any time, since they're
+// only ever read at "Generate embed HTML" time, not live) -> Interactive
+// features (annotations + hotspot, grouped together because they're the
+// same category of choice - "what can a student DO with this embed" - and
+// mutually interact, see the enableannotations/hotspotmode comment below;
+// annotation colours live inside this section too, as a sub-detail of
+// annotations rather than an unrelated top-level fieldset) -> Size (the
+// generated embed's own dimensions, unrelated to anything above it).
 echo html_writer::start_tag('form', ['method' => 'get', 'action' => $pageurl->out(false), 'id' => 'omero-setup-form']);
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'courseid', 'value' => $courseid]);
 if ($embedded) {
@@ -327,6 +434,22 @@ if ($embedded) {
     // direct insert - exactly the bug this fixes.
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'embedded', 'value' => 1]);
 }
+// Records whether the option controls further down are about to render
+// enabled or disabled (i.e. $hasslide, already known by this point) - read
+// back as $optionswereunlocked on the next request. See that variable's
+// own comment near the top of this file for why this exists: without it,
+// the very first "Load slide" submission (made while these were disabled)
+// would silently corrupt every overlay/colour setting back to "off".
+echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'options_unlocked', 'value' => $hasslide ? 1 : 0]);
+
+// Load section - first, not because "the button has to go somewhere" but
+// because it's the one thing here that's a genuine precondition for
+// everything below it: Layout and the hotspot mode dropdown only make
+// sense once there's an actual slide loaded to arrange/draw on (see their
+// own disabled-until-loaded handling below - this was a real, reported bug:
+// selecting either one before loading a slide either silently did nothing
+// or threw a JS error, because both try to live-update the preview iframe,
+// which doesn't exist in the page at all until $hasslide is true).
 echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-bottom: 1rem;']);
 
 // Values are local_omeroembed_subjects.id (a plain int, cast to string by
@@ -358,10 +481,34 @@ echo html_writer::tag(
     html_writer::checkbox('browsable', 1, (bool) $browsable, get_string('browsablelabel', 'local_omeroembed'))
 );
 
+// The actual submit button now lives here, right next to what it submits,
+// instead of at the bottom of the whole form below every option - a
+// teacher's very first action on this page is loading a slide, so that's
+// what's immediately in front of them, not something to scroll past three
+// fieldsets to find. It's still one GET form either way (see the class
+// docblock above): wherever the submit button sits, clicking it submits
+// every field currently set, including layout/overlay/hotspot/colour/size
+// choices made below it.
+echo html_writer::empty_tag('input', [
+    'type' => 'submit', 'value' => get_string('loadslide', 'local_omeroembed'), 'class' => 'btn btn-primary',
+]);
+
 echo html_writer::end_div();
 
+// Disabled (with an explanatory title) until a slide is actually loaded -
+// see this section's own opening comment for why: this is the one control
+// besides the hotspot dropdown below that tries to live-update the preview
+// iframe on change, which simply doesn't exist yet at this point.
+$layoutdisabledattrs = $hasslide ? [] : [
+    'disabled' => 'disabled',
+    'title' => get_string('optionsneedslide', 'local_omeroembed'),
+];
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('layoutlabel', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
+if (!$hasslide) {
+    echo html_writer::tag('p', get_string('optionsneedslide', 'local_omeroembed'),
+        ['class' => 'text-muted', 'style' => 'margin:0 0 0.5rem;']);
+}
 $layoutoptions = [
     'slideleft' => 'layoutslideleft',
     'slideright' => 'layoutslideright',
@@ -369,7 +516,7 @@ $layoutoptions = [
     'textbelow' => 'layouttextbelow',
 ];
 foreach ($layoutoptions as $value => $stringkey) {
-    $attrs = ['type' => 'radio', 'name' => 'layout', 'value' => $value];
+    $attrs = ['type' => 'radio', 'name' => 'layout', 'value' => $value] + $layoutdisabledattrs;
     if ($layout === $value) {
         $attrs['checked'] = 'checked';
     }
@@ -379,13 +526,56 @@ foreach ($layoutoptions as $value => $stringkey) {
         ['style' => 'margin-right: 1rem;']
     );
 }
+
+// Lives here, not in Interactive features below, because it only makes
+// sense for one specific layout: a hotspot region is meant to be answered
+// against a short instruction ("click the...") the same way a quiz
+// question would be, which is exactly what the text-below layout is - a
+// short prompt under the image, not a full write-up beside it. Hidden
+// (not just disabled) unless text-below is the current layout, both here
+// at initial render (avoids a flash of the wrong state before author.js
+// attaches, same reasoning as $panedirection/$iframewrapstyle above) and
+// via applyLayout() in js/author.js on every subsequent layout change.
+// currentHotspotMode() in that same file is the one place this rule is
+// actually enforced, not just hidden from view - see its own comment for
+// why hiding the control alone wouldn't have been enough.
+echo html_writer::start_div('', [
+    'id' => 'omero-hotspot-mode-wrap',
+    'style' => 'margin-top:0.75rem;' . ($layout === 'textbelow' ? '' : ' display:none;'),
+]);
+echo html_writer::tag(
+    'label',
+    get_string('hotspotmodelabel', 'local_omeroembed'),
+    ['style' => 'display:block;', 'for' => 'id_hotspotmode']
+);
+echo html_writer::select(
+    [
+        '' => get_string('hotspotmodenone', 'local_omeroembed'),
+        'single' => get_string('hotspotmodesingle', 'local_omeroembed'),
+        'multi' => get_string('hotspotmodemulti', 'local_omeroembed'),
+    ],
+    'hotspotmode',
+    $hotspotmode,
+    false,
+    ['id' => 'id_hotspotmode'] + $layoutdisabledattrs
+);
+echo html_writer::end_div();
 echo html_writer::end_tag('fieldset');
 
-// Per-embed overrides of the site-wide overlay/annotation defaults - see
-// $overlaysettings' own comment above for how these round-trip, and
-// proxy.php's resolve_overlay_setting() for how they're applied. Reuses
-// the exact same lang strings settings.php's own admin checkboxes use
-// (hideoverview, hideintensity, etc.) - one label, two places it's shown.
+// Purely cosmetic, on-image viewer controls - unlike Layout/hotspot mode
+// above/below, these never touch the live preview iframe on change, so
+// there's no correctness reason they couldn't stay usable before a slide
+// loads. Disabled anyway (same $layoutdisabledattrs as Layout above) -
+// not a bug fix, a deliberate workflow choice: keeping every option
+// inert until there's actually a slide to apply it to makes "load, then
+// configure" the only path through this page, rather than a correctness-
+// only subset of controls being disabled and the rest not, which reads as
+// arbitrary to a teacher who doesn't know which controls are iframe-live
+// and which aren't.
+//
+// Laid out as a wrapping row rather than one-per-line (the previous
+// arrangement) purely to save vertical space - same flex-wrap technique
+// the annotation colour swatches below already use, not a new pattern.
 //
 // html_writer::checkbox() emits a *plain* checkbox with no hidden
 // fallback (confirmed against core's own html_writer.php - unlike some
@@ -399,54 +589,139 @@ echo html_writer::end_tag('fieldset');
 // browser submits both in document order, PHP's superglobals keep
 // whichever came last: the hidden "0" if unchecked, the checkbox's own
 // "1" if checked) so the field is always present either way.
+// Shared by both collapse toggles below (this one and the annotation
+// colours one further down) - Bootstrap's own collapse JS (already loaded
+// site-wide with this theme, nothing extra needed here) toggles a
+// `collapsed` class on the trigger element itself, not just the collapsed
+// content, so a plain CSS rule off that class is enough to rotate the
+// chevron on open/close without writing any JS of our own.
+// Also carries the write-up placeholder rule (#omero-writeup, defined
+// further below) - a contenteditable div has no native placeholder
+// attribute the way <input>/<textarea> do, so :empty::before reading
+// data-placeholder (set server-side here and kept in sync by
+// applyLayout() in js/author.js on every layout change) is the standard
+// substitute. pointer-events:none so the placeholder text itself is never
+// what actually receives a click - clicking anywhere in the (empty) box
+// still focuses the real contenteditable element underneath it.
+echo html_writer::tag('style', '.omero-collapse-chevron { display:inline-block; transition: transform 0.15s ease; }'
+    . ' [data-toggle="collapse"].collapsed .omero-collapse-chevron { transform: rotate(-90deg); }'
+    . ' #omero-writeup:empty::before { content: attr(data-placeholder); color: #6a737b; font-style: italic; pointer-events: none; }');
+
+// Collapsed by default (see $viewerdisplaycustomised's own comment above
+// for why not always, and for the edit-an-existing-embed case it protects
+// against) - most teachers never touch any of these, so the checkbox grid
+// itself is hidden behind a plain Bootstrap collapse (native to this
+// theme, already loaded site-wide - no extra JS needed here) rather than
+// permanently taking up vertical space. The legend doubles as the toggle
+// button rather than sitting next to a separate one, so there's exactly
+// one obvious thing to click.
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
-echo html_writer::tag('legend', get_string('overlaysheading', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
-foreach (
-    [
-    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline',
-    'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
-    ] as $key
-) {
-    $style = ($key === 'enableannotations') ? 'display:block; margin-top:0.5rem;' : 'display:block;';
+echo html_writer::tag(
+    'legend',
+    html_writer::tag(
+        'button',
+        get_string('viewingoptionsheading', 'local_omeroembed') . ' ' .
+            html_writer::span('&#9662;', 'omero-collapse-chevron'),
+        [
+            'type' => 'button',
+            'class' => 'btn btn-link p-0' . ($viewerdisplaycustomised ? '' : ' collapsed'),
+            'style' => 'font-size:1rem; font-weight:bold; text-decoration:none; color:inherit;',
+            'data-toggle' => 'collapse',
+            'data-target' => '#omero-viewerdisplay-collapse',
+            'aria-expanded' => $viewerdisplaycustomised ? 'true' : 'false',
+            'aria-controls' => 'omero-viewerdisplay-collapse',
+        ]
+    ),
+    ['style' => 'font-size: 1rem;']
+);
+echo html_writer::start_div('collapse' . ($viewerdisplaycustomised ? ' show' : ''), ['id' => 'omero-viewerdisplay-collapse']);
+echo html_writer::start_div('', ['style' => 'display:flex; flex-wrap:wrap; gap:0.4rem 1.5rem; margin-top:0.5rem;']);
+foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois'] as $key) {
     echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $key, 'value' => 0]);
     echo html_writer::tag(
         'label',
-        html_writer::checkbox($key, 1, $overlaysettings[$key], get_string($key, 'local_omeroembed')),
-        ['style' => $style]
+        html_writer::checkbox($key, 1, $overlaysettings[$key], get_string($key, 'local_omeroembed'), $layoutdisabledattrs),
+        ['style' => 'white-space:nowrap;']
     );
 }
-// Single dropdown, not two independent checkboxes - see $hotspotmode's
-// own comment above for why. js/author.js greys out (and unchecks) the
-// annotations checkbox above whenever this isn't '', since proxy.php
-// itself always overrides annotations off while a hotspot mode is
-// active anyway (see its own $hotspotoverridesstudentview comment) -
-// this just makes the form honest about that rather than letting a
-// teacher believe both are active at once.
+echo html_writer::end_div();
+
+// Moved in from a standalone row outside any fieldset - genuinely the
+// same kind of "most teachers never touch this" setting as the checkboxes
+// above, now that both have a real site-wide default to start from (see
+// $defaultwidth/$defaultheight above) rather than these being the only
+// way to set a size at all. Disabled until a slide loads too, same
+// $layoutdisabledattrs as everything else here - unlike the checkboxes,
+// these are plain text inputs with no hidden-companion trick to protect,
+// so disabling them carries none of the submission-value-loss risk that
+// needed $optionswereunlocked for the checkboxes (a disabled text input
+// is simply absent from the request, which optional_param() already
+// treats as "use the default" - exactly the right fallback here).
+echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-top:0.75rem;']);
+echo html_writer::tag('label', get_string('widthlabel', 'local_omeroembed') . ' ' .
+    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'width', 'value' => $width,
+        'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs));
+echo html_writer::tag('label', get_string('heightlabel', 'local_omeroembed') . ' ' .
+    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'height', 'value' => $height,
+        'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs));
+echo html_writer::end_div();
+echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), [
+    'class' => 'text-muted', 'style' => 'margin:0.25rem 0 0;',
+]);
+
+echo html_writer::end_div();
+echo html_writer::end_tag('fieldset');
+
+// "What can a student DO with this embed" - just annotations now (colours
+// live here too, as a sub-detail rather than an unrelated top-level
+// fieldset of their own). Hotspot mode moved to the Layout fieldset above
+// (only meaningful for the text-below layout - see its own comment
+// there), but the two still interact exactly as before: js/author.js
+// greys out (and unchecks) this checkbox whenever a genuinely *active*
+// hotspot mode is selected (active meaning both a real mode chosen *and*
+// text-below still the current layout - see currentHotspotMode()'s own
+// comment), since proxy.php itself always overrides annotations off while
+// a hotspot mode is active anyway (see its own
+// $hotspotoverridesstudentview comment) - this just makes the form honest
+// about that rather than letting a teacher believe both are active at
+// once.
+echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
+echo html_writer::tag('legend', get_string('interactivefeaturesheading', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
+
+echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'enableannotations', 'value' => 0]);
 echo html_writer::tag(
     'label',
-    get_string('hotspotmodelabel', 'local_omeroembed'),
-    ['style' => 'display:block; margin-top:0.5rem;', 'for' => 'id_hotspotmode']
+    html_writer::checkbox('enableannotations', 1, $overlaysettings['enableannotations'],
+        get_string('enableannotations', 'local_omeroembed'), $layoutdisabledattrs),
+    ['style' => 'display:block;']
 );
-echo html_writer::select(
-    [
-        '' => get_string('hotspotmodenone', 'local_omeroembed'),
-        'single' => get_string('hotspotmodesingle', 'local_omeroembed'),
-        'multi' => get_string('hotspotmodemulti', 'local_omeroembed'),
-    ],
-    'hotspotmode',
-    $hotspotmode,
-    false,
-    ['id' => 'id_hotspotmode']
-);
-echo html_writer::end_tag('fieldset');
 
 // Same round-trip technique as the overlay fieldset above (hidden
 // companion per checkbox, since html_writer::checkbox() has none of its
 // own), plus one extra hidden field (colours_submitted) so a genuinely
 // empty selection can be told apart from "form never touched yet" - see
-// $overlaycolours' own comment above.
-echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
-echo html_writer::tag('legend', get_string('annotationcolours', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
+// $overlaycolours' own comment above. Disabled before a slide loads, same
+// $layoutdisabledattrs/workflow reasoning as the display fieldset above -
+// see the colour-cap script further below for the one place that
+// reasoning has a real consequence beyond styling. Collapsed by default too, same
+// $colourscustomised reasoning as $viewerdisplaycustomised above - the
+// swatches themselves are the second-biggest single space cost on this
+// page after the display checkboxes.
+echo html_writer::tag(
+    'button',
+    get_string('annotationcolours', 'local_omeroembed') . ' ' .
+        html_writer::span('&#9662;', 'omero-collapse-chevron'),
+    [
+        'type' => 'button',
+        'class' => 'btn btn-link p-0' . ($colourscustomised ? '' : ' collapsed'),
+        'style' => 'font-weight:bold; margin:0.75rem 0 0.25rem; text-decoration:none; color:inherit; display:block;',
+        'data-toggle' => 'collapse',
+        'data-target' => '#omero-colours-collapse',
+        'aria-expanded' => $colourscustomised ? 'true' : 'false',
+        'aria-controls' => 'omero-colours-collapse',
+    ]
+);
+echo html_writer::start_div('collapse' . ($colourscustomised ? ' show' : ''), ['id' => 'omero-colours-collapse']);
 echo html_writer::tag(
     'p',
     get_string('annotationcolours_desc', 'local_omeroembed', annotations_repository::MAX_COLOURS),
@@ -471,48 +746,45 @@ foreach (annotations_repository::get_colour_choices() as $hex => $label) {
     // reconstructed lowercase hex would silently fail to match.
     echo html_writer::tag(
         'label',
-        $swatch . html_writer::checkbox($paramname, 1, $overlaycolours[$hex], '', ['data-hex' => $hex]) . ' ' . s($label),
+        $swatch . html_writer::checkbox($paramname, 1, $overlaycolours[$hex], '', ['data-hex' => $hex] + $layoutdisabledattrs) . ' ' . s($label),
         ['style' => 'display:flex; align-items:center; white-space:nowrap;']
     );
 }
 echo html_writer::end_div();
-echo html_writer::end_tag('fieldset');
+echo html_writer::end_div();
 // The parse_colours() function (see its own docblock) already caps a submission at
 // MAX_COLOURS server-side, but silently, by truncating in palette order -
 // without this, a teacher could tick 6 boxes here, save, and have no idea
 // which 4 actually survived. Disabling the remaining unchecked boxes once
 // the cap is reached stops a 5th selection from ever being possible in the
 // first place, rather than accepting it and quietly dropping it later.
-echo html_writer::script(
-    'document.addEventListener("DOMContentLoaded", function() {'
-    . 'var container = document.getElementById("omero-annotation-colours");'
-    . 'if (!container) { return; }'
-    . 'var boxes = Array.prototype.slice.call(container.querySelectorAll("input[type=checkbox]"));'
-    . 'var max = ' . (int) annotations_repository::MAX_COLOURS . ';'
-    . 'function refresh() {'
-    . '  var checkedcount = boxes.filter(function(cb) { return cb.checked; }).length;'
-    . '  boxes.forEach(function(cb) { cb.disabled = !cb.checked && checkedcount >= max; });'
-    . '}'
-    . 'boxes.forEach(function(cb) { cb.addEventListener("change", refresh); });'
-    . 'refresh();'
-    . '});'
-);
+//
+// Only emitted once a slide is loaded - $layoutdisabledattrs already
+// disabled every one of these boxes server-side otherwise (see above), and
+// this script's own refresh() unconditionally sets .disabled based purely
+// on the cap count with no awareness of that - running it before a slide
+// loads would silently re-enable every box the moment DOMContentLoaded
+// fires, undoing the server-rendered disabled state before a teacher ever
+// touches anything.
+if ($hasslide) {
+    echo html_writer::script(
+        'document.addEventListener("DOMContentLoaded", function() {'
+        . 'var container = document.getElementById("omero-annotation-colours");'
+        . 'if (!container) { return; }'
+        . 'var boxes = Array.prototype.slice.call(container.querySelectorAll("input[type=checkbox]"));'
+        . 'var max = ' . (int) annotations_repository::MAX_COLOURS . ';'
+        . 'function refresh() {'
+        . '  var checkedcount = boxes.filter(function(cb) { return cb.checked; }).length;'
+        . '  boxes.forEach(function(cb) { cb.disabled = !cb.checked && checkedcount >= max; });'
+        . '}'
+        . 'boxes.forEach(function(cb) { cb.addEventListener("change", refresh); });'
+        . 'refresh();'
+        . '});'
+    );
+}
 
-echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-bottom: 1rem;']);
-echo html_writer::tag('label', get_string('widthlabel', 'local_omeroembed') . ' ' .
-    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'width', 'value' => $width,
-        'class' => 'form-control', 'style' => 'width:8em;']));
-echo html_writer::tag('label', get_string('heightlabel', 'local_omeroembed') . ' ' .
-    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'height', 'value' => $height,
-        'class' => 'form-control', 'style' => 'width:8em;']));
-echo html_writer::end_div();
-echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), [
-    'class' => 'text-muted', 'style' => 'margin-top:-0.5rem;',
-]);
+echo html_writer::end_tag('fieldset');
 
-echo html_writer::empty_tag('input', [
-    'type' => 'submit', 'value' => get_string('loadslide', 'local_omeroembed'), 'class' => 'btn btn-primary',
-]);
 echo html_writer::end_tag('form');
 
 if ($hasslide) {
@@ -591,9 +863,21 @@ if ($hasslide) {
         'id' => 'omero-iframe-wrap', 'style' => $iframewrapstyle,
     ]);
 
+    // Placeholder text (:empty::before, see the shared <style> block near
+    // the Layout fieldset above) so an empty write-up box doesn't just look
+    // like a blank rectangle - different wording for text-below (a short
+    // quiz-style question) vs slide-left/slide-right (a genuine write-up),
+    // matching whichever this teacher's *current* layout is. image-only
+    // never shows this box at all ($writeupextrastyle above), so it never
+    // needs a placeholder - left at the write-up wording as a harmless
+    // default rather than adding a third, pointless string for a state
+    // that's never visible.
     echo html_writer::div('', '', [
         'id' => 'omero-writeup',
         'contenteditable' => 'true',
+        'data-placeholder' => ($layout === 'textbelow')
+            ? get_string('questiontextplaceholder', 'local_omeroembed')
+            : get_string('writeupplaceholder', 'local_omeroembed'),
         'style' => 'flex:1; min-width:0; height:' . s($height) . '; border:1px solid #ccc; padding:0.5rem;'
             . ' box-sizing:border-box; overflow:auto;' . $writeupextrastyle,
     ]);
