@@ -84,8 +84,8 @@ $browsable = optional_param('browsable', 0, PARAM_BOOL);
 // every overlay/colour setting to read back as "off" regardless of the
 // real site default. Rendered as a hidden field once $hasslide is known
 // (see the "Load slide" section below), read back here on the next
-// request to tell "genuinely submitted, trust it" apart from "was inert,
-// this submission's values for these fields are meaningless."
+// request to tell "genuinely submitted, trust it" apart from "was
+// inert" (this submission's values for these fields are meaningless).
 $optionswereunlocked = (bool) optional_param('options_unlocked', 0, PARAM_BOOL);
 
 // Per-embed overrides of the site-wide overlay/annotation defaults (Site
@@ -506,8 +506,11 @@ $layoutdisabledattrs = $hasslide ? [] : [
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
 echo html_writer::tag('legend', get_string('layoutlabel', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
 if (!$hasslide) {
-    echo html_writer::tag('p', get_string('optionsneedslide', 'local_omeroembed'),
-        ['class' => 'text-muted', 'style' => 'margin:0 0 0.5rem;']);
+    echo html_writer::tag(
+        'p',
+        get_string('optionsneedslide', 'local_omeroembed'),
+        ['class' => 'text-muted', 'style' => 'margin:0 0 0.5rem;']
+    );
 }
 $layoutoptions = [
     'slideleft' => 'layoutslideleft',
@@ -605,7 +608,8 @@ echo html_writer::end_tag('fieldset');
 // still focuses the real contenteditable element underneath it.
 echo html_writer::tag('style', '.omero-collapse-chevron { display:inline-block; transition: transform 0.15s ease; }'
     . ' [data-toggle="collapse"].collapsed .omero-collapse-chevron { transform: rotate(-90deg); }'
-    . ' #omero-writeup:empty::before { content: attr(data-placeholder); color: #6a737b; font-style: italic; pointer-events: none; }');
+    . ' #omero-writeup:empty::before { content: attr(data-placeholder); color: #6a737b;'
+    . ' font-style: italic; pointer-events: none; }');
 
 // Collapsed by default (see $viewerdisplaycustomised's own comment above
 // for why not always, and for the edit-an-existing-embed case it protects
@@ -658,12 +662,14 @@ echo html_writer::end_div();
 // is simply absent from the request, which optional_param() already
 // treats as "use the default" - exactly the right fallback here).
 echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-top:0.75rem;']);
+$widthattrs = ['type' => 'text', 'name' => 'width', 'value' => $width,
+    'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs;
 echo html_writer::tag('label', get_string('widthlabel', 'local_omeroembed') . ' ' .
-    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'width', 'value' => $width,
-        'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs));
+    html_writer::empty_tag('input', $widthattrs));
+$heightattrs = ['type' => 'text', 'name' => 'height', 'value' => $height,
+    'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs;
 echo html_writer::tag('label', get_string('heightlabel', 'local_omeroembed') . ' ' .
-    html_writer::empty_tag('input', ['type' => 'text', 'name' => 'height', 'value' => $height,
-        'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs));
+    html_writer::empty_tag('input', $heightattrs));
 echo html_writer::end_div();
 echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), [
     'class' => 'text-muted', 'style' => 'margin:0.25rem 0 0;',
@@ -672,7 +678,7 @@ echo html_writer::tag('p', get_string('widthdesc', 'local_omeroembed'), [
 echo html_writer::end_div();
 echo html_writer::end_tag('fieldset');
 
-// "What can a student DO with this embed" - just annotations now (colours
+// What can a student DO with this embed - just annotations now (colours
 // live here too, as a sub-detail rather than an unrelated top-level
 // fieldset of their own). Hotspot mode moved to the Layout fieldset above
 // (only meaningful for the text-below layout - see its own comment
@@ -691,8 +697,13 @@ echo html_writer::tag('legend', get_string('interactivefeaturesheading', 'local_
 echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'enableannotations', 'value' => 0]);
 echo html_writer::tag(
     'label',
-    html_writer::checkbox('enableannotations', 1, $overlaysettings['enableannotations'],
-        get_string('enableannotations', 'local_omeroembed'), $layoutdisabledattrs),
+    html_writer::checkbox(
+        'enableannotations',
+        1,
+        $overlaysettings['enableannotations'],
+        get_string('enableannotations', 'local_omeroembed'),
+        $layoutdisabledattrs
+    ),
     ['style' => 'display:block;']
 );
 
@@ -744,9 +755,10 @@ foreach (annotations_repository::get_colour_choices() as $hex => $label) {
     // reads this back directly rather than reconstructing it from the name,
     // since COLOUR_PALETTE/parse_colours() are case-sensitive and a
     // reconstructed lowercase hex would silently fail to match.
+    $swatchattrs = ['data-hex' => $hex] + $layoutdisabledattrs;
     echo html_writer::tag(
         'label',
-        $swatch . html_writer::checkbox($paramname, 1, $overlaycolours[$hex], '', ['data-hex' => $hex] + $layoutdisabledattrs) . ' ' . s($label),
+        $swatch . html_writer::checkbox($paramname, 1, $overlaycolours[$hex], '', $swatchattrs) . ' ' . s($label),
         ['style' => 'display:flex; align-items:center; white-space:nowrap;']
     );
 }
