@@ -24,14 +24,29 @@ not just the working tree.**
 
 ## Build
 
-- [ ] Build the zip from the tagged commit, not the working tree:
-      `git archive --format=zip --prefix=local_omeroembed/ HEAD:local_omeroembed -o <path>/local_omeroembed-<release>-<build>.zip`
-      (swap the subdirectory/prefix for whichever component is being
-      packaged).
+- [ ] Build the zip from the tagged commit, not the working tree, with
+      the zip's internal top-level folder set to the plugin's **short**
+      name - the frankenstyle name (`local_omeroembed`) *minus* its type
+      prefix (`local_`), i.e. `omeroembed/`, not `local_omeroembed/`.
+      This is a real Marketplace validation failure, not a style
+      preference: it reconstructs the frankenstyle name from the known
+      listing type + the zip's own folder name and rejects the upload
+      ("The frankenstyle component name in the uploaded plugin does not
+      match") if the folder already has the type baked in. `version.php`'s
+      own `$plugin->component` stays the full frankenstyle name either
+      way (`local_omeroembed`) - only the zip's folder changes:
+      `git archive --format=zip --prefix=omeroembed/ HEAD:local_omeroembed -o <path>/local_omeroembed-<release>-<build>.zip`
+      (swap the subdirectory for whichever component is being packaged,
+      and the prefix for that component's own short name - `omeroembed`
+      for `tiny_omeroembed` too, `omerohotspot`/`omerohotspotmulti` for
+      the two qtypes, always the part after the type's own underscore).
 - [ ] **ZIP-matches-HEAD byte check**: extract the zip to a scratch dir
       and `diff -rq` it against `git show HEAD:<component>` (or the
-      working tree, if the working tree is confirmed clean and pushed).
-      Zero output required.
+      working tree, if the working tree is confirmed clean and pushed) -
+      compare the zip's `omeroembed/` (short-name) folder against the
+      repo's own `local_omeroembed/` (frankenstyle) folder; the names
+      differing is expected, only the *contents* need to match. Zero
+      output required.
 - [ ] Delete any previous zip for the same component sitting in the
       submission folder once the new one is confirmed good, so a stale
       build can't get uploaded by accident. Update `VERSION_INFO.txt`/
@@ -163,3 +178,19 @@ page itself looking normal:
 Both needed the same real check to catch: querying the webhook and its
 actual delivery response, not reading the Release page - see "Tag and
 GitHub Release" above.
+
+A fourth incident, this time in the checklist's own build command: the
+`git archive` command in "Build" above used `--prefix=local_omeroembed/`
+(the full frankenstyle name) from the day this list was first written,
+through every zip built this way since - including the one this exact
+list's own byte-check step passed clean, repeatedly, because content
+matching HEAD was never the problem. The Moodle Marketplace's real
+upload validator was the first thing to ever actually check the zip's
+own folder name against what it expects, and rejected it outright:
+*"The frankenstyle component name in the uploaded plugin does not
+match."* Fixed by using the plugin's short name (`omeroembed`, not
+`local_omeroembed`) as the zip's internal folder - `version.php`'s own
+`$plugin->component` was never wrong, only the zip's folder name was.
+Same lesson as every other entry here: a check that verifies the wrong
+property (byte-for-byte content, in this case) can pass cleanly forever
+while missing the actual failure mode entirely.
