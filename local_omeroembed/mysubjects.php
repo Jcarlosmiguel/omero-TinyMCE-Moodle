@@ -79,15 +79,13 @@ if ($delete && $confirm && confirm_sesskey()) {
     redirect($pageurl, get_string('subjectdeleted', 'local_omeroembed'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
-// PERFORMANCE: nothing past this point writes to $_SESSION - see
-// proxy.php's own write_close() comment. Deliberately placed *after* the
-// POST-handling above, not before it: redirect()'s $message argument
-// works by writing to $SESSION->notifications for the next page load
-// (see \core\notification::add()) - closing the session before that
-// write happens means it's silently discarded and the confirmation
-// message never appears on the page the user lands on. Confirmed as a
-// real regression the earlier, too-early placement introduced.
-\core\session\manager::write_close();
+// No write_close() here (removed) - unlike proxy.php's own tile-fetch
+// requests, nothing else is ever waiting concurrently on this page's
+// session lock, so there was never a real benefit to closing it early, only
+// a cost: Moodle's own $OUTPUT->header()/footer() genuinely do write to the
+// session-backed navigation/course-category caches while rendering, which a
+// premature write_close() here made illegal and produced a real, reported
+// "mutated the session after it was closed" debug warning on every load.
 
 if ($delete) {
     echo $OUTPUT->header();

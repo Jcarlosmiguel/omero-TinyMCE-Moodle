@@ -310,3 +310,42 @@ Resolved without needing further follow-up: the PHP 8.2-vs-8.3 figure
 - Filter class relocation to `classes/text_filter.php` — none are filter
   plugins.
 - `subplugins.json` format change — none of the four declare subplugins.
+
+## Moodle 5.3 (pre-release) — real testing, not yet a supported-version claim
+
+Tested 2026-09-23 against Moodle's own `main` development branch
+(self-labelled `5.3beta`, build `2026091600`) — no `MOODLE_503_STABLE`
+branch exists publicly yet (5.3 is an LTS release scheduled for
+2026-10-05, code-frozen since 2026-08-31, so this is genuinely the
+earliest real source available, not a guess at what 5.3 will contain, but
+also not a formal release-candidate build). `$plugin->supported` is
+**deliberately left at `[405, 502]`** below — nothing here claims 5.3
+support until it actually ships and this can be re-verified against a
+real stable/RC tag.
+
+**Real finding**: 5.3's own `admin/environment.xml` bumps the minimum
+MariaDB requirement to **11.4.0** (5.2 only required 10.11.0 — see the
+table above). PHP requirement unchanged at 8.3.0. Worth flagging to
+anyone running a production Moodle on an older MariaDB ahead of their own
+5.3 upgrade, independent of this plugin.
+
+**Verification actually run** (own isolated docker-compose stack, own
+`main`-branch checkout, own MariaDB 11.4 container, nothing shared with
+any other running environment, torn down once done — same discipline as
+every other version tested above):
+- Fresh install of all four components via a real
+  `admin/cli/install_database.php` run: clean, zero errors.
+- A real DEVELOPER-debug sweep (`author.php`, `manage.php`,
+  `mysubjects.php`, `heatmap.php`, a real course view) with
+  `debugdisplay` on: zero notices, warnings, deprecation messages, or
+  fatal errors across any page.
+- Two of this same release's own bug fixes (the re-edit
+  settings/colours round-trip, the Bootstrap-5 Load-slide button sizing
+  fix) independently re-verified live against this 5.3 checkout via real
+  authenticated requests, not assumed to carry over from the 4.5/5.2
+  testing above just because the code is shared.
+
+**Not yet done for 5.3** (unlike the 5.0-5.2 passes above): a real
+4.5→5.3 upgrade path against production-shaped data, and the PostgreSQL
+round trip. Worth repeating once a real stable/RC tag exists — `main` on
+any given day isn't a fixed target to keep re-testing against.

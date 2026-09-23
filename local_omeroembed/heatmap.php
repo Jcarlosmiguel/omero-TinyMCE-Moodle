@@ -20,9 +20,8 @@
  * chooses to track it via the Start/Stop tracking button below (moved off
  * author.php's tracking panel a while back, confirmed with the user:
  * author.php only ever links here). All of this page's own POST handling
- * (start/stop, delete) follows manage.php's own inline plain-form
- * convention, not ajax.php/JS - this page is plain server-rendered PHP
- * throughout.
+ * (start/stop, delete) is a plain inline form, not ajax.php/JS - this page
+ * is plain server-rendered PHP throughout.
  *
  * The actual density render happens inside an iframe pointing back at
  * proxy.php in its heatmap=1 mode (see that file's $heatmap and
@@ -43,6 +42,7 @@ require(__DIR__ . '/../../config.php');
 
 use local_omeroembed\tracking_repository;
 use local_omeroembed\heatmap_frame_repository;
+use local_omeroembed\heatmap_renderer;
 
 $courseid = required_param('courseid', PARAM_INT);
 $embedid = required_param('embedid', PARAM_ALPHANUMEXT);
@@ -168,16 +168,13 @@ if ($delete && $confirm && confirm_sesskey()) {
     );
 }
 
-// PERFORMANCE: nothing past this point writes to $_SESSION - see
-// proxy.php's own write_close() comment. Deliberately placed *after* all
-// the POST-handling above, not before it: redirect()'s $message argument
-// works by writing to $SESSION->notifications for the next page load
-// (see \core\notification::add()) - closing the session before that
-// write happens means it's silently discarded and the confirmation (or
-// refusal - see the "cannot delete while tracking" redirect just above)
-// never appears on the page the user lands on. Confirmed as a real
-// regression the earlier, too-early placement introduced.
-\core\session\manager::write_close();
+// No write_close() here (removed) - unlike proxy.php's own tile-fetch
+// requests, nothing else is ever waiting concurrently on this page's
+// session lock, so there was never a real benefit to closing it early, only
+// a cost: Moodle's own $OUTPUT->header()/footer() genuinely do write to the
+// session-backed navigation/course-category caches while rendering, which a
+// premature write_close() here made illegal and produced a real, reported
+// "mutated the session after it was closed" debug warning on every load.
 
 if ($delete) {
     echo $OUTPUT->header();
@@ -190,6 +187,44 @@ if ($delete) {
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('heatmaptitle', 'local_omeroembed'));
+
+// Real reported gap: this page had no way back to the authoring tool at
+// all, unlike mysubjects.php which already links back the same way (reuses
+// its 'backtoauthoring' string). $courseid is all that's guaranteed here
+// regardless of entry point (author.php's own "View heatmap" link, or
+// straight from a real embed's teacher-only link - see this file's own
+// docblock) - enough to land on the right course's authoring tool even
+// without a specific subject/image pre-loaded.
+$authorurl = new moodle_url('/local/omeroembed/author.php', ['courseid' => $courseid]);
+echo html_writer::link($authorurl, get_string('backtoauthoring', 'local_omeroembed'), [
+    'style' => 'display:inline-block; margin-bottom:1rem;',
+]);
+
+// Real gap found via user testing: the course name alone
+// ($PAGE->set_heading() above) doesn't say *which* embed within that
+// course this heatmap belongs to - with 2-8 slides typical per class, a
+// teacher with several tabs/tracked embeds open has no way to tell them
+// apart at a glance. Reuses heatmap_renderer::parse_sourceurl() (made
+// public specifically for this) rather than a second parser. Silently
+// skipped if parsing fails (e.g. a dataset-only/browsable embed with no
+// single fixed image) - same "don't show something you can't back up"
+// convention as the rest of this page.
+if ($settings['sourceurl'] !== '') {
+    $sourceparsed = heatmap_renderer::parse_sourceurl($settings['sourceurl']);
+    if ($sourceparsed) {
+        echo html_writer::tag('p', get_string('heatmapidentifier', 'local_omeroembed', (object) [
+            'subject' => s($sourceparsed['subject']),
+            'imageid' => $sourceparsed['imageid'],
+            // Short, not the full token - embedid is a long opaque
+            // UUID-like string, not meant to be read in full; this is
+            // only here so a teacher can tell two embeds of the *same*
+            // image apart (e.g. the same slide embedded twice in
+            // different layouts on the same page) - imageid alone can't
+            // do that, only embedid actually distinguishes placement.
+            'embedid' => substr($embedid, 0, 8),
+        ]), ['class' => 'text-muted', 'style' => 'margin-bottom:1rem;']);
+    }
+}
 
 if ($settings['sourceurl'] === '') {
     // Never bootstrapped (bookmarked/typed directly before any embed ever

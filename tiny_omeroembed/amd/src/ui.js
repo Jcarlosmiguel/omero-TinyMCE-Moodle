@@ -45,6 +45,17 @@ const MESSAGE_TYPE = 'omero-embed-html';
 const READY_MESSAGE_TYPE = 'omero-embed-ready';
 const WRITEUP_MESSAGE_TYPE = 'omero-embed-existing-writeup';
 
+// Real bug fixed by this flag: TinyMCE never disables a toolbar button
+// while its onAction is still pending (see commands.js's own onAction),
+// and Modal.create() below is async - two rapid clicks on the toolbar
+// button (easy to do if the modal takes a moment to visually appear) used
+// to fire handleAction() twice, each independently creating its own modal
+// instance, stacking one on top of the other. Confirmed live. Cleared in
+// cleanup() below, which already runs on both real exit paths (the
+// message handler's MESSAGE_TYPE branch, and ModalEvents.hidden), so a
+// second click is only ever blocked while a modal is genuinely still open.
+let modalOpen = false;
+
 // Matches author.php's own $overlaysettings key list (proxy.php's
 // resolve_overlay_setting() is the actual precedence logic - this file
 // only needs to round-trip whatever an existing embed already has).
@@ -171,6 +182,11 @@ const escapeEnclosingTable = (editor) => {
 };
 
 export const handleAction = async(editor) => {
+    if (modalOpen) {
+        return;
+    }
+    modalOpen = true;
+
     const contextId = getContextId(editor);
     const existingNode = editor.selection.getNode().closest('[data-omero-embed]');
     const existing = existingNode ? readExistingEmbed(existingNode) : null;
@@ -181,6 +197,16 @@ export const handleAction = async(editor) => {
     let iframeUrl = Config.wwwroot + '/local/omeroembed/author.php?contextid=' + contextId + '&embedded=1';
     if (existing) {
         const p = existing.params;
+        // Tells author.php's own $optionswereunlocked gate (see that file's
+        // comment on it) that the overlay/colour values below are real,
+        // already-saved state read straight out of this embed's own DOM -
+        // not values submitted from a disabled/inert form, which is the
+        // only other case that hidden field exists to distinguish. Without
+        // this, author.php discarded every forwarded overlay value and
+        // silently fell back to the site default on every re-edit -
+        // confirmed live as the actual cause of settings "not being
+        // remembered" when reopening an existing embed.
+        iframeUrl += '&options_unlocked=1';
         iframeUrl += '&subject=' + encodeURIComponent(p.subject)
             + '&images=' + encodeURIComponent(p.images)
             + '&dataset=' + encodeURIComponent(p.dataset)
@@ -203,13 +229,24 @@ export const handleAction = async(editor) => {
         }
     }
 
-    const modal = await Modal.create({
-        templateContext: {iframeurl: iframeUrl},
-    });
+    let modal;
+    try {
+        modal = await Modal.create({
+            templateContext: {iframeurl: iframeUrl},
+        });
+    } catch (e) {
+        // Real robustness gap otherwise: if Modal.create() itself ever
+        // rejects (a network hiccup fetching the modal template), nothing
+        // downstream would run cleanup() - modalOpen would stay true
+        // forever and the toolbar button would be permanently stuck.
+        modalOpen = false;
+        throw e;
+    }
 
     let messageListener = null;
 
     const cleanup = () => {
+        modalOpen = false;
         if (messageListener) {
             window.removeEventListener('message', messageListener);
             messageListener = null;

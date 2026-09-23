@@ -114,9 +114,23 @@
     function showNotice(viewportEl) {
         var notice = document.createElement('div');
         notice.id = 'omero-tracking-notice';
-        notice.style.cssText = 'position:absolute; bottom:0.5rem; left:0.5rem; z-index:1000; '
-            + 'background:rgba(0,0,0,0.65); color:#fff; font-size:0.75rem; padding:0.3rem 0.6rem; '
-            + 'border-radius:4px; font-family:sans-serif; pointer-events:none;';
+        // Bottom-centre, not bottom-left (real reported overlap: OMERO's
+        // own scale bar defaults to almost the exact same corner,
+        // bottom:8px;left:8px, vs. this notice's old bottom:0.5rem;
+        // left:0.5rem - designed to collide, not a coincidence).
+        // proxy.php's own inject_teacher_heatmap_link() already solved
+        // this same problem for the "View heatmap" pill - its own comment
+        // explains why bottom-centre is the one stretch of the bottom edge
+        // iviewer doesn't already use. Offset above that pill
+        // (bottom:2.5rem, not 0.5rem) rather than exactly on top of it -
+        // both can genuinely be visible to the same viewer at once (a
+        // teacher with viewheatmap looking at their own tracked embed).
+        // Also bumped for visibility (real feedback: "visibility/
+        // prominence could potentially be improved") - larger text, more
+        // opaque background, more padding, not a redesign.
+        notice.style.cssText = 'position:absolute; bottom:2.5rem; left:50%; transform:translateX(-50%); z-index:1000; '
+            + 'background:rgba(0,0,0,0.8); color:#fff; font-size:0.875rem; padding:0.5rem 0.9rem; '
+            + 'border-radius:4px; font-family:sans-serif; pointer-events:none; white-space:nowrap;';
         notice.textContent = config.noticeText;
         if (getComputedStyle(viewportEl).position === 'static') {
             viewportEl.style.position = 'relative';

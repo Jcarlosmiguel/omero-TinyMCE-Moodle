@@ -160,11 +160,25 @@
         }
         ctx.font = '12px sans-serif';
         var padding = 6;
+        var boxheight = 22;
         var width = ctx.measureText(text).width + padding * 2;
+        // Bottom-right, not top-left or bottom-left (real reported bug: a
+        // large sample count widened this box enough to sit on top of
+        // OMERO.iviewer's own zoom controls, top-left by default - see
+        // ol-zoom's own default CSS). Bottom-left was tried next but turned
+        // out to collide with iviewer's own scale bar, which also defaults
+        // there and isn't hidden for this heatmap-only view. Bottom-right is
+        // genuinely clear specifically on this page: unlike the real
+        // student-facing embed, heatmap.php's own view never injects the
+        // annotation/hotspot toolbar (see proxy.php's own $heatmap dispatch
+        // branch, which skips inject_annotation_script()/
+        // inject_hotspot_attempt_script() entirely for this mode).
+        var y = ctx.canvas.height - boxheight - 8;
+        var x = ctx.canvas.width - width - 8;
         ctx.fillStyle = 'rgba(0,0,0,0.65)';
-        ctx.fillRect(8, 8, width, 22);
+        ctx.fillRect(x, y, width, boxheight);
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(text, 8 + padding, 24);
+        ctx.fillText(text, x + padding, y + 16);
     }
 
     function redraw() {

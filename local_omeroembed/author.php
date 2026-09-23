@@ -56,11 +56,16 @@ $context = context_course::instance($courseid);
 
 require_login($course);
 require_capability('moodle/course:manageactivities', $context);
-// PERFORMANCE: nothing below writes to $_SESSION. This page's own live
-// preview iframe hits proxy.php on the same session concurrently with
-// this request - see proxy.php's own write_close() comment for why
-// holding the lock any longer than necessary matters.
-\core\session\manager::write_close();
+// No write_close() here (removed). The original rationale - the live
+// preview iframe's own concurrent proxy.php requests - doesn't actually
+// apply: the browser only starts loading that iframe's src once it has
+// received and begun parsing this page's own HTML, by which point this
+// script has already finished executing and would have released the lock
+// on its own in the normal case. What an early write_close() here actually
+// did was make it illegal for Moodle's own $OUTPUT->header()/footer() to
+// write to the session-backed navigation/course-category caches while
+// rendering, which they genuinely do - producing a real, reported "mutated
+// the session after it was closed" debug warning on every load.
 
 $subject = optional_param('subject', '', PARAM_ALPHANUMEXT);
 $images = optional_param('images', '', PARAM_SEQUENCE);
@@ -98,15 +103,28 @@ $optionswereunlocked = (bool) optional_param('options_unlocked', 0, PARAM_BOOL);
 // proxy.php's resolve_overlay_setting() for why that matters.
 // Rotate isn't included - always hidden, not a real choice (see
 // proxy.php's inject_overlay_hide_css() for why).
+//
+// Fixed literals, not a site setting any more (removed in 1.7.0 - see
+// settings.php's own comment on why) - these are the exact same values
+// that setting used to default to, preserving today's real out-of-the-box
+// behaviour for a new embed exactly, just no longer overridable site-wide.
+// A teacher can still change every one of these per embed below, same as
+// always - only the site-wide "starting point" is now fixed rather than
+// admin-configurable.
+$overlaydefaults = [
+    'hideoverview' => true,
+    'hideintensity' => true,
+    'hidefullscreen' => false,
+    'hidescaleline' => false,
+    'hidezoom' => false,
+    'hidenavbar' => true,
+    'showomerorois' => false,
+    'enableannotations' => false,
+];
 $overlaysettings = [];
-foreach (
-    [
-    'hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline',
-    'hidezoom', 'hidenavbar', 'showomerorois', 'enableannotations',
-    ] as $key
-) {
+foreach (array_keys($overlaydefaults) as $key) {
     $submitted = $optionswereunlocked ? optional_param($key, null, PARAM_BOOL) : null;
-    $overlaysettings[$key] = $submitted ?? (bool) get_config('local_omeroembed', $key);
+    $overlaysettings[$key] = $submitted ?? $overlaydefaults[$key];
 }
 
 // The enablehotspot/enablehotspotmulti settings are presented as a single dropdown
@@ -144,15 +162,12 @@ if ($hotspotmode === null) {
             $hotspotmode = '';
         }
     } else {
-        // Genuinely nothing submitted at all - fall back to the site-wide
-        // defaults, same as every other overlay setting above.
-        if ((bool) get_config('local_omeroembed', 'enablehotspotmulti')) {
-            $hotspotmode = 'multi';
-        } else if ((bool) get_config('local_omeroembed', 'enablehotspot')) {
-            $hotspotmode = 'single';
-        } else {
-            $hotspotmode = '';
-        }
+        // Genuinely nothing submitted at all, and no legacy params to
+        // recover from either - fixed default (removed as a site setting
+        // in 1.7.0, same reasoning as $overlaydefaults above): a hotspot
+        // question is deliberately opt-in per embed, so "None" is the only
+        // sensible starting point for a brand-new one.
+        $hotspotmode = '';
     }
 }
 $overlaysettings['enablehotspot'] = ($hotspotmode === 'single');
@@ -169,15 +184,32 @@ $overlaysettings['enablehotspotmulti'] = ($hotspotmode === 'multi');
 // carries no real information about what was checked, only the hidden
 // "0" companions each swatch also has.
 $coloursformsubmitted = optional_param('colours_submitted', 0, PARAM_BOOL);
+// Tiny_omeroembed's amd/src/ui.js forwards an existing embed's colours as
+// one combined comma-separated param when reopening it for editing - a
+// different wire format from this form's own colour_<hex> checkboxes below
+// (which only exist as separate params on a real form POST), so it needs
+// its own read and its own branch rather than falling through to the site
+// default. Real bug fixed here: before this param was read at all, every
+// re-edit silently lost its colour selection back to the site default,
+// confirmed live as one half of the "settings not remembered" report - see
+// $optionswereunlocked's own comment for the other half.
+$reeditcolours = optional_param('annotationcolours', null, PARAM_TEXT);
 if ($coloursformsubmitted && $optionswereunlocked) {
     $overlaycolours = [];
     foreach (annotations_repository::COLOUR_PALETTE as $hex) {
         $overlaycolours[$hex] = (bool) optional_param('colour_' . strtolower(ltrim($hex, '#')), 0, PARAM_BOOL);
     }
-} else {
-    $sitedefaultcolours = annotations_repository::parse_colours((string) get_config('local_omeroembed', 'annotationcolours'));
+} else if ($reeditcolours !== null && $optionswereunlocked) {
     $overlaycolours = array_fill_keys(annotations_repository::COLOUR_PALETTE, false);
-    foreach ($sitedefaultcolours as $hex) {
+    foreach (annotations_repository::parse_colours($reeditcolours) as $hex) {
+        $overlaycolours[$hex] = true;
+    }
+} else {
+    // Fixed default (removed as a site setting in 1.7.0, same reasoning as
+    // $overlaydefaults above) - annotations_repository::DEFAULT_COLOURS
+    // is the exact same set that setting used to default to.
+    $overlaycolours = array_fill_keys(annotations_repository::COLOUR_PALETTE, false);
+    foreach (annotations_repository::DEFAULT_COLOURS as $hex) {
         $overlaycolours[$hex] = true;
     }
 }
@@ -197,28 +229,24 @@ if ($coloursformsubmitted && $optionswereunlocked) {
 // it doesn't, so an existing customisation is never silently out of view.
 $viewerdisplaycustomised = false;
 foreach (['hideoverview', 'hideintensity', 'hidefullscreen', 'hidescaleline', 'hidezoom', 'hidenavbar', 'showomerorois'] as $key) {
-    if ($overlaysettings[$key] !== (bool) get_config('local_omeroembed', $key)) {
+    if ($overlaysettings[$key] !== $overlaydefaults[$key]) {
         $viewerdisplaycustomised = true;
         break;
     }
 }
-$sitedefaultcolourset = annotations_repository::parse_colours((string) get_config('local_omeroembed', 'annotationcolours'));
+$sitedefaultcolourset = annotations_repository::DEFAULT_COLOURS;
 sort($sitedefaultcolourset);
 $currentcolourset = array_keys(array_filter($overlaycolours));
 sort($currentcolourset);
 $colourscustomised = ($currentcolourset !== $sitedefaultcolourset);
 
 $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
-// Site-wide defaults (Site administration > Plugins > Local plugins >
-// OMERO slide embed > Viewing options - local_omeroembed/defaultwidth(height)),
-// same "just the starting point, teacher can still override per embed"
-// relationship as every overlay checkbox already has to its own site
-// setting. '800px'/'500px' here are only the last-resort fallback if the
-// config value itself is somehow missing or malformed - the real default
-// used to be these two literals hardcoded directly here with no admin
-// control at all.
+// Fixed literals, not a site setting any more (removed in 1.7.0, same
+// reasoning as $overlaydefaults above) - '800px'/'500px' are the exact
+// values that setting used to default to. A teacher can still override
+// either per embed below, same as always.
 //
-// The site default's own original reasoning, still true: it matches the
+// The default's own original reasoning, still true: it matches the
 // actual measured width of this Moodle instance's own content column
 // (mod/page's #region-main, ~814px at a 1920px window) - NOT "100%", which
 // only reflects how wide THIS tool's own page happens to be, not the much
@@ -229,26 +257,16 @@ $layout = optional_param('layout', 'slideleft', PARAM_ALPHA);
 // string-concatenated into the final generated embed HTML client-side
 // (js/author.js's generateEmbed(), which separately HTML-escapes them as
 // the actual fix for that - see its own escapeHtmlAttr() docblock).
-// Restricting to genuine CSS-length syntax here too, defense in depth:
-// closes the hole even if some future code path forgets to escape, and
-// rejects nonsensical values outright rather than accepting them and
-// producing a visibly broken embed. Applied to the config-sourced default
-// too, not just the submitted override - admin_setting_configtext doesn't
-// itself enforce CSS-length syntax, so a malformed site setting shouldn't
-// be able to reach generateEmbed() unvalidated either.
+// Restricting to genuine CSS-length syntax here too, defense in depth -
+// rejects a nonsensical submitted override outright rather than accepting
+// it and producing a visibly broken embed.
 $cssunitpattern = '/^\d+(\.\d+)?(px|%|em|rem|vh|vw)$/';
-$defaultwidth = (string) get_config('local_omeroembed', 'defaultwidth');
-if (!preg_match($cssunitpattern, $defaultwidth)) {
-    $defaultwidth = '800px';
-}
+$defaultwidth = '800px';
 $width = optional_param('width', $defaultwidth, PARAM_TEXT);
 if (!preg_match($cssunitpattern, $width)) {
     $width = $defaultwidth;
 }
-$defaultheight = (string) get_config('local_omeroembed', 'defaultheight');
-if (!preg_match($cssunitpattern, $defaultheight)) {
-    $defaultheight = '500px';
-}
+$defaultheight = '500px';
 $height = optional_param('height', $defaultheight, PARAM_TEXT);
 if (!preg_match($cssunitpattern, $height)) {
     $height = $defaultheight;
@@ -334,8 +352,8 @@ if ($hasslide) {
     }
     // Always baked in explicitly too - a comma-separated hex list,
     // re-validated/capped through parse_colours() rather than trusted
-    // as-is (a teacher's own browser is no more trusted here than
-    // manage.php's equivalent submission is).
+    // as-is - a teacher's own browser is never trusted server-side,
+    // regardless of what this form's own JS already enforces client-side.
     $selectedcolours = array_keys(array_filter($overlaycolours));
     $proxyparams['annotationcolours'] = implode(',', annotations_repository::parse_colours(implode(',', $selectedcolours)));
     $proxyurl = new moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$subject}", $proxyparams);
@@ -406,6 +424,15 @@ if ($hasslide) {
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('authortitle', 'local_omeroembed'));
 echo html_writer::tag('p', get_string('authorintro', 'local_omeroembed'), ['class' => 'text-muted']);
+// Target="_blank" - same reasoning as the "Manage your OMERO connections"
+// link below: this page is often reached while author.php itself is
+// loaded inside the TinyMCE modal's iframe, and a plain link there would
+// navigate that same iframe away, discarding whatever's already been
+// picked/typed in the form.
+$guideurl = new moodle_url('/local/omeroembed/guide.php', ['courseid' => $courseid]);
+echo html_writer::link($guideurl, get_string('guidelink', 'local_omeroembed'), [
+    'target' => '_blank', 'rel' => 'noopener', 'style' => 'display:inline-block; margin-bottom:1rem;',
+]);
 
 // Setup form - always visible, pre-filled from the current GET params so
 // reloading/bookmarking the page with a slide already loaded works naturally.
@@ -450,7 +477,17 @@ echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'options_unl
 // selecting either one before loading a slide either silently did nothing
 // or threw a JS error, because both try to live-update the preview iframe,
 // which doesn't exist in the page at all until $hasslide is true).
-echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-bottom: 1rem;']);
+// Plain inline flexbox, not Bootstrap's .form-group/.row grid classes -
+// matching the convention every other row in this file already uses (see
+// e.g. the width/height row below, or heatmap.php's own forms).
+// Real bug fixed here: Bootstrap 5 (Moodle 5.1+) applies width:100% to
+// EVERY direct child of .row via its own `.row > *` rule, regardless of
+// whether that child has a .col-* class - Bootstrap 4 (Moodle 4.5) never
+// did this. That silently stretched this row's submit button (and every
+// other child) to full width on 5.x, reported as "the Load slide button is
+// huge" on Moodle 5.2. The hand-rolled flex style below has no such
+// version-dependent behaviour.
+echo html_writer::start_div('', ['style' => 'display:flex; align-items:flex-end; flex-wrap:wrap; gap: 1rem; margin-bottom: 1rem;']);
 
 // Values are local_omeroembed_subjects.id (a plain int, cast to string by
 // html_writer::select()) - not the display name. Only this teacher's own
@@ -463,10 +500,23 @@ foreach ($mysubjects as $mysubject) {
     $subjectoptions[$mysubject->id] = $mysubject->name;
 }
 echo html_writer::tag('label', get_string('subjectlabel', 'local_omeroembed') . ' ' .
-    html_writer::select($subjectoptions, 'subject', $subject, null));
+    html_writer::select($subjectoptions, 'subject', $subject, null))
+    . $OUTPUT->help_icon('subjectlabel', 'local_omeroembed');
 
+// Target="_blank" - real reported confusion: this page is often reached
+// while author.php itself is loaded inside the TinyMCE modal's iframe, and
+// a plain link there navigates that same iframe away to mysubjects.php (a
+// full CRUD management page, not anything designed to sit inside a modal),
+// discarding whatever the teacher had already picked/typed in the
+// authoring form. Opening in a new tab keeps the in-progress form intact
+// either way - inside the modal or on author.php's standalone course-page
+// entry point - and needs no special "modal-aware" version of mysubjects.php.
 $mysubjectsurl = new moodle_url('/local/omeroembed/mysubjects.php', ['courseid' => $courseid]);
-echo html_writer::link($mysubjectsurl, get_string('managesubjectslink', 'local_omeroembed'), ['style' => 'margin-left:0.5rem;']);
+echo html_writer::link(
+    $mysubjectsurl,
+    get_string('managesubjectslink', 'local_omeroembed'),
+    ['style' => 'margin-left:0.5rem;', 'target' => '_blank', 'rel' => 'noopener']
+);
 
 echo html_writer::tag('label', get_string('imageidlabel', 'local_omeroembed') . ' ' .
     html_writer::empty_tag('input', ['type' => 'text', 'name' => 'images', 'value' => $images,
@@ -504,7 +554,11 @@ $layoutdisabledattrs = $hasslide ? [] : [
     'title' => get_string('optionsneedslide', 'local_omeroembed'),
 ];
 echo html_writer::start_tag('fieldset', ['style' => 'margin-bottom: 1rem;']);
-echo html_writer::tag('legend', get_string('layoutlabel', 'local_omeroembed'), ['style' => 'font-size: 1rem;']);
+echo html_writer::tag(
+    'legend',
+    get_string('layoutlabel', 'local_omeroembed') . $OUTPUT->help_icon('layoutlabel', 'local_omeroembed'),
+    ['style' => 'font-size: 1rem;']
+);
 if (!$hasslide) {
     echo html_writer::tag(
         'p',
@@ -548,7 +602,7 @@ echo html_writer::start_div('', [
 ]);
 echo html_writer::tag(
     'label',
-    get_string('hotspotmodelabel', 'local_omeroembed'),
+    get_string('hotspotmodelabel', 'local_omeroembed') . $OUTPUT->help_icon('hotspotmodelabel', 'local_omeroembed'),
     ['style' => 'display:block;', 'for' => 'id_hotspotmode']
 );
 echo html_writer::select(
@@ -661,7 +715,10 @@ echo html_writer::end_div();
 // needed $optionswereunlocked for the checkboxes (a disabled text input
 // is simply absent from the request, which optional_param() already
 // treats as "use the default" - exactly the right fallback here).
-echo html_writer::start_div('form-group row align-items-end', ['style' => 'gap: 1rem; margin-top:0.75rem;']);
+// Same fix, same reason as the Load-slide row above - plain flex instead
+// of Bootstrap's .row, which stretches every direct child to width:100% on
+// Bootstrap 5 (Moodle 5.1+) with no .col-* class to opt out.
+echo html_writer::start_div('', ['style' => 'display:flex; align-items:flex-end; flex-wrap:wrap; gap: 1rem; margin-top:0.75rem;']);
 $widthattrs = ['type' => 'text', 'name' => 'width', 'value' => $width,
     'class' => 'form-control', 'style' => 'width:8em;'] + $layoutdisabledattrs;
 echo html_writer::tag('label', get_string('widthlabel', 'local_omeroembed') . ' ' .
@@ -842,6 +899,16 @@ if ($hasslide) {
     echo html_writer::tag('button', get_string('setopeningview', 'local_omeroembed'), [
         'type' => 'button', 'id' => 'omero-set-opening-btn', 'class' => 'btn btn-info',
     ]);
+    // A single combined help icon covering both buttons together, not one
+    // each - real feedback named the *distinction* between them as the
+    // actual confusion ("I don't know what they actually do or what the
+    // difference is"), which a combined explanation answers directly.
+    // Deliberately a sibling <span>, not nested inside either <button> -
+    // an interactive element inside a button is bad markup and would also
+    // trigger that button's own click handler via event bubbling.
+    echo html_writer::tag('span', $OUTPUT->help_icon('viewlinkbuttons', 'local_omeroembed'), [
+        'style' => 'display:inline-flex; align-items:center;',
+    ]);
     echo html_writer::end_div();
 
     // Both the write-up box and the iframe are *always* rendered here, regardless
@@ -936,8 +1003,14 @@ if ($hasslide) {
             'embedid' => $annotateid,
             'sourceurl' => $proxyurl->out(false),
         ]);
+        // A named target, not literal "_blank" - see proxy.php's own
+        // inject_teacher_heatmap_link() comment for why (a lectern PC's
+        // second screen workflow wants the same window reused on repeat
+        // clicks, not a fresh one opened each time). Same target name as
+        // that link, so whichever one a teacher actually used still reuses
+        // the same window the other would have.
         echo html_writer::link($heatmapurl, get_string('viewheatmaplink', 'local_omeroembed'), [
-            'target' => '_blank', 'class' => 'btn btn-secondary', 'style' => 'display:inline-block; margin-top:1rem;',
+            'target' => 'omero-heatmap-view', 'class' => 'btn btn-secondary', 'style' => 'display:inline-block; margin-top:1rem;',
         ]);
     }
 

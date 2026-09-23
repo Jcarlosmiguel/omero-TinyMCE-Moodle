@@ -1352,7 +1352,14 @@ function inject_teacher_heatmap_link(string $body, int $courseid, string $embedi
         var link = document.createElement('a');
         link.id = 'omero-teacher-heatmap-link';
         link.href = config.href;
-        link.target = '_blank';
+        // A named target, not literal "_blank" - real teaching workflow
+        // this enables (a lectern PC with two screens, the heatmap parked
+        // on the instructor's own screen while the projector keeps showing
+        // whatever's being presented): literal "_blank" opens a brand-new
+        // window on every single click, which would defeat exactly that
+        // "leave it open on my own screen" use case by scattering a fresh
+        // window each time instead of reusing the one already placed there.
+        link.target = 'omero-heatmap-view';
         link.textContent = config.label;
         // Bottom, not top - top-right collides with OMERO's own
         // File/ROIs/Help toolbar (confirmed live: the link rendered but

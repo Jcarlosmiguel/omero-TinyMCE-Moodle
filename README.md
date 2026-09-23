@@ -36,22 +36,20 @@ URLs are ever exposed to the browser.
 - **Individually hideable viewer overlays** (overview map, rotate, zoom
   controls, scale bar, coordinate readout, full-screen) to reduce clutter
   for students - purely cosmetic, no effect on pan/zoom or view-links.
-- **Two ways to configure the OMERO server and overlay settings**: the
-  standard Moodle Site administration page, or a dedicated page
-  (`manage.php`) gated by a new capability
-  (`local/omeroembed:managesettings`, Manager role by default) - lets
-  someone who isn't a full Site administrator (e.g. whoever actually
-  administers the OMERO side) manage these settings without needing
-  site-wide config access. Subject accounts are separate from both of
-  these - every teacher adds and manages their own (`mysubjects.php`), no
-  admin or manager step required.
+- **One settings page, Site administrator only** - just the OMERO server
+  URL and how long gathered heatmap data is retained; every other former
+  setting was a site-wide *default* for something a teacher already
+  chooses per-embed in the authoring tool directly, and was removed as a
+  real source of confusion rather than re-explained (see
+  [ADMIN.md](ADMIN.md)). Subject accounts are separate from this - every
+  teacher adds and manages their own (`mysubjects.php`), no admin step
+  required.
 - **Self-healing OMERO sessions.** If a cached session has quietly expired
   on OMERO's side, the proxy detects it and transparently re-authenticates
   once before giving up, rather than surfacing a confusing error.
-- **Discoverable, not just URL-only.** Both `author.php` and `manage.php`
-  are linked from Moodle's own navigation (course nav and primary nav
-  respectively), each gated by the exact same capability check the target
-  page itself makes.
+- **Discoverable, not just URL-only.** `author.php` is linked from
+  Moodle's own course navigation, gated by the exact same capability
+  check the page itself makes.
 - **Click-to-answer hotspot questions**, single- or multi-region, as both a
   standalone embed feature and two Moodle quiz question types - see
   [Hotspot questions](#hotspot-questions) below.
@@ -196,41 +194,18 @@ foreach (["local_omeroembed", "tiny_omeroembed", "qtype_omerohotspot", "qtype_om
 '
 ```
 
-Then configure the OMERO server and viewer overlay settings (one-time,
-site-wide), either as a Site administrator (Site administration > Plugins
-> Local plugins > OMERO slide embed - the full raw settings form) or - once
-granted `local/omeroembed:managesettings` - via **local/omeroembed/manage.php**,
-linked as "OMERO slide embed settings" directly under **Site
-administration > Plugins** for anyone with that capability, even without
-full Site administrator access.
+Then configure the plugin (one-time, site-wide) as a Site administrator:
+Site administration > Plugins > Local plugins > OMERO slide embed. Just
+two settings, deliberately - see [ADMIN.md](ADMIN.md) for why.
 
 - **OMERO base URL** - the real OMERO.web server, e.g.
   `https://your-omero-server.example.org`.
 
 **Subject accounts are not configured here.** Each teacher adds their own
 OMERO service-account credentials directly, from a link on the authoring
-tool (**local/omeroembed/mysubjects.php**) - no Site administrator or
-Manager step needed, and nothing for an admin to maintain on a teacher's
-behalf. See [USAGE.md](USAGE.md).
-
-### Granting settings access to someone who isn't a Site administrator
-
-By default `local/omeroembed:managesettings` is granted to the Manager
-role. To give it to one specific person without making them a Manager
-(e.g. whoever administers the OMERO side but has no other Moodle admin
-duties), create a narrow custom role instead:
-
-1. Site administration > Users > Permissions > Define roles > Add a new
-   role, based on **"No roles"** (so it starts with zero inherited
-   capabilities).
-2. Set `local/omeroembed:managesettings` to **Allow**; leave everything
-   else at its default.
-3. Site administration > Users > Permissions > Assign system roles > pick
-   the new role > add that person.
-
-This must be assigned at the **system context** - these are site-wide
-settings (not tied to any one course), and `manage.php` checks the
-capability at system context specifically.
+tool (**local/omeroembed/mysubjects.php**) - no Site administrator step
+needed, and nothing for an admin to maintain on a teacher's behalf. See
+[USAGE.md](USAGE.md).
 
 ## Usage
 

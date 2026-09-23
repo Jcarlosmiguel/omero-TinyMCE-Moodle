@@ -25,25 +25,6 @@
 defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
-    // Controls manage.php - the OMERO base URL, subject accounts
-    // (course|username|password), and viewer overlay settings. These are
-    // site-wide (not tied to any one course), so this is a CONTEXT_SYSTEM
-    // capability, checked at the system context in manage.php - not scoped
-    // per-course the way author.php's moodle/course:manageactivities check
-    // is. Defaults to the Manager archetype rather than Editing teacher on
-    // purpose - subject account passwords are a shared, site-wide secret,
-    // not something every course's own teachers should be able to see or
-    // change. Site administrators keep access too via the existing
-    // $hassiteconfig-gated settings.php - this capability is an additional
-    // path for non-admins, not a replacement.
-    'local/omeroembed:managesettings' => [
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-        'archetypes' => [
-            'manager' => CAP_ALLOW,
-        ],
-    ],
-
     // Lets a user draw/delete their own point annotations on a final embed
     // (ajax.php) - checked per-course, since an embed can live inside any
     // course content (a Page, a quiz question, ...) with no course-module

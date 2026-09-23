@@ -110,10 +110,16 @@ class heatmap_renderer {
      * shape author.php's own $proxyurl builds, see that file's own
      * comments for the courseid/subject-as-path-segments convention.
      *
+     * Public, not private - also reused by heatmap.php to show a real
+     * subject/image identifier on the page (real gap found via user
+     * testing: with 2-8 embeds per class typical, the course name alone
+     * doesn't tell a teacher which specific slide's heatmap they're
+     * looking at) - one parser, not two.
+     *
      * @param string $sourceurl
      * @return array{subject: string, imageid: int}|null
      */
-    private static function parse_sourceurl(string $sourceurl): ?array {
+    public static function parse_sourceurl(string $sourceurl): ?array {
         $parts = parse_url($sourceurl);
         if (!isset($parts['path']) || !preg_match('#/proxy\.php/\d+/([A-Za-z0-9_]+)#', $parts['path'], $m)) {
             return null;
@@ -166,6 +172,17 @@ class heatmap_renderer {
      * @return string|null Response body, or null on any non-200/curl failure.
      */
     private static function curl_get(string $url, array $session): ?string {
+        global $CFG;
+        // Unlike proxy.php/omero_session.php's own \curl usage, this method
+        // is reachable from a scheduled task (capture_heatmap_frames.php)
+        // run standalone via admin/cli/scheduled_task.php, not only from a
+        // normal page request - a real bug found this way: "Class curl not
+        // found" when that task is run independently, because nothing else
+        // in that narrower bootstrap path happens to have already loaded
+        // this library first. Normal site cron succeeds only by load-order
+        // luck (some earlier task/request in the same run already needed
+        // it). require_once is safe to call even when already loaded.
+        require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setHeader(['Cookie: ' . $session['cookie']]);
         $curl->setopt([

@@ -38,6 +38,17 @@
     {{/body}}
 
     {{$footer}}
-        <button type="button" class="btn btn-secondary" data-action="cancel">{{#str}} cancel, moodle {{/str}}</button>
+        {{!
+            data-action="hide", not "cancel" - this modal extends core/modal
+            directly (see amd/src/modal.js), not core/modal_save_cancel,
+            which is the only base class that actually wires up a "cancel"
+            action (via its own registerCloseOnCancel()). The plain core/modal
+            class only ever registers a listener for data-action="hide" - a
+            "cancel" button here had no listener attached at all and did
+            nothing when clicked, confirmed against core/modal.js's own
+            SELECTORS. hide() is the correct behaviour anyway: there's no
+            save/cancel distinction for this modal, just close it.
+        }}
+        <button type="button" class="btn btn-secondary" data-action="hide">{{#str}} cancel, moodle {{/str}}</button>
     {{/footer}}
 {{/ core/modal }}

@@ -32,12 +32,13 @@ namespace local_omeroembed;
 class annotations_repository {
     /**
      * @var string[] The fixed set of colours a teacher can choose the
-     * active annotation palette from - both settings.php's/manage.php's
-     * site-wide default and author.php's per-embed override pick a subset
-     * of (at most 4) these, never an arbitrary hex value. Keeping the
-     * *set* fixed and only letting the *selection* vary avoids ever
-     * ending up with a colour that's unreadable against the slide or
-     * clashes with another selected one.
+     * active annotation palette from - author.php's per-embed picker (the
+     * only place this is configurable since 1.7.0, see that setting's own
+     * removal note in settings.php) always picks a subset of (at most 4)
+     * these, never an arbitrary hex value. Keeping the *set* fixed and only
+     * letting the *selection* vary avoids ever ending up with a colour
+     * that's unreadable against the slide or clashes with another selected
+     * one.
      */
     const COLOUR_PALETTE = [
         '#e6194B', '#3cb44b', '#4363d8', '#f58231',
@@ -87,13 +88,12 @@ class annotations_repository {
 
     /**
      * Parses and validates a comma-separated colour list - as submitted by
-     * any of settings.php/manage.php/author.php's own forms, or read back
-     * via get_config() - shared here rather than duplicated in all four
-     * places. Anything not actually in COLOUR_PALETTE is silently dropped
-     * (never trusted as an arbitrary hex value), and the result is capped
-     * at MAX_COLOURS. Falls back to DEFAULT_COLOURS if nothing valid
-     * survives, so callers never have to separately handle ending up with
-     * an empty list.
+     * author.php's own per-embed colour picker, or a re-edit's forwarded
+     * annotationcolours param. Anything not actually in COLOUR_PALETTE is
+     * silently dropped (never trusted as an arbitrary hex value), and the
+     * result is capped at MAX_COLOURS. Falls back to DEFAULT_COLOURS if
+     * nothing valid survives, so callers never have to separately handle
+     * ending up with an empty list.
      *
      * @param string $raw Comma-separated hex colours, e.g. "#e6194B,#3cb44b".
      * @return string[]
@@ -108,9 +108,8 @@ class annotations_repository {
     }
 
     /**
-     * COLOUR_PALETTE as a hex => human-readable-name map, for building the
-     * checkbox lists in settings.php/manage.php/author.php - one place
-     * this mapping is defined, rather than three.
+     * COLOUR_PALETTE as a hex => human-readable-name map, for building
+     * author.php's own colour-swatch checkbox list.
      *
      * @return array<string, string>
      */

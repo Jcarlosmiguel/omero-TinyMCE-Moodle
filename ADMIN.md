@@ -1,28 +1,25 @@
-# Administering "OMERO slide embed" - a guide for administrators and managers
+# Administering "OMERO slide embed" - a guide for administrators
 
-This is for whoever configures the plugin day-to-day: Site administrators,
-or anyone granted `local/omeroembed:managesettings` (Manager role by
-default). If you're a teacher wanting to embed a slide, see
-[USAGE.md](USAGE.md) instead. For installation, see [README.md](README.md).
+This is for Site administrators configuring the plugin. If you're a
+teacher wanting to embed a slide, see [USAGE.md](USAGE.md) instead. For
+installation, see [README.md](README.md).
 
 ## Finding the settings page
 
-Both pages live under **Site administration > Plugins**:
+**Site administration > Plugins > Local plugins > OMERO slide embed.**
+This is the only settings page this plugin has (as of 1.7.0) - it's
+deliberately Site-administrator-only, with exactly two settings.
 
-- **If you're a Site administrator**: **Local plugins > OMERO slide
-  embed** - the full raw settings form (every setting below, including
-  `showomerorois`, `enableannotations`, `enablehotspot`, and the heatmap
-  data retention period).
-- **If you have `local/omeroembed:managesettings` but aren't a Site
-  administrator**: look for **"OMERO slide embed settings"** directly
-  under **Plugins** (you won't see "Local plugins" itself, or anything
-  else under Site administration, unless you're also a Site
-  administrator - this one page is the only thing this capability grants
-  access to). It reads and writes the *same underlying config values* as
-  a subset of the full form - just the OMERO base URL, the 6 overlay
-  hide/show checkboxes, and the annotation colour palette. Whichever page
-  last saved a shared setting wins; there's nothing to keep in sync
-  between them.
+*(In earlier versions there was a second, capability-gated settings page
+reachable by non-administrators, plus several more settings than the two
+below - both were removed. Every one of the removed settings was really
+just a site-wide *default* for something a teacher already chooses
+per-embed in the authoring tool directly, e.g. which viewer controls are
+visible, or whether hotspot questions are available - real feedback
+found this genuinely confusing to a site administrator with no obvious
+reason to expect two settings pages for the same plugin, so it was
+simplified rather than re-explained. None of the underlying features
+went away - see [USAGE.md](USAGE.md) for how a teacher controls them.)*
 
 ## What each setting does
 
@@ -33,76 +30,30 @@ The real OMERO.web server this plugin talks to, e.g.
 request is proxied through Moodle, so this address (and the credentials
 below) never reach a student's browser.
 
-### Subject accounts - not an admin/manager setting
+### Data retention
+
+How long gathered heatmap viewing data (and the periodic heatmap video
+frames generated from it) is kept before a daily scheduled task deletes
+it automatically. See "Performance overhead" below for the real numbers
+behind why this matters - it's the only thing keeping the tracking
+feature's storage bounded over time, not a fixed cap on any individual
+class.
+
+### Subject accounts - not an admin setting
 
 Subject accounts (the shared OMERO service-account credentials teachers
 pick from a dropdown when embedding a slide) are **not** configured on
-this page or via `manage.php` - each teacher adds, edits, and deletes
-their own from **local/omeroembed/mysubjects.php** (linked from the
-authoring tool), gated by the same `moodle/course:manageactivities`
-capability that already lets them edit that course. There is no
-site-wide subject-account list for an administrator or Manager to
-maintain, and nothing here needs updating when a teacher rotates a
-password or adds a new one themselves.
+this page - each teacher adds, edits, and deletes their own from
+**local/omeroembed/mysubjects.php** (linked from the authoring tool),
+gated by the same `moodle/course:manageactivities` capability that
+already lets them edit that course. There is no site-wide subject-account
+list for an administrator to maintain, and nothing here needs updating
+when a teacher rotates a password or adds a new one themselves.
 
 If a teacher reports a subject they need isn't available, or an
 "unknown subject" error, the fix is for them (or another teacher in that
 course) to add it themselves via `mysubjects.php` - not something an
-admin/manager needs to do on their behalf.
-
-### Embedded viewer overlays
-
-Six checkboxes, each hiding one on-image control - purely cosmetic, no
-effect on pan/zoom, view-links, or the opening view teachers set up.
-
-**This is only a starting point for new embeds, not a live global
-override.** Changing one of these settings never touches anything a
-teacher has already published:
-
-- Every embed is generated through the authoring tool (`author.php`),
-  which pre-fills its overlay checkboxes from whatever this setting
-  currently is - but the teacher can freely change any of them before
-  clicking "Generate embed HTML".
-- Whatever the checkboxes show at that moment gets written permanently
-  into that specific embed's own stored HTML, as an explicit choice - not
-  a reference back to this setting.
-- So changing this setting later only changes what a teacher sees as the
-  *starting* checkbox state the next time they build a **new** embed.
-  Every embed already published elsewhere keeps behaving exactly as it
-  was set up, indefinitely, regardless of what this page says afterwards.
-- The one exception: an embed built with an older version of the plugin,
-  before a particular checkbox existed at all, has no explicit choice
-  baked in for that one setting - it keeps following whatever this page
-  says until someone reopens and re-saves it through the authoring tool.
-
-| Setting | What it hides | Recommendation |
-|---|---|---|
-| Hide overview map | Small inset thumbnail of the whole image | Usually fine to hide - most people find it more distracting than useful for a single embedded slide |
-| Hide coordinate/zoom readout | Diagnostic pixel position readout | Safe to hide - the authoring tool reads this value directly, not by displaying it, so hiding it doesn't break "Insert view link" or "Set as opening view" |
-| Hide full-screen button | Full-screen toggle | Consider leaving visible - useful for students wanting to see fine detail |
-| Hide scale bar | Real-world size reference (e.g. "5 mm") | Consider leaving visible - often pedagogically useful for judging magnification |
-| Hide zoom controls | Zoom in/out, "1:1", zoom % input | **Not just cosmetic** - hiding this removes the ability to zoom interactively at all. Only enable if an embed is meant to show one fixed view with no student interaction |
-| Hide OMERO top navigation bar | OMERO.web's own File/ROIs/Help menu bar - not part of the slide viewer | **Recommended, and on by default** - its links point outside this locked-down embed and don't work correctly here |
-
-The slide's rotate control isn't in this list because it isn't configurable at all - it's always hidden, unconditionally, regardless of any setting here (there's no way to actually control rotation from this embed, so a visible control for it would just be confusing clutter).
-
-## Granting settings access to someone who isn't a Site administrator
-
-By default `local/omeroembed:managesettings` is granted to the Manager
-role. To give it to one specific person without making them a Manager
-(e.g. whoever administers OMERO but has no other Moodle admin duties):
-
-1. Site administration > Users > Permissions > Define roles > Add a new
-   role, based on **"No roles"** (starts with zero inherited
-   capabilities, so this person gets *only* what you explicitly allow).
-2. Set `local/omeroembed:managesettings` to **Allow**; leave everything
-   else at its default.
-3. Site administration > Users > Permissions > Assign system roles > pick
-   the new role > add that person.
-
-This must be assigned at the **system context**, not a course or category
-- these are site-wide settings, and the check happens at system context
-specifically.
+admin needs to do on their behalf.
 
 ## Restricting who sees the "OMERO embed" button in TinyMCE
 
@@ -124,16 +75,17 @@ that context) hides the button everywhere below it, without touching the
 Teacher role site-wide. Useful for e.g. "only courses in the Pathology
 category should ever see this."
 
-**Narrowing to specific people**: the same pattern already used above for
-`local/omeroembed:managesettings` works here too, with one difference -
-this capability can be assigned at **system, category, or course**
-context (not system-only):
+**Narrowing to specific people**: create a new role built on Moodle's own
+permission system rather than editing the Teacher role directly:
 
 1. Site administration > Users > Permissions > Define roles > Add a new
-   role, based on **"No roles"**.
+   role, based on **"No roles"** (starts with zero inherited
+   capabilities, so this person gets *only* what you explicitly allow).
 2. Set `tiny/omeroembed:embed` to **Allow**.
-3. Assign the new role to specific people, at whichever context is
-   appropriate - a whole category, one course, or site-wide.
+3. Site administration > Users > Permissions > Assign system roles (or
+   the equivalent category/course-level permissions page) > pick the new
+   role > add that person. This capability can be assigned at **system,
+   category, or course** context, whichever is appropriate.
 
 **Turning it off entirely**: if you want the button gone for absolutely
 everyone, including Managers, that's a plugin-level toggle rather than a
@@ -276,8 +228,8 @@ a checkbox's "default" only exists to pre-fill the form the very first
 time you look at it, not something the plugin reads on its own if nobody
 has ever saved that page. **After installing or upgrading, open the
 settings page and click Save changes once, even without changing
-anything** - this is what actually writes the current defaults (including
-the "Embedded viewer overlays" checkboxes) into the database.
+anything** - this is what actually writes the current defaults into the
+database.
 
 ### omero-iviewer version compatibility
 

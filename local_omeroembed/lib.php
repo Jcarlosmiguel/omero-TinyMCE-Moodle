@@ -19,9 +19,6 @@
  * URL directly. Re-checks the exact same capability author.php itself
  * checks, so this link only ever appears for someone who could actually use
  * the page anyway - never a dead link for students or ordinary staff.
- * manage.php's own discoverability is handled differently - see
- * settings.php's admin_externalpage registration (Site administration >
- * Plugins), not a navigation callback at all.
  *
  * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
