@@ -1002,6 +1002,15 @@ if ($hasslide) {
             'courseid' => $courseid,
             'embedid' => $annotateid,
             'sourceurl' => $proxyurl->out(false),
+            // SECURITY: same requirement as proxy.php's own
+            // inject_teacher_heatmap_link() - heatmap.php's first-visit
+            // branch requires this, see that file's own comment. Missing
+            // here was a real bug (not just a hardening gap): without it,
+            // heatmap.php's confirm_sesskey() call throws a missing-param
+            // exception outright rather than failing quietly, since a
+            // completely absent sesskey is treated differently from a
+            // present-but-wrong one - so this link 500'd on every click.
+            'sesskey' => sesskey(),
         ]);
         // A named target, not literal "_blank" - see proxy.php's own
         // inject_teacher_heatmap_link() comment for why (a lectern PC's

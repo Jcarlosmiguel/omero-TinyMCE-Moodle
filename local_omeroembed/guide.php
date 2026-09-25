@@ -23,13 +23,9 @@
  * restructured around real screenshots at each step per direct feedback
  * ("teachers like images to be guided... something easy to the eyes").
  *
- * PLACEHOLDER IMAGES: every {{IMAGE: ...}} box below is a stand-in for a
- * real screenshot of the actual running product, not yet captured (see
- * this plugin's own submission process for the shot list this maps to).
- * Deliberately left as visible placeholders rather than silently omitted,
- * so it's obvious at a glance what still needs a real image dropped in -
- * replace pix/guide/*.png and the corresponding <img> tag below once
- * captured, don't leave a placeholder shipped in a real release.
+ * Screenshots live in pix/guide/*.png, captured against a real course
+ * (Proxy Test Course) with real, non-human histology slides - see
+ * USAGE.md for the same images reused on the GitHub-rendered side.
  *
  * Gated identically to author.php (moodle/course:manageactivities) -
  * same audience, same "can this person actually use the tool this guide
@@ -58,22 +54,20 @@ $PAGE->set_title(get_string('guidetitle', 'local_omeroembed'));
 $PAGE->set_heading($course->fullname);
 
 /**
- * A visible, unmissable stand-in for a real screenshot not yet captured -
- * see this file's own docblock for why these are deliberately obvious
- * rather than silently blank.
+ * A step screenshot from pix/guide/, with the step's own description
+ * as its alt text.
  *
- * @param string $description What the real screenshot should show.
+ * @param string $filename Basename under pix/guide/ (e.g. 'step0-more-dropdown.png').
+ * @param string $alt Alt text - reuses the same string that used to describe the placeholder.
  * @return string
  */
-function local_omeroembed_guide_placeholder(string $description): string {
-    return html_writer::div(
-        html_writer::tag('strong', get_string('guideimageplaceholder', 'local_omeroembed')) . ' ' . s($description),
-        '',
-        [
-            'style' => 'border:2px dashed #ccc; border-radius:4px; padding:1.5rem; margin:0.75rem 0 1.25rem; '
-                . 'background:#f8f8f8; color:#666; font-style:italic; max-width:700px;',
-        ]
-    );
+function local_omeroembed_guide_image(string $filename, string $alt): string {
+    global $CFG;
+    return html_writer::empty_tag('img', [
+        'src' => $CFG->wwwroot . '/local/omeroembed/pix/guide/' . $filename,
+        'alt' => $alt,
+        'style' => 'max-width:700px; width:100%; height:auto; border-radius:4px; margin:0.75rem 0 1.25rem; display:block;',
+    ]);
 }
 
 $authorurl = new moodle_url('/local/omeroembed/author.php', ['courseid' => $courseid]);
@@ -93,7 +87,7 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidestep0image', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step0-more-dropdown.png', get_string('guidestep0image', 'local_omeroembed'));
 
 echo html_writer::tag('h3', get_string('guidestep1heading', 'local_omeroembed'));
 echo html_writer::div(
@@ -101,7 +95,7 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidestep1image', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step1-load-slide.png', get_string('guidestep1image', 'local_omeroembed'));
 
 echo html_writer::tag('h3', get_string('guidestep2heading', 'local_omeroembed'));
 echo html_writer::div(
@@ -109,7 +103,7 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidestep2image', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step2-layout.png', get_string('guidestep2image', 'local_omeroembed'));
 
 echo html_writer::tag('h3', get_string('guidestep3heading', 'local_omeroembed'));
 echo html_writer::div(
@@ -117,8 +111,8 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidestep3imagea', 'local_omeroembed'));
-echo local_omeroembed_guide_placeholder(get_string('guidestep3imageb', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step3a-select-text.png', get_string('guidestep3imagea', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step3b-view-link-inserted.png', get_string('guidestep3imageb', 'local_omeroembed'));
 
 echo html_writer::tag('h3', get_string('guidestep4heading', 'local_omeroembed'));
 echo html_writer::div(
@@ -126,7 +120,7 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidestep4image', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step4-opening-view.png', get_string('guidestep4image', 'local_omeroembed'));
 
 echo html_writer::tag('h3', get_string('guidestep5heading', 'local_omeroembed'));
 echo html_writer::div(
@@ -134,7 +128,7 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidestep5image', 'local_omeroembed'));
+echo local_omeroembed_guide_image('step5-generate-copy.png', get_string('guidestep5image', 'local_omeroembed'));
 
 echo html_writer::tag('h3', get_string('guideworthknowingheading', 'local_omeroembed'));
 echo html_writer::div(
@@ -149,9 +143,9 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_placeholder(get_string('guidehotspotimagea', 'local_omeroembed'));
-echo local_omeroembed_guide_placeholder(get_string('guidehotspotimageb', 'local_omeroembed'));
-echo local_omeroembed_guide_placeholder(get_string('guidehotspotimagec', 'local_omeroembed'));
+echo local_omeroembed_guide_image('hotspot-a-layout.png', get_string('guidehotspotimagea', 'local_omeroembed'));
+echo local_omeroembed_guide_image('hotspot-b-drawing.png', get_string('guidehotspotimageb', 'local_omeroembed'));
+echo local_omeroembed_guide_image('hotspot-c-feedback.png', get_string('guidehotspotimagec', 'local_omeroembed'));
 echo html_writer::tag('p', get_string('guidehotspotqtypenote', 'local_omeroembed'), [
     'class' => 'text-muted', 'style' => 'max-width:700px;',
 ]);

@@ -79,7 +79,6 @@ $string['guidehotspotimagea'] = 'The Layout section with "Image with a short que
 $string['guidehotspotimageb'] = 'The drawing toolbar mid-use on the live preview - an actual region being drawn, not an empty/idle toolbar.';
 $string['guidehotspotimagec'] = 'A student-facing hotspot question after clicking - the right/wrong feedback actually visible.';
 $string['guidehotspotqtypenote'] = 'There\'s also a separate, fuller Moodle quiz question type for graded hotspot questions inside a real Moodle quiz - a different, deeper integration than the standalone embed hotspot covered above. Ask whoever manages your Moodle\'s plugins if you want graded quiz hotspots.';
-$string['guideimageplaceholder'] = 'Screenshot placeholder:';
 $string['guidelink'] = 'New to this? Read the visual guide';
 $string['guideintro'] = 'This is for anyone with editing rights in a course who wants to embed an OMERO microscopy slide, with your own commentary alongside it - no HTML or URLs to type by hand.';
 $string['guidestep0body'] = 'Go into your course. Look at the row of tabs near the top (Course, Participants, Grades...) and click <strong>"More"</strong> - a dropdown opens. Click <strong>"Embed an OMERO slide"</strong>. If you don\'t see it there, you don\'t have editing rights in this particular course, or it hasn\'t been enabled yet - ask whoever manages your Moodle\'s plugins.';
