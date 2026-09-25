@@ -54,20 +54,33 @@ $PAGE->set_title(get_string('guidetitle', 'local_omeroembed'));
 $PAGE->set_heading($course->fullname);
 
 /**
- * A step screenshot from pix/guide/, with the step's own description
- * as its alt text.
+ * A step screenshot from pix/guide/, with the step's own description as
+ * its alt text, and an optional short visible caption underneath.
+ *
+ * The caption is only needed where a step has more than one image in a
+ * row with nothing distinguishing them in the surrounding text (alt text
+ * alone isn't visible unless you hover or the image fails to load) - see
+ * this file's own step 3 and hotspot sections, and USAGE.md's identical
+ * captions on the GitHub-rendered side (kept in sync deliberately).
  *
  * @param string $filename Basename under pix/guide/ (e.g. 'step0-more-dropdown.png').
  * @param string $alt Alt text - reuses the same string that used to describe the placeholder.
+ * @param string $caption Optional short visible caption below the image, or '' for none.
  * @return string
  */
-function local_omeroembed_guide_image(string $filename, string $alt): string {
+function local_omeroembed_guide_image(string $filename, string $alt, string $caption = ''): string {
     global $CFG;
-    return html_writer::empty_tag('img', [
+    $html = html_writer::empty_tag('img', [
         'src' => $CFG->wwwroot . '/local/omeroembed/pix/guide/' . $filename,
         'alt' => $alt,
-        'style' => 'max-width:700px; width:100%; height:auto; border-radius:4px; margin:0.75rem 0 1.25rem; display:block;',
+        'style' => 'max-width:700px; width:100%; height:auto; border-radius:4px; margin:0.75rem 0 0.25rem; display:block;',
     ]);
+    if ($caption !== '') {
+        $html .= html_writer::tag('p', $caption, [
+            'class' => 'text-muted', 'style' => 'max-width:700px; margin:0 0 1.25rem; font-style:italic;',
+        ]);
+    }
+    return $html;
 }
 
 $authorurl = new moodle_url('/local/omeroembed/author.php', ['courseid' => $courseid]);
@@ -111,8 +124,16 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_image('step3a-select-text.png', get_string('guidestep3imagea', 'local_omeroembed'));
-echo local_omeroembed_guide_image('step3b-view-link-inserted.png', get_string('guidestep3imageb', 'local_omeroembed'));
+echo local_omeroembed_guide_image(
+    'step3a-select-text.png',
+    get_string('guidestep3imagea', 'local_omeroembed'),
+    get_string('guidestep3imageacaption', 'local_omeroembed')
+);
+echo local_omeroembed_guide_image(
+    'step3b-view-link-inserted.png',
+    get_string('guidestep3imageb', 'local_omeroembed'),
+    get_string('guidestep3imagebcaption', 'local_omeroembed')
+);
 
 echo html_writer::tag('h3', get_string('guidestep4heading', 'local_omeroembed'));
 echo html_writer::div(
@@ -143,10 +164,26 @@ echo html_writer::div(
     '',
     ['style' => 'max-width:700px;']
 );
-echo local_omeroembed_guide_image('hotspot-a-layout.png', get_string('guidehotspotimagea', 'local_omeroembed'));
-echo local_omeroembed_guide_image('hotspot-b-drawing.png', get_string('guidehotspotimageb', 'local_omeroembed'));
-echo local_omeroembed_guide_image('hotspot-c-feedback.png', get_string('guidehotspotimagec', 'local_omeroembed'));
-echo local_omeroembed_guide_image('hotspot-d-rotate-resize.png', get_string('guidehotspotimaged', 'local_omeroembed'));
+echo local_omeroembed_guide_image(
+    'hotspot-a-layout.png',
+    get_string('guidehotspotimagea', 'local_omeroembed'),
+    get_string('guidehotspotimageacaption', 'local_omeroembed')
+);
+echo local_omeroembed_guide_image(
+    'hotspot-b-drawing.png',
+    get_string('guidehotspotimageb', 'local_omeroembed'),
+    get_string('guidehotspotimagebcaption', 'local_omeroembed')
+);
+echo local_omeroembed_guide_image(
+    'hotspot-c-feedback.png',
+    get_string('guidehotspotimagec', 'local_omeroembed'),
+    get_string('guidehotspotimageccaption', 'local_omeroembed')
+);
+echo local_omeroembed_guide_image(
+    'hotspot-d-rotate-resize.png',
+    get_string('guidehotspotimaged', 'local_omeroembed'),
+    get_string('guidehotspotimagedcaption', 'local_omeroembed')
+);
 echo html_writer::tag('p', get_string('guidehotspotqtypenote', 'local_omeroembed'), [
     'class' => 'text-muted', 'style' => 'max-width:700px;',
 ]);

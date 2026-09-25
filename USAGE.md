@@ -81,8 +81,10 @@ part of the slide, this is that same pattern.
    image.
 
 ![A word selected in the write-up text, next to the "Insert view link" button](local_omeroembed/pix/guide/step3a-select-text.png)
+*Select the word or phrase first, then click Insert view link.*
 
 ![The same text immediately after clicking "Insert view link" - now visibly a link](local_omeroembed/pix/guide/step3b-view-link-inserted.png)
+*The selected text becomes a clickable link.*
 
 ## Step 4: Set the opening view (optional)
 
@@ -155,12 +157,16 @@ Write your question in the text box below the slide, same as any other
 layout.
 
 ![The Layout section with "Image with a short question below" selected and the Hotspot question dropdown visible](local_omeroembed/pix/guide/hotspot-a-layout.png)
+*Choosing the layout and hotspot mode.*
 
 ![The drawing toolbar mid-use on the live preview, with one region already marked and a second being drawn](local_omeroembed/pix/guide/hotspot-b-drawing.png)
+*Drawing a region directly on the slide (one already placed, a second being drawn).*
 
 ![A student-facing hotspot question right after a correct click, with the "Correct!" feedback visible](local_omeroembed/pix/guide/hotspot-c-feedback.png)
+*What a student sees immediately after a correct click.*
 
 ![A drawn region selected, showing the round rotate handle above it and the 4 square resize handles at its corners, mid-rotation](local_omeroembed/pix/guide/hotspot-d-rotate-resize.png)
+*A selected region, mid-rotation, with the resize handles at its corners.*
 
 There's also a separate, fuller Moodle quiz question type
 (`qtype_omerohotspot`/`qtype_omerohotspotmulti`) for graded hotspot
