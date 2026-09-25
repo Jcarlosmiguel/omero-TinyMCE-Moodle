@@ -61,7 +61,7 @@
         el.style.cssText = 'position:absolute; left:' + px[0] + 'px; top:' + px[1] + 'px; '
             + 'transform:translate(-50%, -120%); z-index:1001; pointer-events:none; '
             + 'background:' + (correct ? 'rgba(46,204,113,0.9)' : 'rgba(231,76,60,0.9)') + '; '
-            + 'color:#ffffff; padding:0.3rem 0.6rem; border-radius:4px; font-size:0.85rem; '
+            + 'color:#ffffff; padding:0.4rem 0.75rem; border-radius:4px; font-size:1.1rem; '
             + 'font-family:sans-serif; white-space:nowrap; transition:opacity 0.4s; opacity:1;';
         viewportEl.appendChild(el);
         window.setTimeout(function() {

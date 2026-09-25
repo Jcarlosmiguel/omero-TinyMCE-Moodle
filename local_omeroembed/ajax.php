@@ -275,10 +275,15 @@ if ($action === 'hotspot_save') {
     $y = required_param('y', PARAM_FLOAT);
     $rx = required_param('rx', PARAM_FLOAT);
     $ry = required_param('ry', PARAM_FLOAT);
+    // Optional, not required: hotspot-author.js always sends it explicitly
+    // (0 for a freshly-drawn region, the dragged angle when only the rotate
+    // handle moved), but defaulting to 0 here keeps this endpoint backwards
+    // compatible with any caller that doesn't.
+    $rotation = optional_param('rotation', 0, PARAM_FLOAT);
     if ($rx <= 0 || $ry <= 0) {
         throw new \moodle_exception('invalidradius', 'local_omeroembed', '', "rx=$rx, ry=$ry");
     }
-    $geometry = ['type' => $type, 'x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry, 'rotation' => 0];
+    $geometry = ['type' => $type, 'x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry, 'rotation' => $rotation];
 
     hotspot_repository::verify_course($embedid, $courseid);
     $record = hotspot_repository::save($courseid, $embedid, $USER->id, $geometry);

@@ -30,11 +30,20 @@
  * Draws exactly one ellipse or rectangle by the same drag-to-draw gesture
  * js/annotate.js already established (press at the centre, drag out a
  * radius, release) - reused here rather than reinvented, minus the
- * multi-shape/select/rotate machinery that file needs and this one
- * doesn't: a hotspot region always has rotation 0, and a newly-drawn
- * region simply replaces whatever was there before ("one region per
- * embed" - see hotspot_repository.php's own docblock), so there is no
- * select/edit-in-place case to build.
+ * multi-shape/select machinery that file needs and this one doesn't: a
+ * newly-drawn region simply replaces whatever was there before ("one
+ * region per embed" - see hotspot_repository.php's own docblock), so
+ * there is no select/edit-in-place case to build for the shape itself.
+ *
+ * Rotation is the one exception - reused directly from js/annotate.js
+ * (handlePosition()/unrotate()-equivalent math, and the same drag-the-
+ * handle gesture), since the server side (hotspot_repository.php's own
+ * check_attempt(), and the same {type,x,y,rx,ry,rotation} shape ported
+ * into both qtype plugins' lib.php) was already fully rotation-aware -
+ * only the JS authoring side never exposed a way to set one. The handle
+ * is shown whenever a region exists and no new draw is in progress -
+ * there's no "selection" concept to gate it on, since there's only ever
+ * the one region.
  *
  * @module     local_omeroembed/hotspot-author
  * @copyright  2026 University of Glasgow MVLS
@@ -53,6 +62,7 @@
     var TYPE_ELLIPSE = 'ellipse';
     var TYPE_RECTANGLE = 'rectangle';
     var HIT_RADIUS = 12; // Screen px - same "too small to be deliberate" threshold as annotate.js's own.
+    var HANDLE_OFFSET = 20; // px beyond the shape's own edge - identical convention to annotate.js's own.
 
     var olmap = null;
     var viewportEl = null;
@@ -60,7 +70,7 @@
     var activeTool = null; // null | 'ellipse' | 'rectangle'
     var constrainShape = false; // touch-reachable equivalent of holding Shift - see annotate.js's own identical convention
     var pendingShape = null; // {type,x,y,rx,ry} while drag-drawing, else null
-    var savedGeometry = null; // the currently-persisted region, or null
+    var savedGeometry = null; // {type,x,y,rx,ry,rotation} the currently-persisted region, or null
     var disabledInteractions = null;
 
     /**
@@ -103,6 +113,91 @@
     function pixelToImageCoord(px) {
         var coord = olmap.getCoordinateFromPixel(px);
         return [coord[0], -coord[1]];
+    }
+
+    /**
+     * Where the rotate handle sits on screen - identical formula to
+     * js/annotate.js's own handlePosition().
+     *
+     * @param {Array} centrePx [screenX, screenY]
+     * @param {Array} radii [screenRx, screenRy]
+     * @param {number} rotation Radians.
+     * @return {Array} [screenX, screenY] of the handle.
+     */
+    function handlePosition(centrePx, radii, rotation) {
+        var distance = radii[1] + HANDLE_OFFSET;
+        return [
+            centrePx[0] + distance * Math.sin(rotation),
+            centrePx[1] - distance * Math.cos(rotation),
+        ];
+    }
+
+    /**
+     * Rotates a click into the shape's own unrotated local frame -
+     * identical formula to js/annotate.js's own unrotate() and
+     * hotspot_repository.php's own PHP port of the same.
+     *
+     * @param {number} px
+     * @param {number} py
+     * @param {number} rotation Radians.
+     * @return {Array} [px, py] in the shape's own local frame.
+     */
+    function unrotate(px, py, rotation) {
+        var cos = Math.cos(rotation);
+        var sin = Math.sin(rotation);
+        return [px * cos + py * sin, -px * sin + py * cos];
+    }
+
+    /**
+     * Traces an ellipse/rectangle outline into ctx's current path,
+     * accounting for rotation - identical approach to js/annotate.js's own
+     * traceShape().
+     *
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {string} type
+     * @param {number} cx Screen x of the shape's centre.
+     * @param {number} cy Screen y of the shape's centre.
+     * @param {Array} radii [screenRx, screenRy].
+     * @param {number} rotation Radians.
+     */
+    /**
+     * The 4 corners of a shape's own bounding box, rotated to match its
+     * current orientation - used both to trace a rectangle's outline and
+     * (below) to draw/hit-test the resize handles, including for an
+     * ellipse, which has no literal corners of its own but still gets
+     * resize handles at its bounding box's corners - the same convention
+     * PowerPoint/Illustrator use for resizing a circle/ellipse by drag.
+     *
+     * @param {number} cx Screen x of the shape's centre.
+     * @param {number} cy Screen y of the shape's centre.
+     * @param {Array} radii [screenRx, screenRy].
+     * @param {number} rotation Radians.
+     * @return {Array} four [screenX, screenY] points (top-left, top-right,
+     *                 bottom-right, bottom-left in the shape's own
+     *                 unrotated local frame).
+     */
+    function cornerPositions(cx, cy, radii, rotation) {
+        return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function(sign) {
+            var lx = sign[0] * radii[0];
+            var ly = sign[1] * radii[1];
+            return [
+                cx + lx * Math.cos(rotation) - ly * Math.sin(rotation),
+                cy + lx * Math.sin(rotation) + ly * Math.cos(rotation),
+            ];
+        });
+    }
+
+    function traceShape(ctx, type, cx, cy, radii, rotation) {
+        if (type === TYPE_ELLIPSE) {
+            ctx.ellipse(cx, cy, radii[0], radii[1], rotation, 0, 2 * Math.PI);
+            return;
+        }
+        var corners = cornerPositions(cx, cy, radii, rotation);
+        ctx.moveTo(corners[0][0], corners[0][1]);
+        for (var i = 1; i < corners.length; i++) {
+            ctx.lineTo(corners[i][0], corners[i][1]);
+        }
+        ctx.closePath();
     }
 
     /** @return {number[]} [screenRx, screenRy] for an image-pixel radius at an image-pixel centre. */
@@ -165,6 +260,14 @@
         if (!px) {
             return;
         }
+        // Compounds the view's own current rotation on top of the shape's
+        // stored rotation, same reasoning as annotate.js's own redraw() -
+        // keeps the shape's on-screen orientation matching the image
+        // regardless of view rotation, re-read fresh every redraw() since
+        // this also fires continuously during a shift+drag of the view.
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (shape.rotation || 0) + viewRotation;
+
         ctx.save();
         ctx.strokeStyle = pendingShape ? '#2ecc71' : '#f5a623';
         ctx.lineWidth = pendingShape ? 2 : 3;
@@ -172,13 +275,49 @@
             ctx.setLineDash([8, 5]);
         }
         ctx.beginPath();
-        if (shape.type === TYPE_ELLIPSE) {
-            ctx.ellipse(px[0], px[1], radii[0], radii[1], 0, 0, Math.PI * 2);
-        } else {
-            ctx.rect(px[0] - radii[0], px[1] - radii[1], radii[0] * 2, radii[1] * 2);
-        }
+        traceShape(ctx, shape.type, px[0], px[1], radii, rotation);
         ctx.stroke();
         ctx.restore();
+
+        // The rotate handle - only for the persisted region, not while a
+        // new one is actively being drawn (there's nothing to rotate yet
+        // mid-drag, and pendingShape has no .rotation of its own).
+        if (!pendingShape && savedGeometry) {
+            var handlePx = handlePosition(px, radii, rotation);
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(px[0], px[1]);
+            ctx.lineTo(handlePx[0], handlePx[1]);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(handlePx[0], handlePx[1], 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.strokeStyle = '#f5a623';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+
+            // The 4 corner resize handles - small squares, distinct from
+            // the round rotate handle, at the shape's own (rotated)
+            // bounding-box corners. Square markers here follow the same
+            // "shape suggests behaviour" convention as annotate.js's own
+            // constrain-to-square icon.
+            cornerPositions(px[0], px[1], radii, rotation).forEach(function(corner) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(corner[0] - 5, corner[1] - 5, 10, 10);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.strokeStyle = '#f5a623';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
     }
 
     function showSavedMessage() {
@@ -194,14 +333,27 @@
     }
 
     /**
-     * Drag-to-draw: press at the centre, drag out a radius, release - same
-     * gesture and geometry formula as annotate.js's own
+     * A corner resize handle, or the rotate handle, if either is there to
+     * grab - checked unconditionally, before the draw-tool branch below,
+     * same priority order as annotate.js's own onViewportPointerDown().
+     * Corners first: they sit at the shape's own edge, the rotate handle
+     * further out beyond it, so there's no real overlap between them to
+     * disambiguate, but checking the closer one first is the more natural
+     * order. See tryStartResizeDrag()/tryStartRotateDrag()'s own docblocks
+     * for each drag itself.
+     *
+     * Drag-to-draw (the rest of this function, once this returns false):
+     * press at the centre, drag out a radius, release - same gesture and
+     * geometry formula as annotate.js's own
      * onViewportPointerDown()/computePending(), minus the "is this a
      * select instead" branch (there's nothing else on this canvas to
-     * select) and minus rotation (always 0 - see this module's own
-     * docblock for why).
+     * select).
      */
     function onViewportPointerDown(e) {
+        if (savedGeometry && (tryStartResizeDrag(e) || tryStartRotateDrag(e))) {
+            return;
+        }
+
         if (activeTool !== TYPE_ELLIPSE && activeTool !== TYPE_RECTANGLE) {
             return;
         }
@@ -253,6 +405,11 @@
                 y: finished.y,
                 rx: finished.rx,
                 ry: finished.ry,
+                // A freshly-drawn region always starts unrotated - rotation
+                // is a separate, subsequent adjustment via the handle (see
+                // tryStartRotateDrag()), not something this drag gesture
+                // itself can express.
+                rotation: 0,
             }, 'POST').then(function(result) {
                 savedGeometry = result.geometry;
                 redraw();
@@ -262,6 +419,160 @@
 
         window.addEventListener('pointermove', onMove, true);
         window.addEventListener('pointerup', onUp, true);
+    }
+
+    /**
+     * Dragging a corner handle to resize - always centre-anchored, not
+     * opposite-corner-anchored: the same mental model the original
+     * drag-to-draw gesture already established ("press at the centre, drag
+     * out a radius"), just applied after the fact instead of only at
+     * creation time. Which of the 4 corners was actually grabbed only
+     * matters for this initial hit-test - once the drag starts, dragging
+     * ANY corner produces the same result (the live cursor position,
+     * converted to image coordinates and un-rotated into the shape's own
+     * local frame, directly gives the new rx/ry - same
+     * pixelToImageCoord()-based approach the original computePending()
+     * already uses, just also un-rotating this time, since the original
+     * draw always starts from rotation 0 and never needed to), so there's
+     * no need to track which specific corner initiated it.
+     *
+     * @param {PointerEvent} e
+     * @return {boolean} True if the press actually hit a corner.
+     */
+    function tryStartResizeDrag(e) {
+        var rect = viewportEl.getBoundingClientRect();
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (savedGeometry.rotation || 0) + viewRotation;
+        var corners = cornerPositions(centrePx[0], centrePx[1], radii, rotation);
+
+        var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
+        var hit = corners.some(function(corner) {
+            var cdx = corner[0] - pressPx[0];
+            var cdy = corner[1] - pressPx[1];
+            return Math.sqrt(cdx * cdx + cdy * cdy) <= HIT_RADIUS;
+        });
+        if (!hit) {
+            return false;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        setMapInteractionsEnabled(false);
+
+        function computeResize(moveEvent) {
+            var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
+            var moveCoord = pixelToImageCoord(movePx);
+            var dx = moveCoord[0] - savedGeometry.x;
+            var dy = moveCoord[1] - savedGeometry.y;
+            var local = unrotate(dx, dy, savedGeometry.rotation || 0);
+            return {
+                rx: Math.max(Math.abs(local[0]), 1),
+                ry: Math.max(Math.abs(local[1]), 1),
+            };
+        }
+
+        function onMove(moveEvent) {
+            var resized = computeResize(moveEvent);
+            savedGeometry.rx = resized.rx;
+            savedGeometry.ry = resized.ry;
+            redraw();
+        }
+
+        function onUp(upEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            setMapInteractionsEnabled(true);
+
+            var resized = computeResize(upEvent);
+            savedGeometry.rx = resized.rx;
+            savedGeometry.ry = resized.ry;
+            redraw();
+
+            ajax('hotspot_save', {
+                type: savedGeometry.type,
+                x: savedGeometry.x,
+                y: savedGeometry.y,
+                rx: resized.rx,
+                ry: resized.ry,
+                rotation: savedGeometry.rotation || 0,
+            }, 'POST').then(function(result) {
+                savedGeometry = result.geometry;
+                redraw();
+                showSavedMessage();
+            });
+        }
+
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        return true;
+    }
+
+    /**
+     * Dragging the rotate handle - identical interaction to annotate.js's
+     * own tryStartRotateDrag(), simplified: there's only ever the one
+     * region here, so no selection state to check, just "does a region
+     * exist" (already checked by the caller).
+     *
+     * @param {PointerEvent} e
+     * @return {boolean} True if the press actually hit the handle.
+     */
+    function tryStartRotateDrag(e) {
+        var rect = viewportEl.getBoundingClientRect();
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (savedGeometry.rotation || 0) + viewRotation;
+        var handlePx = handlePosition(centrePx, radii, rotation);
+
+        var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
+        var hdx = handlePx[0] - pressPx[0];
+        var hdy = handlePx[1] - pressPx[1];
+        if (Math.sqrt(hdx * hdx + hdy * hdy) > HIT_RADIUS) {
+            return false;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        setMapInteractionsEnabled(false);
+
+        function angleFor(moveEvent) {
+            var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
+            return Math.atan2(movePx[0] - centrePx[0], -(movePx[1] - centrePx[1])) - viewRotation;
+        }
+
+        function onMove(moveEvent) {
+            savedGeometry.rotation = angleFor(moveEvent);
+            redraw();
+        }
+
+        function onUp(upEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            setMapInteractionsEnabled(true);
+
+            var finalRotation = angleFor(upEvent);
+            savedGeometry.rotation = finalRotation;
+            redraw();
+
+            ajax('hotspot_save', {
+                type: savedGeometry.type,
+                x: savedGeometry.x,
+                y: savedGeometry.y,
+                rx: savedGeometry.rx,
+                ry: savedGeometry.ry,
+                rotation: finalRotation,
+            }, 'POST').then(function(result) {
+                savedGeometry = result.geometry;
+                redraw();
+                showSavedMessage();
+            });
+        }
+
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        return true;
     }
 
     function buildToolbar() {

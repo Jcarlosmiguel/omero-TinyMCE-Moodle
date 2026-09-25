@@ -94,12 +94,17 @@ Two independent modes, both available in two forms:
   correct examples. No partial credit either way - a click is simply
   correct or not.
 
-**As a standalone embed feature** - toggle `enablehotspot` or
-`enablehotspotmulti` in the authoring tool (mutually exclusive; enabling
-either automatically disables student annotations for that embed, since a
-hidden-answer region and free student markup on the same image don't mix).
-The teacher draws the region(s) directly on the live preview; a small
-drawing toolbar appears while either mode is active.
+**As a standalone embed feature** - needs only `local_omeroembed` itself,
+nothing else installed. In the authoring tool, choose the "Image with a
+short question below" layout, then Single region or Multiple regions from
+the Hotspot question dropdown that appears (mutually exclusive with student
+annotations for that embed, since a hidden-answer region and free student
+markup on the same image don't mix). The teacher draws the region(s)
+directly on the live preview; a small drawing toolbar appears while either
+mode is active. Feedback is intentionally simple - "Correct!" or "Not quite
+- try again," no score or partial credit - since this is a quick embedded
+check, not a graded assessment. Works the same way inside a Label, Page,
+Lesson content page, or anywhere else an embed can go.
 
 **As a quiz question type** - `qtype_omerohotspot` (single-region) and
 `qtype_omerohotspotmulti` (multi-region) plug into Moodle's normal question

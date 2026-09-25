@@ -631,6 +631,18 @@
             window.setTimeout(function() {
                 button.textContent = original;
             }, 1500);
+            // A direct paste into the editor's normal (non-Source-code) view
+            // silently inserts this as visible escaped text rather than a
+            // working embed - tried writing a real text/html clipboard
+            // payload alongside the plain text to see if that would let a
+            // direct paste be recognised as real markup instead, but a real
+            // test showed it made no difference (still landed as escaped
+            // text on an empty page) - so writeText() below stays the only
+            // clipboard write, and this reminder is the actual fix.
+            var reminder = document.getElementById('omero-copy-reminder');
+            if (reminder) {
+                reminder.style.display = 'block';
+            }
         };
 
         if (navigator.clipboard && navigator.clipboard.writeText) {

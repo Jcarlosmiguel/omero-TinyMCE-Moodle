@@ -981,6 +981,19 @@ if ($hasslide) {
         echo html_writer::tag('button', get_string('copyembed', 'local_omeroembed'), [
             'type' => 'button', 'id' => 'omero-copy-btn', 'class' => 'btn btn-secondary', 'style' => 'margin-top:0.5rem;',
         ]);
+        // Hidden until copyEmbed() reveals it (see js/author.js) - shown only
+        // once there's actually something on the clipboard to paste, not
+        // before. Real, tested reason this exists at all: a direct paste
+        // into the editor's normal view silently inserts the raw HTML as
+        // visible escaped text rather than a working embed, with no error of
+        // any kind - confirmed against a real paste, not assumed. A plain
+        // notice at the moment someone's about to go paste is more reliable
+        // than only documenting it in the guide, which people skip.
+        echo html_writer::div(
+            get_string('copyembedreminder', 'local_omeroembed'),
+            'alert alert-warning',
+            ['id' => 'omero-copy-reminder', 'style' => 'display:none; margin-top:0.75rem;']
+        );
         echo html_writer::end_div();
     }
 

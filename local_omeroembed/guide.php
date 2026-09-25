@@ -146,6 +146,7 @@ echo html_writer::div(
 echo local_omeroembed_guide_image('hotspot-a-layout.png', get_string('guidehotspotimagea', 'local_omeroembed'));
 echo local_omeroembed_guide_image('hotspot-b-drawing.png', get_string('guidehotspotimageb', 'local_omeroembed'));
 echo local_omeroembed_guide_image('hotspot-c-feedback.png', get_string('guidehotspotimagec', 'local_omeroembed'));
+echo local_omeroembed_guide_image('hotspot-d-rotate-resize.png', get_string('guidehotspotimaged', 'local_omeroembed'));
 echo html_writer::tag('p', get_string('guidehotspotqtypenote', 'local_omeroembed'), [
     'class' => 'text-muted', 'style' => 'max-width:700px;',
 ]);

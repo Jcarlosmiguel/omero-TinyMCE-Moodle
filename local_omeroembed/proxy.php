@@ -1128,6 +1128,33 @@ function inject_contextmenu_blocker(string $body, bool $suppress): string {
 }
 
 /**
+ * A cache-busted URL for one of this plugin's own js/ files, injected below
+ * via a plain <script src="...">. Every one of these was previously a bare
+ * URL with no versioning at all - a real bug, not just a hardening gap:
+ * since this script tag lives inside a nested iframe's own document (not
+ * the parent page's own resource list), a parent-page hard refresh does not
+ * reliably force the iframe's own <script src> to bypass the browser's
+ * cache the way it does for the parent page's own resources - confirmed
+ * live this session, chasing what looked like a JS logic bug in a rotate-
+ * handle feature that turned out to be several-versions-stale cached JS
+ * still running silently, well after purge_caches.php and repeated hard
+ * refreshes. Appending the plugin's own version number (not time() - that
+ * would force a fresh download on literally every page load forever, not
+ * just after a real update) means a browser only ever re-fetches once per
+ * actual deployment, exactly when the file might genuinely have changed.
+ *
+ * @param string $filename e.g. 'hotspot-author.js'
+ * @return \moodle_url
+ */
+function local_omeroembed_versioned_script_url(string $filename): \moodle_url {
+    static $version = null;
+    if ($version === null) {
+        $version = get_config('local_omeroembed', 'version');
+    }
+    return new \moodle_url('/local/omeroembed/js/' . $filename, ['v' => $version]);
+}
+
+/**
  * Injects js/annotate.js (a real file, not another inline string - this one's
  * substantial enough to deserve one) into the final student-facing embed,
  * plus a small inline config block giving it what it needs to call
@@ -1186,7 +1213,7 @@ function inject_annotation_script(
     ];
     $configscript = '<script id="omero-annotate-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/annotate.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('annotate.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1243,7 +1270,7 @@ function inject_tracking_script(string $body, int $courseid, string $embedid): s
     ];
     $configscript = '<script id="omero-track-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/track.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('track.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1271,7 +1298,7 @@ function inject_heatmap_view_script(string $body, int $courseid, string $embedid
     ];
     $configscript = '<script id="omero-heatmap-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/heatmap-view.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('heatmap-view.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1420,7 +1447,7 @@ function inject_hotspot_author_script(string $body, int $courseid, string $embed
     ];
     $configscript = '<script id="omero-hotspot-author-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-author.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('hotspot-author.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1457,7 +1484,7 @@ function inject_hotspot_attempt_script(string $body, int $courseid, string $embe
     ];
     $configscript = '<script id="omero-hotspot-attempt-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-attempt.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('hotspot-attempt.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1488,7 +1515,7 @@ function inject_hotspot_edit_form_script(string $body): string {
     ];
     $configscript = '<script id="omero-hotspot-qtype-author-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-qtype-author.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('hotspot-qtype-author.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1509,7 +1536,7 @@ function inject_hotspot_edit_form_script(string $body): string {
  * @return string
  */
 function inject_hotspot_qtype_attempt_script(string $body): string {
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-qtype-attempt.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('hotspot-qtype-attempt.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $srcscript);
@@ -1545,7 +1572,7 @@ function inject_hotspot_multi_author_script(string $body, int $courseid, string 
     ];
     $configscript = '<script id="omero-hotspotmulti-author-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-multi-author.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('hotspot-multi-author.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1575,7 +1602,7 @@ function inject_hotspot_multi_attempt_script(string $body, int $courseid, string
     ];
     $configscript = '<script id="omero-hotspotmulti-attempt-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $srcscript = '<script src="' . (new \moodle_url('/local/omeroembed/js/hotspot-multi-attempt.js'))->out(false) . '"></script>';
+    $srcscript = '<script src="' . local_omeroembed_versioned_script_url('hotspot-multi-attempt.js')->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
     return $withscript !== null ? $withscript : ($body . $configscript . $srcscript);
@@ -1604,7 +1631,7 @@ function inject_hotspot_multi_edit_form_script(string $body): string {
     ];
     $configscript = '<script id="omero-hotspotmulti-qtype-author-config" type="application/json">'
         . json_encode($config) . '</script>';
-    $scripturl = new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-author.js');
+    $scripturl = local_omeroembed_versioned_script_url('hotspot-multi-qtype-author.js');
     $srcscript = '<script src="' . $scripturl->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $configscript . $srcscript . '$1', $body, 1);
@@ -1621,7 +1648,7 @@ function inject_hotspot_multi_edit_form_script(string $body): string {
  * @return string
  */
 function inject_hotspot_multi_qtype_attempt_script(string $body): string {
-    $scripturl = new \moodle_url('/local/omeroembed/js/hotspot-multi-qtype-attempt.js');
+    $scripturl = local_omeroembed_versioned_script_url('hotspot-multi-qtype-attempt.js');
     $srcscript = '<script src="' . $scripturl->out(false) . '"></script>';
 
     $withscript = preg_replace('#(</head>)#i', $srcscript . '$1', $body, 1);

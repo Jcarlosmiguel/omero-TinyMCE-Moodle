@@ -144,6 +144,13 @@ regions) directly on the slide. This region is never sent to a student's
 browser before they click - only whether their own click was right or
 wrong.
 
+Once a region is drawn, you can fine-tune it: drag the round white handle
+above it to **rotate** it to match an angled feature, or drag any of the
+4 square white corners to **resize** it - both stay centred on where you
+originally drew it. For multiple regions, click a region first to select
+it (needed for "Delete region" too) - the handles only ever show for
+whichever one is currently selected.
+
 Write your question in the text box below the slide, same as any other
 layout.
 
@@ -152,6 +159,8 @@ layout.
 ![The drawing toolbar mid-use on the live preview, with one region already marked and a second being drawn](local_omeroembed/pix/guide/hotspot-b-drawing.png)
 
 ![A student-facing hotspot question right after a correct click, with the "Correct!" feedback visible](local_omeroembed/pix/guide/hotspot-c-feedback.png)
+
+![A drawn region selected, showing the round rotate handle above it and the 4 square resize handles at its corners, mid-rotation](local_omeroembed/pix/guide/hotspot-d-rotate-resize.png)
 
 There's also a separate, fuller Moodle quiz question type
 (`qtype_omerohotspot`/`qtype_omerohotspotmulti`) for graded hotspot
