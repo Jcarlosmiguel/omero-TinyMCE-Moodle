@@ -22,6 +22,17 @@
  * this form's own hidden 'geometry' field, exactly like any other form
  * field, only ever persisted when the whole question is saved.
  *
+ * Also owns the optional "Set as opening view" button - reads the live
+ * preview's own current pan/zoom position straight out of the iframe's
+ * OMERO viewer (readCurrentView() below, ported from local_omeroembed's
+ * own js/author.js - that file has no exported module to import from, a
+ * plain script rather than AMD) and writes it into the hidden
+ * 'openingview' field as {x,y,zm} JSON. Deliberately doesn't touch the
+ * live preview iframe itself when clicked - same "should feel like
+ * bookmarking, not navigating" reasoning author.js's own setOpeningView()
+ * gives - it's only ever applied to the student-facing render
+ * (renderer.php forwards it to proxy.php as x/y/zm query params).
+ *
  * @module     qtype_omerohotspot/editform
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -44,6 +55,7 @@ export const init = async(wrapId) => {
     const imageEl = document.getElementById('id_imageid');
     const datasetEl = document.getElementById('id_datasetid');
     const geometryEl = document.getElementById('id_geometry');
+    const openingviewEl = document.getElementById('id_openingview');
 
     let iframe = null;
 
@@ -52,6 +64,12 @@ export const init = async(wrapId) => {
     loadButton.className = 'btn btn-secondary mb-2';
     loadButton.textContent = await getString('loadslide', 'qtype_omerohotspot');
     wrap.parentNode.insertBefore(loadButton, wrap);
+
+    const openingViewButton = document.createElement('button');
+    openingViewButton.type = 'button';
+    openingViewButton.className = 'btn btn-info mt-2';
+    openingViewButton.textContent = await getString('setopeningview', 'local_omeroembed');
+    wrap.insertAdjacentElement('afterend', openingViewButton);
 
     /**
      * (Re)points the preview iframe at the current subject/image/dataset
@@ -89,6 +107,68 @@ export const init = async(wrapId) => {
     };
 
     loadButton.addEventListener('click', loadPreview);
+
+    /**
+     * Reads the live preview iframe's current pan/zoom position - ported
+     * from local_omeroembed's own js/author.js readCurrentView(), same
+     * formula, just reading this module's own `iframe` variable instead
+     * of a static element id.
+     *
+     * @return {Object|null} {x, y, zm} or null if the preview isn't ready.
+     */
+    const readCurrentView = () => {
+        if (!iframe) {
+            return null;
+        }
+        let doc;
+        try {
+            doc = iframe.contentDocument;
+        } catch (e) {
+            return null;
+        }
+        if (!doc) {
+            return null;
+        }
+
+        const viewerEl = doc.querySelector('ol3-viewer');
+        if (!viewerEl || !viewerEl.au || !viewerEl.au.controller) {
+            return null;
+        }
+
+        const viewer = viewerEl.au.controller.viewModel.viewer;
+        let params;
+        try {
+            params = viewer.getViewParameters();
+        } catch (e) {
+            return null;
+        }
+        if (!params || !params.center || !params.resolution) {
+            return null;
+        }
+
+        return {
+            x: Math.round(params.center[0]),
+            y: Math.round(-params.center[1]),
+            zm: (1 / params.resolution * 100)
+        };
+    };
+
+    openingViewButton.addEventListener('click', async() => {
+        const view = readCurrentView();
+        if (!view) {
+            window.alert(await getString('previewnotready', 'local_omeroembed'));
+            return;
+        }
+        if (openingviewEl) {
+            openingviewEl.value = JSON.stringify(view);
+        }
+
+        const original = openingViewButton.textContent;
+        openingViewButton.textContent = await getString('openingviewset', 'local_omeroembed');
+        window.setTimeout(() => {
+            openingViewButton.textContent = original;
+        }, 1500);
+    });
 
     window.addEventListener('message', (event) => {
         if (event.origin !== window.location.origin || !iframe || event.source !== iframe.contentWindow) {

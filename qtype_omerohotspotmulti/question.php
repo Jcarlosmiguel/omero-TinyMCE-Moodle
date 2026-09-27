@@ -57,6 +57,9 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
     /** @var array Array of {type,x,y,rx,ry,rotation} - the hidden set of acceptable correct-answer regions. */
     public $regions;
 
+    /** @var array|null {x,y,zm} - the position/zoom the slide opens on for a student, or null for OMERO's own default. */
+    public $openingview;
+
     /**
      * The response fields this question expects: the raw click position.
      *

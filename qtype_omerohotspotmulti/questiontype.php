@@ -71,6 +71,15 @@ class qtype_omerohotspotmulti extends question_type {
             }
         }
 
+        // Optional, unlike $regions above - same reasoning
+        // qtype_omerohotspot's own save_question_options() gives on this
+        // same line.
+        $openingview = '';
+        $decodedopeningview = json_decode($question->openingview ?? '', true);
+        if (is_array($decodedopeningview) && isset($decodedopeningview['x'], $decodedopeningview['y'], $decodedopeningview['zm'])) {
+            $openingview = json_encode($decodedopeningview);
+        }
+
         $options = $DB->get_record('qtype_omerohotspotmulti_options', ['questionid' => $question->id]);
         $record = new \stdClass();
         $record->questionid = $question->id;
@@ -78,6 +87,7 @@ class qtype_omerohotspotmulti extends question_type {
         $record->imageid = $question->imageid ?? '';
         $record->datasetid = $question->datasetid ?? '';
         $record->geometry = json_encode(array_values($regions));
+        $record->openingview = $openingview;
 
         if ($options) {
             $record->id = $options->id;
@@ -130,6 +140,9 @@ class qtype_omerohotspotmulti extends question_type {
         $question->imageid = $questiondata->options->imageid;
         $question->datasetid = $questiondata->options->datasetid;
         $question->regions = json_decode($questiondata->options->geometry, true);
+        $question->openingview = !empty($questiondata->options->openingview)
+            ? json_decode($questiondata->options->openingview, true)
+            : null;
     }
 
     /**

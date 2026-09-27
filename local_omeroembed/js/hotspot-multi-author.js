@@ -60,17 +60,49 @@
     var TYPE_RECTANGLE = 'rectangle';
     var HIT_RADIUS = 12; // Screen px - same "too small to be deliberate"/"still easy to click" threshold as hotspot-author.js/annotate.js's own.
     var HANDLE_OFFSET = 20; // px beyond the shape's own edge - identical convention to annotate.js/hotspot-author.js's own.
+    // Screen px - see tryStartMoveDrag()'s own comment on why a plain
+    // click needs to be told apart from a real drag here specifically.
+    var MOVE_CLICK_THRESHOLD = 3;
+
+    // Same custom cursor as hotspot-author.js's own ROTATE_CURSOR - see
+    // that file's own comment for why (no built-in CSS keyword for this).
+    var ROTATE_CURSOR = 'url(\'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">'
+        + '<g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M4 10a6 6 0 1 1 2.2 4.6"/><path d="M4 10 L3 6 M4 10 L8 11"/>'
+        + '</g>'
+        + '<g fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M4 10a6 6 0 1 1 2.2 4.6"/><path d="M4 10 L3 6 M4 10 L8 11"/>'
+        + '</g>'
+        + '</svg>'
+    ) + '\') 10 10, grab';
 
     var olmap = null;
     var viewportEl = null;
+    // The actual element OpenLayers/iviewer manage their own cursor on
+    // (map.getViewport()'s own '.ol-viewport' div, nested INSIDE
+    // viewportEl/getTargetElement()) - not the same element. Setting
+    // cursor on viewportEl was silently shadowed by iviewer's own cursor
+    // handling on this closer descendant - see hotspot-author.js's own
+    // identical comment for the full story. Falls back to viewportEl
+    // itself if getViewport() is ever unavailable.
+    var cursorTargetEl = null;
     var overlayCanvas = null;
     var activeTool = null; // null | 'ellipse' | 'rectangle'
     var constrainShape = false; // touch-reachable equivalent of holding Shift - same convention as hotspot-author.js's own
     var pendingShape = null; // {type,x,y,rx,ry} while drag-drawing, else null
     var regions = []; // every saved region, in-memory mirror of the server's own array
     var selectedIndex = -1; // index into regions[], or -1 if nothing selected
+    // See tryStartMoveDrag()'s own comment on why the native 'click' this
+    // canvas still receives after a real move-drag needs to be ignored -
+    // set true right before that drag's own onUp() returns, consumed (and
+    // reset) by onViewportClick() the very next time it fires.
+    var suppressNextClick = false;
     var disabledInteractions = null;
     var deleteBtn = null;
+    // True for the duration of any resize/rotate/move drag - see
+    // hotspot-author.js's own identical comment on this same variable.
+    var isDragging = false;
 
     /**
      * Same Aurelia-component route every other injected script here
@@ -227,6 +259,122 @@
         var cos = Math.cos(rotation);
         var sin = Math.sin(rotation);
         return [px * cos + py * sin, -px * sin + py * cos];
+    }
+
+    /**
+     * Whether a screen pixel falls inside the *selected* region's own
+     * corner handles - shared by tryStartResizeDrag()'s own hit-test and
+     * the hover-cursor logic below. Unselected regions never have handles
+     * at all (see redraw()'s own comment), so there's nothing to check
+     * when selectedIndex is -1.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function cornerAtPixel(px) {
+        if (selectedIndex < 0) {
+            return false;
+        }
+        var region = regions[selectedIndex];
+        var centrePx = olmap.getPixelFromCoordinate([region.x, -region.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var radii = screenRadii(region.x, region.y, region.rx, region.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (region.rotation || 0) + viewRotation;
+        return cornerPositions(centrePx[0], centrePx[1], radii[0], radii[1], rotation).some(function(corner) {
+            var cdx = corner[0] - px[0];
+            var cdy = corner[1] - px[1];
+            return Math.sqrt(cdx * cdx + cdy * cdy) <= HIT_RADIUS;
+        });
+    }
+
+    /**
+     * Whether a screen pixel falls on the *selected* region's own rotate
+     * handle - shared by tryStartRotateDrag()'s own hit-test and the
+     * hover-cursor logic below.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function rotateHandleAtPixel(px) {
+        if (selectedIndex < 0) {
+            return false;
+        }
+        var region = regions[selectedIndex];
+        var centrePx = olmap.getPixelFromCoordinate([region.x, -region.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var radii = screenRadii(region.x, region.y, region.rx, region.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (region.rotation || 0) + viewRotation;
+        var handlePx = handlePosition(centrePx, radii, rotation);
+        var hdx = handlePx[0] - px[0];
+        var hdy = handlePx[1] - px[1];
+        return Math.sqrt(hdx * hdx + hdy * hdy) <= HIT_RADIUS;
+    }
+
+    /**
+     * Whether a screen pixel falls inside the *selected* region's own
+     * body - same point-in-shape test regionAtPixel() uses per-region,
+     * applied here to just the selected one. Used both to start a
+     * move-drag (tryStartMoveDrag()) and by the hover-cursor logic to
+     * preview that a drag from here would move it - deliberately scoped
+     * to the selected region only, same as the handles: an unselected
+     * region's body is still a valid click-to-select target
+     * (onViewportClick()), not a move target, until it's selected first.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function shapeBodyAtPixel(px) {
+        if (selectedIndex < 0) {
+            return false;
+        }
+        var region = regions[selectedIndex];
+        var centrePx = olmap.getPixelFromCoordinate([region.x, -region.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var dx = centrePx[0] - px[0];
+        var dy = centrePx[1] - px[1];
+        var radii = screenRadii(region.x, region.y, region.rx, region.ry);
+        var rx = Math.max(radii[0], HIT_RADIUS);
+        var ry = Math.max(radii[1], HIT_RADIUS);
+        var viewRotation = olmap.getView().getRotation();
+        var local = unrotate(dx, dy, (region.rotation || 0) + viewRotation);
+        if (region.type === TYPE_ELLIPSE) {
+            var normalised = (local[0] * local[0]) / (rx * rx) + (local[1] * local[1]) / (ry * ry);
+            return normalised <= 1;
+        }
+        return Math.abs(local[0]) <= rx && Math.abs(local[1]) <= ry;
+    }
+
+    /**
+     * Same hover-preview reasoning as hotspot-author.js's own
+     * updateHoverCursor() - a resize cursor over a corner, the custom
+     * rotate cursor over the rotate handle, 'move' over the selected
+     * region's own body, or the default cursor otherwise.
+     *
+     * @param {PointerEvent} e
+     */
+    function updateHoverCursor(e) {
+        if (isDragging || !viewportEl) {
+            return;
+        }
+        var rect = viewportEl.getBoundingClientRect();
+        var px = [e.clientX - rect.left, e.clientY - rect.top];
+        if (cornerAtPixel(px)) {
+            cursorTargetEl.style.cursor = 'nwse-resize';
+        } else if (rotateHandleAtPixel(px)) {
+            cursorTargetEl.style.cursor = ROTATE_CURSOR;
+        } else if (shapeBodyAtPixel(px)) {
+            cursorTargetEl.style.cursor = 'move';
+        } else {
+            cursorTargetEl.style.cursor = '';
+        }
     }
 
     function redraw() {
@@ -400,6 +548,10 @@
      * instead.
      */
     function onViewportClick(e) {
+        if (suppressNextClick) {
+            suppressNextClick = false;
+            return;
+        }
         if (activeTool === TYPE_ELLIPSE || activeTool === TYPE_RECTANGLE) {
             return;
         }
@@ -443,6 +595,8 @@
         e.preventDefault();
         e.stopPropagation();
         setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = 'nwse-resize';
 
         function computeResize(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
@@ -467,6 +621,7 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
             setMapInteractionsEnabled(true);
+            isDragging = false;
 
             var resized = computeResize(upEvent);
             region.rx = resized.rx;
@@ -507,6 +662,8 @@
         e.preventDefault();
         e.stopPropagation();
         setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = ROTATE_CURSOR;
 
         function angleFor(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
@@ -522,6 +679,7 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
             setMapInteractionsEnabled(true);
+            isDragging = false;
 
             region.rotation = angleFor(upEvent);
             persistRegions();
@@ -533,12 +691,131 @@
     }
 
     /**
-     * Drag-to-draw: press at the centre, drag out a radius, release - same
-     * gesture and geometry formula as hotspot-author.js's own
+     * Dragging the selected region's own body (not a handle) to
+     * reposition it - identical interaction to hotspot-author.js's own
+     * tryStartMoveDrag(), just operating on regions[selectedIndex] and
+     * persisting via persistRegions() instead of a single-shape ajax.php
+     * POST. Works correctly regardless of the region's own rotation with
+     * no extra math - see that file's own docblock on this same function
+     * for why.
+     *
+     * Real regression risk here specifically (not shared with the
+     * single-region file, which has no selection concept to deselect):
+     * a plain click on the selected region's own body is *already* how a
+     * teacher deselects it (onViewportClick()'s own toggle), and this
+     * function's own pointerdown handler sits on that exact same body
+     * area. Two real bugs were live-verified while building this, both
+     * now fixed by suppressNextClick, not by this function trying to
+     * pre-empt or replicate onViewportClick()'s own job:
+     * - This function's own preventDefault()/stopPropagation() on the
+     * *pointerdown* do NOT stop the native 'click' event from still
+     * firing afterward regardless (confirmed live - a plausible-sounding
+     * assumption that turned out to be wrong for this event pair in
+     * practice) - so onViewportClick() always still runs after this
+     * function's own onUp(), for every press on the body, drag or not.
+     * - A first attempt had this function's own onUp() manually toggle
+     * selectedIndex off itself for a non-drag (reasoning: "the native
+     * click might be suppressed, so replicate its job just in case") -
+     * live-verified as actively wrong once the point above was confirmed:
+     * onViewportClick() *also* runs, sees selectedIndex already at -1,
+     * and immediately re-selects (its own toggle: hitIndex !== -1, so it
+     * sets selectedIndex = hitIndex again) - net effect, clicking to
+     * deselect silently did nothing at all.
+     * The actual fix: a plain click (never crossed the movement
+     * threshold) is left alone entirely here - onViewportClick() still
+     * fires and toggles selection exactly as it always did, unmodified.
+     * A *real* drag instead sets suppressNextClick, so the native click
+     * that inevitably follows it is the one that gets skipped, rather
+     * than being allowed to immediately deselect the region right after
+     * a teacher just finished moving it.
+     *
+     * @param {PointerEvent} e
+     * @return {boolean} True if the press actually hit the region's body.
+     */
+    function tryStartMoveDrag(e) {
+        var region = regions[selectedIndex];
+        var rect = viewportEl.getBoundingClientRect();
+        var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
+        if (!shapeBodyAtPixel(pressPx)) {
+            return false;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = 'move';
+
+        var startCoord = pixelToImageCoord(pressPx);
+        var startX = region.x;
+        var startY = region.y;
+
+        function computeMove(moveEvent) {
+            var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
+            var moveCoord = pixelToImageCoord(movePx);
+            var ddx = movePx[0] - pressPx[0];
+            var ddy = movePx[1] - pressPx[1];
+            return {
+                x: startX + (moveCoord[0] - startCoord[0]),
+                y: startY + (moveCoord[1] - startCoord[1]),
+                screenDistance: Math.sqrt(ddx * ddx + ddy * ddy),
+            };
+        }
+
+        function onMove(moveEvent) {
+            var moved = computeMove(moveEvent);
+            region.x = moved.x;
+            region.y = moved.y;
+            redraw();
+        }
+
+        function onUp(upEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            setMapInteractionsEnabled(true);
+            isDragging = false;
+
+            var moved = computeMove(upEvent);
+            region.x = moved.x;
+            region.y = moved.y;
+            redraw();
+
+            if (moved.screenDistance < MOVE_CLICK_THRESHOLD) {
+                // Not a real drag - see this function's own docblock. The
+                // native 'click' this same mouseup still triggers is left
+                // alone (not suppressed) so it can do its own normal job -
+                // toggling selection exactly as it always has.
+                return;
+            }
+            // A real drag did happen - suppress the native 'click' this
+            // mouseup still triggers (see this function's own docblock
+            // and suppressNextClick's own comment for why it's needed:
+            // live-verified that preventDefault()/stopPropagation() on
+            // this drag's own pointerdown do *not* actually stop it) so
+            // it doesn't also toggle selection off right after a
+            // legitimate move.
+            suppressNextClick = true;
+            persistRegions();
+        }
+
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        return true;
+    }
+
+    /**
+     * A corner resize handle, the rotate handle, or (checked last, since
+     * it covers the widest area) the selected region's own body to move
+     * it - see hotspot-author.js's own identical priority-order comment
+     * on its own onViewportPointerDown() for why this order.
+     *
+     * Drag-to-draw (the rest of this function, once this returns false):
+     * press at the centre, drag out a radius, release - same gesture and
+     * geometry formula as hotspot-author.js's own
      * onViewportPointerDown()/computePending().
      */
     function onViewportPointerDown(e) {
-        if (selectedIndex >= 0 && (tryStartResizeDrag(e) || tryStartRotateDrag(e))) {
+        if (selectedIndex >= 0 && (tryStartResizeDrag(e) || tryStartRotateDrag(e) || tryStartMoveDrag(e))) {
             return;
         }
 
@@ -704,6 +981,7 @@
             window.setTimeout(init, 300);
             return;
         }
+        cursorTargetEl = (typeof olmap.getViewport === 'function' && olmap.getViewport()) || viewportEl;
 
         overlayCanvas = document.createElement('canvas');
         overlayCanvas.id = 'omero-hotspotmulti-author-overlay';
@@ -716,6 +994,7 @@
 
         viewportEl.addEventListener('click', onViewportClick);
         viewportEl.addEventListener('pointerdown', onViewportPointerDown, true);
+        viewportEl.addEventListener('pointermove', updateHoverCursor);
         olmap.on('postrender', redraw);
 
         buildToolbar();

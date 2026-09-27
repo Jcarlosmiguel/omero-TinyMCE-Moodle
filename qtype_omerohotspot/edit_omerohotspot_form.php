@@ -70,6 +70,15 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
         $mform->addElement('hidden', 'geometry', '', ['id' => 'id_geometry']);
         $mform->setType('geometry', PARAM_RAW);
 
+        // Optional - unlike geometry above, a student can be shown a
+        // hotspot question with no opening view set at all (OMERO's own
+        // default: whole slide, default zoom). Same {x,y,zm} shape and
+        // "doesn't touch the live preview when set" behaviour as
+        // local_omeroembed's own author.js setOpeningView() - see
+        // amd/src/editform.js's own docblock on its opening-view button.
+        $mform->addElement('hidden', 'openingview', '', ['id' => 'id_openingview']);
+        $mform->setType('openingview', PARAM_RAW);
+
         if ($courseid === null) {
             // No course to build a locked-down proxy.php URL against (this
             // question category isn't scoped to a course/activity) - refuse
@@ -85,13 +94,52 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
                 'static',
                 'preview',
                 get_string('regionpreview', 'qtype_omerohotspot'),
+                // The default mform grid splits this row col-md-3 (label) /
+                // col-md-9 (field), leaving the actual drawing area only
+                // 75% of the row's width - cramped compared to
+                // local_omeroembed's own author.php preview, which isn't
+                // fighting a label column for space at all. Stack the
+                // label above the field instead (same as Bootstrap's own
+                // narrow-viewport behaviour, just forced at every width)
+                // so the preview gets the full row.
+                // Moodle's own .form-control-static wrapper (which the
+                // 'static' element's raw HTML always lands inside) has no
+                // explicit width and, as a flex item of .felement above,
+                // shrinks to fit its content - live-verified via a real
+                // headless-browser check that without this second rule
+                // the preview div's own width:100% has nothing real to
+                // resolve against and collapses to ~94px regardless of
+                // the row-width fix above.
+                \html_writer::tag(
+                    'style',
+                    '#fitem_id_preview .col-md-3, #fitem_id_preview .col-md-9 { flex: 0 0 100%; max-width: 100%; }'
+                    . ' #fitem_id_preview .form-control-static { width: 100%; }'
+                ) .
                 \html_writer::tag(
                     'div',
                     '',
                     ['id' => 'qtype_omerohotspot_preview_wrap', 'data-courseid' => $courseid,
                     'style' => 'width:100%; max-width:900px; height:550px; border:1px solid #ccc;']
                 )
+                // Beside the preview, always shown here (unlike
+                // author.php's own equivalent link, which only appears
+                // while hotspot mode is active - this whole form already
+                // is one) - deep-links straight to local_omeroembed's own
+                // drawing walkthrough (mode buttons, lock, rotate/resize,
+                // the centre-out draw gesture, having to switch a mode off
+                // again before a region can be selected), the same shared
+                // drawing UI this form's own preview uses.
+                . \html_writer::link(
+                    new \moodle_url(
+                        '/local/omeroembed/guide.php',
+                        ['courseid' => $courseid],
+                        'drawing-and-adjusting-a-region-step-by-step'
+                    ),
+                    get_string('hotspotdrawinghelplink', 'local_omeroembed'),
+                    ['target' => '_blank', 'rel' => 'noopener', 'style' => 'display:inline-block; margin-top:0.4rem;']
+                )
             );
+            $mform->addElement('static', 'openingviewhelp', '', get_string('openingviewhelp', 'qtype_omerohotspot'));
             $PAGE->requires->js_call_amd(
                 'qtype_omerohotspot/editform',
                 'init',
@@ -126,8 +174,8 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
     }
 
     /**
-     * Copies the saved subject/image/dataset/geometry options onto the
-     * question object so the form fields above pre-fill on edit.
+     * Copies the saved subject/image/dataset/geometry/openingview options
+     * onto the question object so the form fields above pre-fill on edit.
      *
      * @param object $question
      * @return object
@@ -140,6 +188,10 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
             $question->imageid = $question->options->imageid;
             $question->datasetid = $question->options->datasetid;
             $question->geometry = $question->options->geometry;
+            // Round-trips into the hidden 'openingview' field untouched -
+            // a re-edit that never clicks "Set as opening view" again
+            // keeps whatever was saved before, same as geometry above.
+            $question->openingview = $question->options->openingview ?? '';
         }
 
         return $question;

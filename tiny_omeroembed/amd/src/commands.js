@@ -22,8 +22,10 @@
  */
 
 import {getImagePath} from 'editor_tiny/utils';
+import {getContextId} from 'editor_tiny/options';
 import {handleAction} from './ui';
 import {getString} from 'core/str';
+import Config from 'core/config';
 import {
     component,
     buttonName,
@@ -59,9 +61,11 @@ export const getSetup = async() => {
     const [
         buttonText,
         buttonMarkup,
+        helpTabTitle,
     ] = await Promise.all([
         getString('buttontitle', component),
         getIconMarkup('icon', component),
+        getString('helptabtitle', component),
     ]);
 
     return (editor) => {
@@ -94,6 +98,35 @@ export const getSetup = async() => {
             icon,
             text: buttonText,
             onAction: () => handleAction(editor),
+        });
+
+        // A custom tab in TinyMCE's own native Help dialog (the toolbar's
+        // "?" button / Alt+0 / the Help menu's own "Help" item - all the
+        // same dialog, all already present, see the 'help' plugin bundled
+        // with TinyMCE itself). Registered on 'init' rather than
+        // synchronously here: every plugin's own setup callback (this one
+        // included) runs during editor construction, before TinyMCE fires
+        // 'init' - the 'help' plugin's own editor.plugins.help API isn't
+        // guaranteed to exist yet at this exact point if it happens to be
+        // configured to load after this plugin, but 'init' only fires once
+        // every plugin has finished loading, so it's the correct place to
+        // rely on another plugin's own registered API. Guarded regardless,
+        // in case some other Moodle context ever configures a TinyMCE
+        // toolbar without the 'help' plugin at all.
+        editor.on('init', async() => {
+            if (!editor.plugins.help) {
+                return;
+            }
+            const guideUrl = Config.wwwroot + '/local/omeroembed/guide.php?contextid=' + getContextId(editor);
+            const helpTabBody = await getString('helptabbody', component, guideUrl);
+            editor.plugins.help.addTab({
+                name: `${component}-help`,
+                title: helpTabTitle,
+                items: [{
+                    type: 'htmlpanel',
+                    html: helpTabBody,
+                }],
+            });
         });
     };
 };

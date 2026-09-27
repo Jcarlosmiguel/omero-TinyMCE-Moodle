@@ -45,15 +45,42 @@
     var TYPE_RECTANGLE = 'rectangle';
     var HIT_RADIUS = 12;
     var HANDLE_OFFSET = 20; // px beyond the shape's own edge - identical convention to annotate.js/hotspot-author.js's own.
+    // Screen px - see tryStartMoveDrag()'s own comment on why a plain
+    // click needs to be told apart from a real drag here specifically.
+    var MOVE_CLICK_THRESHOLD = 3;
+
+    // Same custom cursor as hotspot-author.js's own ROTATE_CURSOR - see
+    // that file's own comment for why (no built-in CSS keyword for this).
+    var ROTATE_CURSOR = 'url(\'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">'
+        + '<g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M4 10a6 6 0 1 1 2.2 4.6"/><path d="M4 10 L3 6 M4 10 L8 11"/>'
+        + '</g>'
+        + '<g fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M4 10a6 6 0 1 1 2.2 4.6"/><path d="M4 10 L3 6 M4 10 L8 11"/>'
+        + '</g>'
+        + '</svg>'
+    ) + '\') 10 10, grab';
 
     var olmap = null;
     var viewportEl = null;
+    // The actual element OpenLayers/iviewer manage their own cursor on
+    // (map.getViewport()'s own '.ol-viewport' div, nested INSIDE
+    // viewportEl/getTargetElement()) - not the same element. Setting
+    // cursor on viewportEl was silently shadowed by iviewer's own cursor
+    // handling on this closer descendant - see hotspot-author.js's own
+    // identical comment for the full story. Falls back to viewportEl
+    // itself if getViewport() is ever unavailable.
+    var cursorTargetEl = null;
     var overlayCanvas = null;
     var activeTool = null;
     var constrainShape = false;
     var pendingShape = null;
     var savedGeometry = null;
     var disabledInteractions = null;
+    // True for the duration of any resize/rotate/move drag - see
+    // hotspot-author.js's own identical comment on this same variable.
+    var isDragging = false;
 
     function findViewer() {
         var el = document.querySelector('ol3-viewer');
@@ -87,6 +114,111 @@
         var cos = Math.cos(rotation);
         var sin = Math.sin(rotation);
         return [px * cos + py * sin, -px * sin + py * cos];
+    }
+
+    /**
+     * Whether a screen pixel falls inside the saved shape's own corner
+     * handles - shared by tryStartResizeDrag()'s own hit-test and the
+     * hover-cursor logic below.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function cornerAtPixel(px) {
+        if (!savedGeometry) {
+            return false;
+        }
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (savedGeometry.rotation || 0) + viewRotation;
+        return cornerPositions(centrePx[0], centrePx[1], radii, rotation).some(function(corner) {
+            var cdx = corner[0] - px[0];
+            var cdy = corner[1] - px[1];
+            return Math.sqrt(cdx * cdx + cdy * cdy) <= HIT_RADIUS;
+        });
+    }
+
+    /**
+     * Whether a screen pixel falls on the saved shape's own rotate handle -
+     * shared by tryStartRotateDrag()'s own hit-test and the hover-cursor
+     * logic below.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function rotateHandleAtPixel(px) {
+        if (!savedGeometry) {
+            return false;
+        }
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (savedGeometry.rotation || 0) + viewRotation;
+        var handlePx = handlePosition(centrePx, radii, rotation);
+        var hdx = handlePx[0] - px[0];
+        var hdy = handlePx[1] - px[1];
+        return Math.sqrt(hdx * hdx + hdy * hdy) <= HIT_RADIUS;
+    }
+
+    /**
+     * Whether a screen pixel falls inside the saved shape's own body -
+     * used both to start a move-drag (tryStartMoveDrag()) and, when
+     * nothing is being dragged, by the hover-cursor logic to preview that
+     * a drag from here would move it.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function shapeBodyAtPixel(px) {
+        if (!savedGeometry) {
+            return false;
+        }
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var dx = centrePx[0] - px[0];
+        var dy = centrePx[1] - px[1];
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var rx = Math.max(radii[0], HIT_RADIUS);
+        var ry = Math.max(radii[1], HIT_RADIUS);
+        var viewRotation = olmap.getView().getRotation();
+        var local = unrotate(dx, dy, (savedGeometry.rotation || 0) + viewRotation);
+        if (savedGeometry.type === TYPE_ELLIPSE) {
+            var normalised = (local[0] * local[0]) / (rx * rx) + (local[1] * local[1]) / (ry * ry);
+            return normalised <= 1;
+        }
+        return Math.abs(local[0]) <= rx && Math.abs(local[1]) <= ry;
+    }
+
+    /**
+     * Previews what a press at this pixel would do - see hotspot-author.js's
+     * own identical updateHoverCursor() for the full reasoning.
+     *
+     * @param {PointerEvent} e
+     */
+    function updateHoverCursor(e) {
+        if (isDragging || !viewportEl) {
+            return;
+        }
+        var rect = viewportEl.getBoundingClientRect();
+        var px = [e.clientX - rect.left, e.clientY - rect.top];
+        if (cornerAtPixel(px)) {
+            cursorTargetEl.style.cursor = 'nwse-resize';
+        } else if (rotateHandleAtPixel(px)) {
+            cursorTargetEl.style.cursor = ROTATE_CURSOR;
+        } else if (shapeBodyAtPixel(px)) {
+            cursorTargetEl.style.cursor = 'move';
+        } else {
+            cursorTargetEl.style.cursor = '';
+        }
     }
 
     function screenRadii(centreX, centreY, rx, ry) {
@@ -294,6 +426,8 @@
         e.preventDefault();
         e.stopPropagation();
         setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = 'nwse-resize';
 
         function computeResize(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
@@ -318,6 +452,7 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
             setMapInteractionsEnabled(true);
+            isDragging = false;
 
             var resized = computeResize(upEvent);
             savedGeometry.rx = resized.rx;
@@ -356,6 +491,8 @@
         e.preventDefault();
         e.stopPropagation();
         setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = ROTATE_CURSOR;
 
         function angleFor(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
@@ -371,6 +508,7 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
             setMapInteractionsEnabled(true);
+            isDragging = false;
 
             savedGeometry.rotation = angleFor(upEvent);
             reportGeometry(savedGeometry);
@@ -381,8 +519,78 @@
         return true;
     }
 
+    /**
+     * Dragging the shape's own body (not a handle) to reposition it - same
+     * interaction as hotspot-author.js's own tryStartMoveDrag() (including
+     * its own click-vs-drag movement threshold - see that file's own
+     * docblock on this same function for why), reporting via
+     * reportGeometry() on release instead of an ajax.php POST.
+     *
+     * @param {PointerEvent} e
+     * @return {boolean} True if the press actually hit the shape's body.
+     */
+    function tryStartMoveDrag(e) {
+        var rect = viewportEl.getBoundingClientRect();
+        var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
+        if (!shapeBodyAtPixel(pressPx)) {
+            return false;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = 'move';
+
+        var startCoord = pixelToImageCoord(pressPx);
+        var startX = savedGeometry.x;
+        var startY = savedGeometry.y;
+
+        function computeMove(moveEvent) {
+            var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
+            var moveCoord = pixelToImageCoord(movePx);
+            var ddx = movePx[0] - pressPx[0];
+            var ddy = movePx[1] - pressPx[1];
+            return {
+                x: startX + (moveCoord[0] - startCoord[0]),
+                y: startY + (moveCoord[1] - startCoord[1]),
+                screenDistance: Math.sqrt(ddx * ddx + ddy * ddy),
+            };
+        }
+
+        function onMove(moveEvent) {
+            var moved = computeMove(moveEvent);
+            savedGeometry.x = moved.x;
+            savedGeometry.y = moved.y;
+            redraw();
+        }
+
+        function onUp(upEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            setMapInteractionsEnabled(true);
+            isDragging = false;
+
+            var moved = computeMove(upEvent);
+            savedGeometry.x = moved.x;
+            savedGeometry.y = moved.y;
+
+            if (moved.screenDistance < MOVE_CLICK_THRESHOLD) {
+                // Not a real drag - see hotspot-author.js's own identical
+                // comment on its own tryStartMoveDrag().
+                redraw();
+                return;
+            }
+            reportGeometry(savedGeometry);
+        }
+
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        return true;
+    }
+
     function onViewportPointerDown(e) {
-        if (savedGeometry && (tryStartResizeDrag(e) || tryStartRotateDrag(e))) {
+        if (savedGeometry && (tryStartResizeDrag(e) || tryStartRotateDrag(e) || tryStartMoveDrag(e))) {
             return;
         }
 
@@ -523,6 +731,7 @@
             window.setTimeout(init, 300);
             return;
         }
+        cursorTargetEl = (typeof olmap.getViewport === 'function' && olmap.getViewport()) || viewportEl;
 
         overlayCanvas = document.createElement('canvas');
         overlayCanvas.id = 'omero-hotspot-author-overlay';
@@ -534,6 +743,7 @@
         viewportEl.appendChild(overlayCanvas);
 
         viewportEl.addEventListener('pointerdown', onViewportPointerDown, true);
+        viewportEl.addEventListener('pointermove', updateHoverCursor);
         olmap.on('postrender', redraw);
 
         buildToolbar();

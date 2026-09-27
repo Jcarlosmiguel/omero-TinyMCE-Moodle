@@ -38,7 +38,20 @@ export default new Promise(async(resolve) => {
     ] = await Promise.all([
         getTinyMCE(),
         Commands.getSetup(),
-        getPluginMetadata(component, pluginName),
+        // Real bug, found while adding the Help dialog's own custom tab
+        // (see commands.js): getPluginMetadata()'s own default, with no
+        // url override, points this plugin's "Plugins" tab entry at
+        // https://docs.moodle.org/en/editor_tiny/omeroembed - a page that
+        // doesn't exist (that convention is for plugins Moodle HQ
+        // documents itself, not third-party ones like this). Overridden
+        // with this plugin's own real GitHub README instead - this call
+        // resolves once per page load, before any editor instance exists,
+        // so unlike commands.js's own per-instance guide.php link it has
+        // no course/context to build a context-aware URL from anyway; a
+        // stable, context-independent reference page is the right fit
+        // here regardless.
+        getPluginMetadata(component, pluginName,
+            'https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle/tree/main/tiny_omeroembed'),
     ]);
 
     tinyMCE.PluginManager.add(`${component}/plugin`, (editor) => {

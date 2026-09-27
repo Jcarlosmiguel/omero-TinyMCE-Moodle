@@ -77,6 +77,11 @@ class qtype_omerohotspotmulti_edit_form extends question_edit_form {
         $mform->addElement('hidden', 'geometry', '', ['id' => 'id_geometry']);
         $mform->setType('geometry', PARAM_RAW);
 
+        // Optional - same {x,y,zm} shape and reasoning as
+        // qtype_omerohotspot's own edit form gives on this same line.
+        $mform->addElement('hidden', 'openingview', '', ['id' => 'id_openingview']);
+        $mform->setType('openingview', PARAM_RAW);
+
         if ($courseid === null) {
             // No course to build a locked-down proxy.php URL against (this
             // question category isn't scoped to a course/activity) - refuse
@@ -92,13 +97,37 @@ class qtype_omerohotspotmulti_edit_form extends question_edit_form {
                 'static',
                 'preview',
                 get_string('regionpreview', 'qtype_omerohotspotmulti'),
+                // Same fix as qtype_omerohotspot's own edit form - see its
+                // docblock comment on this same line for why the label
+                // needs to stack above the field instead of sharing the
+                // row with it.
+                // Same second rule as qtype_omerohotspot's own edit form -
+                // see its docblock comment on this same line for why
+                // .form-control-static also needs an explicit width.
+                \html_writer::tag(
+                    'style',
+                    '#fitem_id_preview .col-md-3, #fitem_id_preview .col-md-9 { flex: 0 0 100%; max-width: 100%; }'
+                    . ' #fitem_id_preview .form-control-static { width: 100%; }'
+                ) .
                 \html_writer::tag(
                     'div',
                     '',
                     ['id' => 'qtype_omerohotspotmulti_preview_wrap', 'data-courseid' => $courseid,
                     'style' => 'width:100%; max-width:900px; height:550px; border:1px solid #ccc;']
                 )
+                // Same reasoning as qtype_omerohotspot's own edit form -
+                // see its docblock comment on this same line.
+                . \html_writer::link(
+                    new \moodle_url(
+                        '/local/omeroembed/guide.php',
+                        ['courseid' => $courseid],
+                        'drawing-and-adjusting-a-region-step-by-step'
+                    ),
+                    get_string('hotspotdrawinghelplink', 'local_omeroembed'),
+                    ['target' => '_blank', 'rel' => 'noopener', 'style' => 'display:inline-block; margin-top:0.4rem;']
+                )
             );
+            $mform->addElement('static', 'openingviewhelp', '', get_string('openingviewhelp', 'qtype_omerohotspotmulti'));
             $PAGE->requires->js_call_amd(
                 'qtype_omerohotspotmulti/editform',
                 'init',
@@ -130,8 +159,8 @@ class qtype_omerohotspotmulti_edit_form extends question_edit_form {
     }
 
     /**
-     * Copies the saved subject/image/dataset/geometry options onto the
-     * question object so the form fields above pre-fill on edit.
+     * Copies the saved subject/image/dataset/geometry/openingview options
+     * onto the question object so the form fields above pre-fill on edit.
      *
      * @param object $question
      * @return object
@@ -144,6 +173,10 @@ class qtype_omerohotspotmulti_edit_form extends question_edit_form {
             $question->imageid = $question->options->imageid;
             $question->datasetid = $question->options->datasetid;
             $question->geometry = $question->options->geometry;
+            // Round-trips into the hidden 'openingview' field untouched -
+            // same reasoning qtype_omerohotspot's own data_preprocessing()
+            // gives on this same line.
+            $question->openingview = $question->options->openingview ?? '';
         }
 
         return $question;

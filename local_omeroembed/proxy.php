@@ -466,7 +466,27 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
         // there's no sensible way to want both active on the same click at
         // once.
         $hotspotoverridesstudentview = ($enablehotspot || $enablehotspotmulti) && !$authoring && !$heatmap;
-        if ($hotspotoverridesstudentview) {
+        // The qtype hotspot plugins' own edit-form preview wants the same
+        // clean view as the student-facing case above, for a different
+        // reason: direct feedback that the on-screen zoom/fullscreen/
+        // scale-line controls were just confusing clutter in this narrow,
+        // single-purpose authoring tool, on top of the navbar/ROI panel
+        // already closed off elsewhere in this dispatch (see
+        // inject_hide_roi_panel_css()'s own docblock). Hiding the
+        // on-screen .ol-zoom control *buttons* doesn't disable the
+        // OpenLayers zoom *interactions* that back them (scroll-wheel,
+        // double-click) - those are separate, always-on interactions the
+        // control widget only happens to also expose as clickable buttons,
+        // confirmed live: pan/zoom still works fully with the buttons
+        // hidden, same reasoning already proven for .ol-rotate above (a
+        // hidden button doesn't touch the interaction bound to the map
+        // itself). Deliberately narrower than $hotspotoverridesstudentview
+        // above - local_omeroembed's own general authoring preview
+        // (author.php, hotspotmode 'standalone') is unaffected, only the
+        // two qtype forms' own preview.
+        $hotspotqtypeauthoring = $authoring
+            && (($hotspotmode === 'qtype' && $enablehotspot) || ($hotspotmode === 'qtypemulti' && $enablehotspotmulti));
+        if ($hotspotoverridesstudentview || $hotspotqtypeauthoring) {
             $hideflags = array_fill_keys(array_keys($hideflags), true);
             $enableannotations = false;
         }
@@ -538,6 +558,10 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
             // This is qtype_omerohotspotmulti's own question-edit-form preview -
             // same reasoning as the single-region qtype's own branch below,
             // just posting a whole array of regions instead of one shape.
+            // See inject_hide_roi_panel_css()'s own docblock for why this
+            // one authoring context also gets the panel hidden, unlike
+            // local_omeroembed's own general authoring preview.
+            $rewritten = inject_hide_roi_panel_css($rewritten);
             $rewritten = inject_hotspot_multi_edit_form_script($rewritten);
         } else if (
             $hotspotmode === 'qtype' && $enablehotspot
@@ -551,6 +575,7 @@ if ($contenttype && str_contains($contenttype, 'text/css')) {
             // $embedid, and nothing to persist server-side here at all -
             // the geometry is just one more field on that form, saved
             // when the whole question is saved).
+            $rewritten = inject_hide_roi_panel_css($rewritten);
             $rewritten = inject_hotspot_edit_form_script($rewritten);
         } else if (
             $enablehotspotmulti && $embedid !== ''
@@ -686,21 +711,56 @@ function inject_server_workaround(string $body, string $proxybase): string {
 }
 
 /**
- * Resolves one of the 6 overlay/annotation boolean settings (hideoverview,
- * hideintensity, hidefullscreen, hidescaleline, hidezoom, enableannotations
- * - rotate isn't one of these, see inject_overlay_hide_css()'s own comment
+ * Resolves one of the overlay/feature boolean settings (hideoverview,
+ * hideintensity, hidefullscreen, hidescaleline, hidezoom, hidenavbar,
+ * showomerorois, enableannotations, enablehotspot, enablehotspotmulti -
+ * rotate isn't one of these, see inject_overlay_hide_css()'s own comment
  * for why) for the current request: an explicit per-embed value baked into
- * the URL by author.php wins outright (even '0', overriding a site default
- * of "on") - only when the param is genuinely absent (embeds generated
- * before this feature existed) does the site admin's own setting apply,
- * exactly as it always has.
+ * the URL wins outright (even '0', overriding the default of "on") - only
+ * when the param is genuinely absent does the fixed default below apply.
+ *
+ * That default used to be get_config('local_omeroembed', $key) - a real
+ * site admin setting. It no longer is: settings.php's 1.7.0 cleanup
+ * removed every one of these from Site Administration (see that file's
+ * own comment, and author.php's $overlaydefaults, which this array must
+ * stay identical to - author.php always bakes an explicit value into
+ * every proxy.php URL it builds, specifically so it would never depend on
+ * this fallback, per that file's own comment on $overlaydefaults).
+ * get_config() therefore now always returns false for every one of these
+ * keys, silently reverting to "everything visible" for any OTHER caller
+ * that doesn't explicitly set every param - confirmed as a real bug, not
+ * hypothetical: both qtype hotspot plugins' own edit-form preview
+ * (amd/src/editform.js) build a minimal proxy.php URL that never sets
+ * hideoverview/hideintensity/hidenavbar at all, so OMERO's own overview
+ * thumbnail, intensity indicator and full File/ROIs/Help navbar were all
+ * showing on that preview with no way to turn them off - not what a new
+ * embed actually defaults to anywhere else.
  *
  * @param string $key
  * @return bool
  */
 function resolve_overlay_setting(string $key): bool {
+    // Keep identical to author.php's own $overlaydefaults (plus the two
+    // hotspot flags, which aren't in that array - a plain embed with
+    // neither param present is correctly not a hotspot embed at all).
+    $defaults = [
+        'hideoverview' => true,
+        'hideintensity' => true,
+        'hidefullscreen' => false,
+        'hidescaleline' => false,
+        // Deliberately true, not a preserved historical value like the
+        // rest of this list - see author.php's own $overlaydefaults
+        // comment on this same key.
+        'hidezoom' => true,
+        'hidenavbar' => true,
+        'showomerorois' => false,
+        // Same as hidezoom above - deliberately true, not preserved.
+        'enableannotations' => true,
+        'enablehotspot' => false,
+        'enablehotspotmulti' => false,
+    ];
     $override = optional_param($key, null, PARAM_BOOL);
-    return $override ?? (bool) get_config('local_omeroembed', $key);
+    return $override ?? ($defaults[$key] ?? false);
 }
 
 /**
@@ -974,10 +1034,23 @@ JS;
  *   selector - the same class also exists on a *different*, unrelated
  *   left-hand splitter, confirmed live - hence the specific #id here.)
  *
- * Never applied to the authoring tool's own preview - a teacher
- * legitimately might use this panel themselves while building an embed,
- * with their own real OMERO permissions; this is specifically about
- * closing off a student's manual access, not removing the panel outright.
+ * Not applied to local_omeroembed's own general authoring preview - a
+ * teacher legitimately might use this panel themselves while building a
+ * plain embed, with their own real OMERO permissions; this is
+ * specifically about closing off a student's manual access there, not
+ * removing the panel outright.
+ *
+ * Also called (see this file's own dispatch) for qtype_omerohotspot's and
+ * qtype_omerohotspotmulti's own question-edit-form preview specifically -
+ * a narrower exception to the paragraph above, added after direct user
+ * feedback that the panel was just confusing clutter there, not a real
+ * tool: a hotspot question's correct-answer region is entirely separate,
+ * plugin-managed geometry (this file's own inject_hotspot_edit_form_script()/
+ * inject_hotspot_multi_edit_form_script()), with no relationship to
+ * OMERO's native ROIs at all, so there's no legitimate reason for a
+ * teacher to open OMERO's own ROI/rendering panel while authoring one -
+ * unlike the general embed-authoring case above, where a teacher's own
+ * real OMERO work on the slide is a genuine, common reason to want it.
  *
  * inject_show_rois_script()'s own programmatic `.click()` on
  * `.collapse-right` still works perfectly fine once it's hidden this way -

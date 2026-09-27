@@ -29,4 +29,25 @@ $observers = [
         'eventname' => '\core\event\course_deleted',
         'callback' => '\local_omeroembed\observer::course_deleted',
     ],
+    // Keeps both hotspot qtypes off a shared quiz page - see
+    // classes/observer.php's own enforce_hotspot_own_page() docblock for
+    // why. Registered here (not in either qtype plugin) since the rule
+    // covers both of them together, and this is the one plugin both
+    // already depend on.
+    [
+        'eventname' => '\mod_quiz\event\slot_created',
+        'callback' => '\local_omeroembed\observer::quiz_slot_created',
+    ],
+    [
+        'eventname' => '\mod_quiz\event\slot_deleted',
+        'callback' => '\local_omeroembed\observer::quiz_slot_deleted',
+    ],
+    [
+        'eventname' => '\mod_quiz\event\slot_moved',
+        'callback' => '\local_omeroembed\observer::quiz_slot_moved',
+    ],
+    [
+        'eventname' => '\mod_quiz\event\quiz_repaginated',
+        'callback' => '\local_omeroembed\observer::quiz_repaginated',
+    ],
 ];

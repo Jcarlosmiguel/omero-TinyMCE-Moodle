@@ -105,21 +105,28 @@ $optionswereunlocked = (bool) optional_param('options_unlocked', 0, PARAM_BOOL);
 // proxy.php's inject_overlay_hide_css() for why).
 //
 // Fixed literals, not a site setting any more (removed in 1.7.0 - see
-// settings.php's own comment on why) - these are the exact same values
-// that setting used to default to, preserving today's real out-of-the-box
-// behaviour for a new embed exactly, just no longer overridable site-wide.
-// A teacher can still change every one of these per embed below, same as
-// always - only the site-wide "starting point" is now fixed rather than
-// admin-configurable.
+// settings.php's own comment on why) - these were originally the exact
+// same values that setting used to default to (preserving the real
+// out-of-the-box behaviour for a new embed at the time), just no longer
+// overridable site-wide. A teacher can still change every one of these
+// per embed below, same as always - only the site-wide "starting point"
+// is fixed rather than admin-configurable.
+//
+// enableannotations and hidezoom are the deliberate exceptions: changed
+// to true (student annotations on, zoom controls hidden, both by default
+// for a new embed), direct feedback - not preserved historical values
+// like the rest of this list. proxy.php's resolve_overlay_setting()
+// carries its own matching literals for both keys - keep all three in
+// sync if any of this ever changes again.
 $overlaydefaults = [
     'hideoverview' => true,
     'hideintensity' => true,
     'hidefullscreen' => false,
     'hidescaleline' => false,
-    'hidezoom' => false,
+    'hidezoom' => true,
     'hidenavbar' => true,
     'showomerorois' => false,
-    'enableannotations' => false,
+    'enableannotations' => true,
 ];
 $overlaysettings = [];
 foreach (array_keys($overlaydefaults) as $key) {
@@ -341,6 +348,30 @@ if ($hasslide) {
     }
     if ($browsable) {
         $proxyparams['browsable'] = 1;
+    }
+    // Real, confirmed bug: without this, embedid was only ever added to
+    // the live preview iframe's src by a *client-side* reload
+    // (author.js's own reloadHotspotPreview()-type functions, triggered
+    // by a real 'change' event on the hotspot mode dropdown or similar) -
+    // fine for a teacher picking hotspot mode for the first time (a real
+    // change event fires, the reload happens, embedid gets added then),
+    // but re-editing an existing hotspot embed pre-selects that same
+    // dropdown value from this page's very first server render, so no
+    // change event ever fires and the reload-with-embedid logic never
+    // runs. The very first iframe request (the only one that ever loads)
+    // was missing embedid entirely, so hotspot-author.js's own
+    // ajax('hotspot_get', ...) call fetched the geometry for a blank
+    // embedid and got nothing back - live-verified: the region's own row
+    // was genuinely still in the database under the real embedid the
+    // whole time, only the client-side fetch was asking for the wrong
+    // (empty) one. $annotateid is always the real, correct id once it's
+    // non-empty (either forwarded by tiny_omeroembed's own
+    // readExistingEmbed() on re-edit, or already minted by this same
+    // request's own author.js on an earlier reload within the same
+    // session) - baking it in here as soon as it's known removes the
+    // dependency on that change event firing at all.
+    if ($annotateid !== '') {
+        $proxyparams['embedid'] = $annotateid;
     }
     // Unlike images/dataset/browsable above, these 9 are *always* written
     // explicitly (never omitted when false) - proxy.php's
@@ -940,6 +971,24 @@ if ($hasslide) {
     ]);
     echo html_writer::div($iframe, '', [
         'id' => 'omero-iframe-wrap', 'style' => $iframewrapstyle,
+    ]);
+
+    // Beside the preview, not just in the Layout fieldset's own help icon -
+    // direct feedback: the drawing toolbar (mode buttons, lock, rotate/
+    // resize handles, the centre-out draw gesture, having to switch a mode
+    // off again before a region can be selected) has enough real detail
+    // that a link right where the toolbar itself appears is more likely to
+    // get used than one buried in a dropdown's help icon further up the
+    // page. Hidden by default, shown only while a hotspot mode is active -
+    // js/author.js's applyHotspotModeUI() toggles it the same way it
+    // already toggles the annotations checkbox for the same condition.
+    // Deep-links straight to guide.php's own drawing walkthrough section
+    // (see that file's own id="..." comment on this same heading), not
+    // just the top of the guide.
+    echo html_writer::link($guideurl->out(false) . '#drawing-and-adjusting-a-region-step-by-step',
+        get_string('hotspotdrawinghelplink', 'local_omeroembed'), [
+        'id' => 'omero-hotspot-drawing-help', 'target' => '_blank', 'rel' => 'noopener',
+        'style' => 'display:none; margin-top:0.4rem;',
     ]);
 
     // Placeholder text (:empty::before, see the shared <style> block near

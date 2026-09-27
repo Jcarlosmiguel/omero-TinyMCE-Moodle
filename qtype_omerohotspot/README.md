@@ -23,9 +23,31 @@ replicate.
 
 - The teacher draws the hidden correct-answer region directly on a live,
   pannable/zoomable preview of the real slide, using the same authoring
-  UI `local_omeroembed`'s own standalone hotspot feature uses.
+  UI `local_omeroembed`'s own standalone hotspot feature uses - resize
+  (drag any of its 4 square corner handles) and rotate (drag the round
+  handle above it) are the only two ways to adjust it once drawn, both
+  staying centred on where it was originally drawn - **there's no way to
+  drag a region to a different spot**; drawn in the wrong place means
+  delete and redraw, not move. Two more details worth knowing before
+  drawing one: the draw gesture starts at the region's *centre*, not a
+  corner - press where the feature actually is, then drag outward to set
+  its size, rather than dragging corner-to-corner like most drawing
+  tools; and switching the ellipse/rectangle mode button off again
+  (click it a second time) is what lets a click select an existing
+  region for editing instead of starting a new one. See [the full visual
+  walkthrough](https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle/blob/main/USAGE.md#drawing-and-adjusting-a-region-step-by-step)
+  for the whole sequence with screenshots.
+- **Opening view** - pan/zoom the slide to a starting position in the
+  question editing form and click **Set as opening view**; a student then
+  sees that position, rather than OMERO's own default view, when they
+  reach the question. Independent of the hidden region itself, and
+  entirely optional.
 - Plugs into Moodle's normal question bank, gradebook, and quiz review
-  flow like any other question type.
+  flow like any other question type - including getting its own quiz
+  page by default, kept separate from whatever else is in the quiz (a
+  full slide viewer sharing a page with another question reads as
+  genuinely confusing, not just untidy). Only a default, not a lock - a
+  teacher can still manually join it back onto a shared page afterward.
 - The hidden region is never sent to a student's browser under any
   circumstance, including question review - only a plain correct/incorrect
   result ever reaches the client.
@@ -63,7 +85,10 @@ target instead.
 Add an "OMERO hotspot" question in any quiz's question bank, pick a
 subject account and image the same way you would in
 `local_omeroembed`'s own authoring tool, and draw the correct region on
-the live preview before saving.
+the live preview - rotate/resize it in place with the same handles as
+the standalone embed feature, and optionally click **Set as opening
+view** to choose the slide position a student sees first - before
+saving.
 
 ## License
 

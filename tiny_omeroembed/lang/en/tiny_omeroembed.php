@@ -25,6 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['buttontitle'] = 'Insert OMERO slide';
+$string['helptabbody'] = '<p>The <strong>Insert OMERO slide</strong> button (in the toolbar, and in the Insert menu) opens a live, pannable slide viewer - pick a subject account and image, write your commentary alongside it, and insert the finished embed directly into this text. No HTML or URLs to type by hand.</p><p>With the cursor on or inside an existing embed, the same button re-opens it pre-filled with that embed\'s current settings, ready to change.</p><p><a href="{$a}" target="_blank" rel="noopener">Read the full visual guide</a> for a step-by-step walkthrough with screenshots.</p>';
+$string['helptabtitle'] = 'OMERO slide embed';
 $string['modaltitle'] = 'Insert an OMERO slide';
 $string['omeroembed:embed'] = 'Insert an OMERO slide embed';
 $string['pluginname'] = 'OMERO embed';

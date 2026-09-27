@@ -12,6 +12,7 @@
         <FIELD NAME="imageid" TYPE="char" LENGTH="32" NOTNULL="false" SEQUENCE="false" COMMENT="OMERO image id - same convention as author.php's own 'images' param"/>
         <FIELD NAME="datasetid" TYPE="char" LENGTH="32" NOTNULL="false" SEQUENCE="false" COMMENT="OMERO dataset id, if the student is meant to browse a dataset rather than one fixed image - same convention as author.php's own 'dataset' param"/>
         <FIELD NAME="geometry" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON ARRAY of {type,x,y,rx,ry,rotation} objects - plural sibling of local_omeroembed_hotspots.geometry"/>
+        <FIELD NAME="openingview" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Optional JSON {x,y,zm} - the pan/zoom position the slide should open on for a student, same shape/meaning as local_omeroembed's own author.js 'Set as opening view' feature, and identical to qtype_omerohotspot_options.openingview. Blank/null means OMERO's own default view (whole slide, default zoom) - never required, unlike geometry."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>

@@ -29,12 +29,37 @@ Digital Image Hub.
 - The teacher marks as many acceptable regions as the slide needs,
   directly on a live, pannable/zoomable preview of the real slide, using
   the same authoring UI `local_omeroembed`'s own standalone multi-region
-  hotspot feature uses.
+  hotspot feature uses - rotate (drag the round handle above the
+  currently-selected region) and resize (drag any of its 4 square corner
+  handles) are the only two ways to adjust one once drawn, both staying
+  centred on where it was originally drawn - **there's no way to drag a
+  region to a different spot**; drawn in the wrong place means delete
+  and redraw, not move. A few more details worth knowing before drawing:
+  the draw gesture starts at the region's *centre*, not a corner - press
+  where the feature actually is, then drag outward to set its size,
+  rather than dragging corner-to-corner like most drawing tools; the
+  ellipse/rectangle mode button you used stays switched on after
+  drawing, so you can draw several regions in a row - switch it off
+  again (click it a second time) before clicking a region to select it
+  for editing, or the click just starts a new region instead; and only
+  the currently-selected region shows its rotate/resize handles, with
+  "Delete region" only ever removing that one. See [the full visual
+  walkthrough](https://github.com/Jcarlosmiguel/omero-TinyMCE-Moodle/blob/main/USAGE.md#drawing-and-adjusting-a-region-step-by-step)
+  for the whole sequence with screenshots.
+- **Opening view** - pan/zoom the slide to a starting position in the
+  question editing form and click **Set as opening view**; a student then
+  sees that position, rather than OMERO's own default view, when they
+  reach the question. Independent of the marked regions themselves, and
+  entirely optional.
 - A click is correct if it lands inside *any* marked region - a plain
   any-of-N model, not a "find all N" checklist exercise, and no partial
   credit either way.
 - Plugs into Moodle's normal question bank, gradebook, and quiz review
-  flow like any other question type.
+  flow like any other question type - including getting its own quiz
+  page by default, kept separate from whatever else is in the quiz (a
+  full slide viewer sharing a page with another question reads as
+  genuinely confusing, not just untidy). Only a default, not a lock - a
+  teacher can still manually join it back onto a shared page afterward.
 - The marked regions are never sent to a student's browser under any
   circumstance, including question review - only a plain correct/incorrect
   result ever reaches the client.
@@ -67,7 +92,10 @@ target instead.
 Add an "OMERO hotspot (multi-region)" question in any quiz's question
 bank, pick a subject account and image the same way you would in
 `local_omeroembed`'s own authoring tool, and draw as many correct regions
-as needed on the live preview before saving.
+as needed on the live preview - select a region to rotate/resize it in
+place with the same handles as the standalone embed feature, and
+optionally click **Set as opening view** to choose the slide position a
+student sees first - before saving.
 
 ## License
 

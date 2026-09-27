@@ -64,7 +64,30 @@ defined('MOODLE_INTERNAL') || die();
 // every click) to a named target (repeat clicks reuse the same window) -
 // noted here only because it's the same underlying UX area, no code in
 // this component actually changed for it.
-$plugin->version   = 2026092301;
+//
+// 2026092700 (still 1.1.0 - not yet released): two real, related fixes
+// found while looking into whether TinyMCE's own native Help dialog
+// could surface this plugin's help, live-tested against a real Lesson
+// content page editor:
+// - A genuine bug: getPluginMetadata() (editor_tiny/utils) was called
+// with no url override, so this plugin's entry in the Help dialog's own
+// "Plugins" tab pointed at https://docs.moodle.org/en/editor_tiny/
+// omeroembed - a page that doesn't exist (that convention is for
+// plugins Moodle HQ documents itself, not third-party ones). Fixed with
+// an explicit url override pointing at this plugin's own GitHub README
+// instead.
+// - New: a custom "OMERO slide embed" tab in that same Help dialog
+// (TinyMCE's own bundled help plugin exposes a real, public
+// editor.plugins.help.addTab() API for exactly this - see commands.js's
+// own comment on where/why it's registered), explaining the toolbar
+// button and linking to local_omeroembed's own guide.php. That link
+// needed local_omeroembed's guide.php to accept a contextid param (the
+// only thing a TinyMCE instance actually knows), the same dual
+// courseid/contextid acceptance author.php already had - a real,
+// coordinated small change on that side too (see its own version.php).
+// Both live-verified: the tab renders with real content, and the link
+// resolves to a real course's guide page via contextid alone.
+$plugin->version   = 2026092700;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
 $plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
@@ -80,5 +103,5 @@ $plugin->maturity  = MATURITY_STABLE;
 // there's no reason to leave this pin pointing at an older build than
 // what's actually being tested against.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026092301,
+    'local_omeroembed' => 2026092605,
 ];

@@ -251,6 +251,27 @@ own internal structure.
 Not something this plugin adds a workaround for - the embed shows the
 image's own name from OMERO, whatever it was named there.
 
+### Hotspot questions always get their own quiz page by default
+
+Not a bug if a quiz's page layout changes on its own after adding,
+moving, or repaginating a `qtype_omerohotspot`/`qtype_omerohotspotmulti`
+question - an event observer (`local_omeroembed\observer`, hooked onto
+`mod_quiz`'s own slot/repagination events) keeps every hotspot question
+on a page by itself by default, splitting it away from whatever else
+would otherwise share that page, even overriding a teacher's own
+"Repaginate" choice for those specific questions. Each hotspot question
+loads a full slide viewer with its own click/drawing surface, which is
+genuinely confusing to share a page with another question rather than
+just untidy.
+
+This is only a default, not a lock: a teacher can still manually join a
+hotspot question back onto a shared page afterward, the same way they'd
+join any other two pages (the "join with previous page" arrow next to
+that slot on the quiz's Questions tab) - that specific action isn't one
+of the events the observer reacts to, so it sticks. It's only re-split
+apart the next time something else changes that quiz's structure (adding
+another question, deleting one, dragging a slot, or repaginating).
+
 ## Troubleshooting
 
 **"Image not found" when loading a slide.** Usually resolves itself

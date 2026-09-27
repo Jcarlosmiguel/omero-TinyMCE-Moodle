@@ -101,15 +101,37 @@ the Hotspot question dropdown that appears (mutually exclusive with student
 annotations for that embed, since a hidden-answer region and free student
 markup on the same image don't mix). The teacher draws the region(s)
 directly on the live preview; a small drawing toolbar appears while either
-mode is active. Feedback is intentionally simple - "Correct!" or "Not quite
-- try again," no score or partial credit - since this is a quick embedded
-check, not a graded assessment. Works the same way inside a Label, Page,
-Lesson content page, or anywhere else an embed can go.
+mode is active. Once a region is drawn, it can be fine-tuned in place -
+drag the round handle above it to rotate, or any of its 4 square corner
+handles to resize, both staying centred on where it was originally
+drawn - but not moved; a region drawn in the wrong place has to be
+deleted and redrawn, not dragged elsewhere. Feedback is intentionally
+simple - "Correct!" or "Not quite - try again,"
+no score or partial credit - since this is a quick embedded check, not a
+graded assessment. Works the same way inside a Label, Page, Lesson content
+page, or anywhere else an embed can go.
 
 **As a quiz question type** - `qtype_omerohotspot` (single-region) and
 `qtype_omerohotspotmulti` (multi-region) plug into Moodle's normal question
 bank, gradebook, and quiz review flow like any other question type, with
-the same region-drawing authoring UI embedded in the question editing form.
+the same region-drawing (including rotate/resize) authoring UI embedded in
+the question editing form. Two things beyond the standalone feature above:
+
+- **Opening view** - pan/zoom the slide to a starting position in the
+  question editing form and click **Set as opening view**; a student then
+  sees that position rather than the whole slide at default zoom when they
+  reach the question. The same idea as the standalone embed's own opening
+  view, independent of the hidden answer region. Optional - skip it and
+  the question just opens at OMERO's own default view.
+- **Its own quiz page by default** - adding, moving, or repaginating
+  questions in a quiz automatically keeps every hotspot question on a
+  page by itself, separate from whatever else is in the quiz (a full
+  slide viewer with its own click/drawing surface reads as genuinely
+  confusing sharing a page with another question, not just untidy). Only
+  a default, not a lock - a teacher can still manually join it back onto
+  a shared page afterward via the normal "join with previous page"
+  control; it's only re-split the next time the quiz's structure changes
+  again.
 
 ## Student annotations
 

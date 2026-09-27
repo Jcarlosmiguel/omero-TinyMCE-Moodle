@@ -75,12 +75,25 @@ class qtype_omerohotspot_renderer extends qtype_renderer {
         ]);
 
         $courseid = $this->page->course->id ?? SITEID;
-        $proxyurl = new \moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$question->subjectid}", array_filter([
+        $proxyparams = array_filter([
             'images' => $question->imageid,
             'dataset' => $question->datasetid,
             'enablehotspot' => 1,
             'hotspotmode' => 'qtype',
-        ]));
+        ]);
+        // Not folded into the array_filter() call above - x/y can
+        // legitimately be 0 (a position right at the slide's origin),
+        // which array_filter's default callback would silently strip.
+        // Same reasoning proxy.php's own view-param forwarding already
+        // uses (see that file's own x/y/zm handling).
+        if (!empty($question->openingview)) {
+            foreach (['x', 'y', 'zm'] as $viewkey) {
+                if (isset($question->openingview[$viewkey])) {
+                    $proxyparams[$viewkey] = $question->openingview[$viewkey];
+                }
+            }
+        }
+        $proxyurl = new \moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$question->subjectid}", $proxyparams);
 
         $wrapid = 'qtype_omerohotspot_attempt_' . $qa->get_slot();
         $result .= html_writer::start_div('qtype_omerohotspot_answer', ['id' => $wrapid]);

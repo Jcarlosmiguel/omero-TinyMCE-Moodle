@@ -25,13 +25,37 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'qtype_omerohotspot';
-// 2026081300 (1.0.2): patch only - lang.php re-sorted into strict
-// alphabetical order (phpcs LangFilesOrdering cleanup). Same string
-// keys, same string values, no behaviour change.
-$plugin->version   = 2026081300;
+// 2026092600 (1.1.0): adds an optional opening-view position (pan/zoom) a
+// teacher can set on the edit form's own live preview, forwarded to the
+// student-facing embed the same way local_omeroembed's own "Set as
+// opening view" feature already works - previously there was no way to
+// define what position the slide opened on for a student at all, always
+// OMERO's own default (whole slide, default zoom). New DB field
+// (openingview), new edit-form button, new AMD editform.js logic,
+// renderer.php now forwards x/y/zm to proxy.php when set. Purely
+// additive/optional - an existing question with no opening view set keeps
+// behaving exactly as before.
+//
+// 2026092601 (still 1.1.0): documentation only, no code changes. README.md
+// now covers rotate/resize, the opening-view feature, and the
+// one-hotspot-per-quiz-page-by-default behaviour local_omeroembed's own
+// event observer added - all real, already-shipped features that were
+// never written up here.
+//
+// 2026092602 (still 1.1.0): README.md's rotate/resize bullet now covers
+// two easy-to-miss details - the draw gesture is centre-out (press where
+// the feature is, drag outward to size it), and selecting an
+// already-drawn region needs the ellipse/rectangle mode switched off
+// first - and links to local_omeroembed's own fuller step-by-step
+// walkthrough. New: a "See how to draw and adjust a region" link beside
+// the live preview in edit_omerohotspot_form.php, deep-linking straight
+// to that same walkthrough - always shown here, unlike author.php's own
+// equivalent (which only shows while a hotspot mode is chosen), since
+// this whole form is already one.
+$plugin->version   = 2026092602;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.0.2';
+$plugin->release   = '1.1.0';
 $plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-

@@ -72,12 +72,22 @@ class qtype_omerohotspotmulti_renderer extends qtype_renderer {
         ]);
 
         $courseid = $this->page->course->id ?? SITEID;
-        $proxyurl = new \moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$question->subjectid}", array_filter([
+        $proxyparams = array_filter([
             'images' => $question->imageid,
             'dataset' => $question->datasetid,
             'enablehotspotmulti' => 1,
             'hotspotmode' => 'qtypemulti',
-        ]));
+        ]);
+        // Same reasoning qtype_omerohotspot's own renderer.php gives on
+        // this same line - x/y can legitimately be 0.
+        if (!empty($question->openingview)) {
+            foreach (['x', 'y', 'zm'] as $viewkey) {
+                if (isset($question->openingview[$viewkey])) {
+                    $proxyparams[$viewkey] = $question->openingview[$viewkey];
+                }
+            }
+        }
+        $proxyurl = new \moodle_url("/local/omeroembed/proxy.php/{$courseid}/{$question->subjectid}", $proxyparams);
 
         $wrapid = 'qtype_omerohotspotmulti_attempt_' . $qa->get_slot();
         $result .= html_writer::start_div('qtype_omerohotspotmulti_answer', ['id' => $wrapid]);

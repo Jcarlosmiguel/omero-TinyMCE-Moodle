@@ -62,6 +62,15 @@ class qtype_omerohotspot extends question_type {
             throw new \moodle_exception('missinggeometry', 'qtype_omerohotspot');
         }
 
+        // Optional, unlike $geometry above - a fresh question with no
+        // opening view set yet, or an invalid/tampered-with hidden field
+        // value, both just mean "no opening view", not a save failure.
+        $openingview = '';
+        $decodedopeningview = json_decode($question->openingview ?? '', true);
+        if (is_array($decodedopeningview) && isset($decodedopeningview['x'], $decodedopeningview['y'], $decodedopeningview['zm'])) {
+            $openingview = json_encode($decodedopeningview);
+        }
+
         $options = $DB->get_record('qtype_omerohotspot_options', ['questionid' => $question->id]);
         $record = new \stdClass();
         $record->questionid = $question->id;
@@ -69,6 +78,7 @@ class qtype_omerohotspot extends question_type {
         $record->imageid = $question->imageid ?? '';
         $record->datasetid = $question->datasetid ?? '';
         $record->geometry = json_encode($geometry);
+        $record->openingview = $openingview;
 
         if ($options) {
             $record->id = $options->id;
@@ -121,6 +131,9 @@ class qtype_omerohotspot extends question_type {
         $question->imageid = $questiondata->options->imageid;
         $question->datasetid = $questiondata->options->datasetid;
         $question->geometry = json_decode($questiondata->options->geometry, true);
+        $question->openingview = !empty($questiondata->options->openingview)
+            ? json_decode($questiondata->options->openingview, true)
+            : null;
     }
 
     /**

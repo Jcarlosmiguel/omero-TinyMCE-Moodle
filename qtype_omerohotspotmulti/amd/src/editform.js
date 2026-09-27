@@ -30,6 +30,10 @@
  * listener receiving the wrong shape could corrupt state if both qtypes'
  * scripts were ever present in the same tab.
  *
+ * Also owns the optional "Set as opening view" button - identical
+ * reasoning/implementation to qtype_omerohotspot/editform.js's own copy,
+ * see that module's docblock.
+ *
  * @module     qtype_omerohotspotmulti/editform
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -52,6 +56,7 @@ export const init = async(wrapId) => {
     const imageEl = document.getElementById('id_imageid');
     const datasetEl = document.getElementById('id_datasetid');
     const geometryEl = document.getElementById('id_geometry');
+    const openingviewEl = document.getElementById('id_openingview');
 
     let iframe = null;
 
@@ -60,6 +65,12 @@ export const init = async(wrapId) => {
     loadButton.className = 'btn btn-secondary mb-2';
     loadButton.textContent = await getString('loadslide', 'qtype_omerohotspotmulti');
     wrap.parentNode.insertBefore(loadButton, wrap);
+
+    const openingViewButton = document.createElement('button');
+    openingViewButton.type = 'button';
+    openingViewButton.className = 'btn btn-info mt-2';
+    openingViewButton.textContent = await getString('setopeningview', 'local_omeroembed');
+    wrap.insertAdjacentElement('afterend', openingViewButton);
 
     /**
      * (Re)points the preview iframe at the current subject/image/dataset
@@ -96,6 +107,67 @@ export const init = async(wrapId) => {
     };
 
     loadButton.addEventListener('click', loadPreview);
+
+    /**
+     * Reads the live preview iframe's current pan/zoom position - same
+     * implementation as qtype_omerohotspot/editform.js's own copy, see
+     * that module's docblock for where the formula comes from.
+     *
+     * @return {Object|null} {x, y, zm} or null if the preview isn't ready.
+     */
+    const readCurrentView = () => {
+        if (!iframe) {
+            return null;
+        }
+        let doc;
+        try {
+            doc = iframe.contentDocument;
+        } catch (e) {
+            return null;
+        }
+        if (!doc) {
+            return null;
+        }
+
+        const viewerEl = doc.querySelector('ol3-viewer');
+        if (!viewerEl || !viewerEl.au || !viewerEl.au.controller) {
+            return null;
+        }
+
+        const viewer = viewerEl.au.controller.viewModel.viewer;
+        let params;
+        try {
+            params = viewer.getViewParameters();
+        } catch (e) {
+            return null;
+        }
+        if (!params || !params.center || !params.resolution) {
+            return null;
+        }
+
+        return {
+            x: Math.round(params.center[0]),
+            y: Math.round(-params.center[1]),
+            zm: (1 / params.resolution * 100)
+        };
+    };
+
+    openingViewButton.addEventListener('click', async() => {
+        const view = readCurrentView();
+        if (!view) {
+            window.alert(await getString('previewnotready', 'local_omeroembed'));
+            return;
+        }
+        if (openingviewEl) {
+            openingviewEl.value = JSON.stringify(view);
+        }
+
+        const original = openingViewButton.textContent;
+        openingViewButton.textContent = await getString('openingviewset', 'local_omeroembed');
+        window.setTimeout(() => {
+            openingViewButton.textContent = original;
+        }, 1500);
+    });
 
     window.addEventListener('message', (event) => {
         if (event.origin !== window.location.origin || !iframe || event.source !== iframe.contentWindow) {

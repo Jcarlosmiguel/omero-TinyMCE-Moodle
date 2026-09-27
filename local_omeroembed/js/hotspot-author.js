@@ -63,15 +63,53 @@
     var TYPE_RECTANGLE = 'rectangle';
     var HIT_RADIUS = 12; // Screen px - same "too small to be deliberate" threshold as annotate.js's own.
     var HANDLE_OFFSET = 20; // px beyond the shape's own edge - identical convention to annotate.js's own.
+    // Screen px - see tryStartMoveDrag()'s own comment on why a plain
+    // click needs to be told apart from a real drag here specifically.
+    var MOVE_CLICK_THRESHOLD = 3;
+
+    // CSS has no built-in keyword for a "rotate" cursor (unlike 'move',
+    // which is standard) - a small hand-authored inline SVG instead, same
+    // convention this codebase already uses for its own icons (e.g.
+    // annotate.js's) rather than pulling in an icon library. Drawn twice
+    // (thick white halo, then a thin black line on top) so it stays
+    // visible against both light and dark parts of a real slide, the same
+    // technique most OS pointer cursors themselves use. 10,10 is the
+    // hotspot (the icon's own centre); 'grab' is the fallback if a
+    // browser somehow can't load a custom cursor image at all.
+    var ROTATE_CURSOR = 'url(\'data:image/svg+xml;utf8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">'
+        + '<g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M4 10a6 6 0 1 1 2.2 4.6"/><path d="M4 10 L3 6 M4 10 L8 11"/>'
+        + '</g>'
+        + '<g fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M4 10a6 6 0 1 1 2.2 4.6"/><path d="M4 10 L3 6 M4 10 L8 11"/>'
+        + '</g>'
+        + '</svg>'
+    ) + '\') 10 10, grab';
 
     var olmap = null;
     var viewportEl = null;
+    // The actual element OpenLayers/iviewer manage their own cursor on
+    // (map.getViewport()'s own '.ol-viewport' div, nested INSIDE
+    // viewportEl/getTargetElement()) - not the same element. Setting
+    // cursor on viewportEl was silently shadowed by iviewer's own cursor
+    // handling on this closer descendant (confirmed live: the JS was
+    // setting the right value all along, per earlier automated
+    // .style.cursor checks, but nothing was ever visually shown, since
+    // those checks never rendered a real cursor - only read the property
+    // back off the wrong element in the cascade). Falls back to
+    // viewportEl itself if getViewport() is ever unavailable.
+    var cursorTargetEl = null;
     var overlayCanvas = null;
     var activeTool = null; // null | 'ellipse' | 'rectangle'
     var constrainShape = false; // touch-reachable equivalent of holding Shift - see annotate.js's own identical convention
     var pendingShape = null; // {type,x,y,rx,ry} while drag-drawing, else null
     var savedGeometry = null; // {type,x,y,rx,ry,rotation} the currently-persisted region, or null
     var disabledInteractions = null;
+    // True for the duration of any resize/rotate/move drag - stops the
+    // hover-cursor logic (see updateHoverCursor()) from fighting the fixed
+    // cursor a drag already set for itself the moment it started.
+    var isDragging = false;
 
     /**
      * Same Aurelia-component route annotate.js/track.js/heatmap-view.js
@@ -211,6 +249,117 @@
     }
 
     /**
+     * Whether a screen pixel falls inside the saved shape's own corner
+     * handles - shared by tryStartResizeDrag()'s own hit-test and the
+     * hover-cursor logic below, so both agree on exactly the same zone.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function cornerAtPixel(px) {
+        if (!savedGeometry) {
+            return false;
+        }
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (savedGeometry.rotation || 0) + viewRotation;
+        return cornerPositions(centrePx[0], centrePx[1], radii, rotation).some(function(corner) {
+            var cdx = corner[0] - px[0];
+            var cdy = corner[1] - px[1];
+            return Math.sqrt(cdx * cdx + cdy * cdy) <= HIT_RADIUS;
+        });
+    }
+
+    /**
+     * Whether a screen pixel falls on the saved shape's own rotate handle -
+     * shared by tryStartRotateDrag()'s own hit-test and the hover-cursor
+     * logic below.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function rotateHandleAtPixel(px) {
+        if (!savedGeometry) {
+            return false;
+        }
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var viewRotation = olmap.getView().getRotation();
+        var rotation = (savedGeometry.rotation || 0) + viewRotation;
+        var handlePx = handlePosition(centrePx, radii, rotation);
+        var hdx = handlePx[0] - px[0];
+        var hdy = handlePx[1] - px[1];
+        return Math.sqrt(hdx * hdx + hdy * hdy) <= HIT_RADIUS;
+    }
+
+    /**
+     * Whether a screen pixel falls inside the saved shape's own body -
+     * same point-in-shape test hotspot-multi-author.js's own
+     * regionAtPixel() uses per-region, applied here to the one shape this
+     * file ever has. Used both to start a move-drag (tryStartMoveDrag())
+     * and, unselected, by the hover-cursor logic to preview that a drag
+     * from here would move it.
+     *
+     * @param {Array} px [screenX, screenY]
+     * @return {boolean}
+     */
+    function shapeBodyAtPixel(px) {
+        if (!savedGeometry) {
+            return false;
+        }
+        var centrePx = olmap.getPixelFromCoordinate([savedGeometry.x, -savedGeometry.y]);
+        if (!centrePx) {
+            return false;
+        }
+        var dx = centrePx[0] - px[0];
+        var dy = centrePx[1] - px[1];
+        var radii = screenRadii(savedGeometry.x, savedGeometry.y, savedGeometry.rx, savedGeometry.ry);
+        var rx = Math.max(radii[0], HIT_RADIUS);
+        var ry = Math.max(radii[1], HIT_RADIUS);
+        var viewRotation = olmap.getView().getRotation();
+        var local = unrotate(dx, dy, (savedGeometry.rotation || 0) + viewRotation);
+        if (savedGeometry.type === TYPE_ELLIPSE) {
+            var normalised = (local[0] * local[0]) / (rx * rx) + (local[1] * local[1]) / (ry * ry);
+            return normalised <= 1;
+        }
+        return Math.abs(local[0]) <= rx && Math.abs(local[1]) <= ry;
+    }
+
+    /**
+     * Previews what a press at this pixel would do, before anything is
+     * actually pressed - a resize cursor over a corner, the custom rotate
+     * cursor over the rotate handle, 'move' over the shape's own body
+     * (see tryStartMoveDrag()), or the default cursor otherwise. Does
+     * nothing while a drag is already in progress (see isDragging's own
+     * comment) - that drag's cursor stays exactly as it started.
+     *
+     * @param {PointerEvent} e
+     */
+    function updateHoverCursor(e) {
+        if (isDragging || !viewportEl) {
+            return;
+        }
+        var rect = viewportEl.getBoundingClientRect();
+        var px = [e.clientX - rect.left, e.clientY - rect.top];
+        if (cornerAtPixel(px)) {
+            cursorTargetEl.style.cursor = 'nwse-resize';
+        } else if (rotateHandleAtPixel(px)) {
+            cursorTargetEl.style.cursor = ROTATE_CURSOR;
+        } else if (shapeBodyAtPixel(px)) {
+            cursorTargetEl.style.cursor = 'move';
+        } else {
+            cursorTargetEl.style.cursor = '';
+        }
+    }
+
+    /**
      * Same "lock panning for as long as a shape tool is active" convention
      * as annotate.js's own setMapInteractionsEnabled()/refreshInteractionLock() -
      * simplified here since this module has only one lock reason (a draw
@@ -333,14 +482,17 @@
     }
 
     /**
-     * A corner resize handle, or the rotate handle, if either is there to
-     * grab - checked unconditionally, before the draw-tool branch below,
-     * same priority order as annotate.js's own onViewportPointerDown().
-     * Corners first: they sit at the shape's own edge, the rotate handle
-     * further out beyond it, so there's no real overlap between them to
+     * A corner resize handle, the rotate handle, or (checked last, since
+     * it covers the widest area) the shape's own body to move it - all
+     * checked unconditionally, before the draw-tool branch below, same
+     * priority order as annotate.js's own onViewportPointerDown(). Corners
+     * first: they sit at the shape's own edge, the rotate handle further
+     * out beyond it, so there's no real overlap between the two to
      * disambiguate, but checking the closer one first is the more natural
-     * order. See tryStartResizeDrag()/tryStartRotateDrag()'s own docblocks
-     * for each drag itself.
+     * order; the body drag is checked last precisely because it's meant
+     * to catch everything inside the shape a handle didn't already claim.
+     * See tryStartResizeDrag()/tryStartRotateDrag()/tryStartMoveDrag()'s
+     * own docblocks for each drag itself.
      *
      * Drag-to-draw (the rest of this function, once this returns false):
      * press at the centre, drag out a radius, release - same gesture and
@@ -350,7 +502,7 @@
      * select).
      */
     function onViewportPointerDown(e) {
-        if (savedGeometry && (tryStartResizeDrag(e) || tryStartRotateDrag(e))) {
+        if (savedGeometry && (tryStartResizeDrag(e) || tryStartRotateDrag(e) || tryStartMoveDrag(e))) {
             return;
         }
 
@@ -460,6 +612,8 @@
         e.preventDefault();
         e.stopPropagation();
         setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = 'nwse-resize';
 
         function computeResize(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
@@ -484,6 +638,7 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
             setMapInteractionsEnabled(true);
+            isDragging = false;
 
             var resized = computeResize(upEvent);
             savedGeometry.rx = resized.rx;
@@ -536,6 +691,8 @@
         e.preventDefault();
         e.stopPropagation();
         setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = ROTATE_CURSOR;
 
         function angleFor(moveEvent) {
             var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
@@ -551,6 +708,7 @@
             window.removeEventListener('pointermove', onMove, true);
             window.removeEventListener('pointerup', onUp, true);
             setMapInteractionsEnabled(true);
+            isDragging = false;
 
             var finalRotation = angleFor(upEvent);
             savedGeometry.rotation = finalRotation;
@@ -563,6 +721,98 @@
                 rx: savedGeometry.rx,
                 ry: savedGeometry.ry,
                 rotation: finalRotation,
+            }, 'POST').then(function(result) {
+                savedGeometry = result.geometry;
+                redraw();
+                showSavedMessage();
+            });
+        }
+
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        return true;
+    }
+
+    /**
+     * Dragging the shape's own body (not a handle) to reposition it - a
+     * plain translation of its stored centre by the same delta the
+     * pointer moves, in image coordinates. Works correctly regardless of
+     * the shape's own rotation with no extra math: rotation is defined
+     * *around* this centre point, so moving the centre doesn't need to
+     * account for it at all - only resizing does (see
+     * tryStartResizeDrag()'s own unrotate() call), since that has to
+     * interpret the drag along the shape's own rotated axes instead.
+     *
+     * Guarded by a small movement threshold before it's treated as a real
+     * drag (see hotspot-multi-author.js's own identical comment on its
+     * own tryStartMoveDrag() for the full reasoning - there's no
+     * click-to-deselect behaviour to protect here specifically, since
+     * this file has no selection concept at all, but it's still not
+     * worth POSTing a no-op "save" to the server for every plain click
+     * that happens to land on the shape).
+     *
+     * @param {PointerEvent} e
+     * @return {boolean} True if the press actually hit the shape's body.
+     */
+    function tryStartMoveDrag(e) {
+        var rect = viewportEl.getBoundingClientRect();
+        var pressPx = [e.clientX - rect.left, e.clientY - rect.top];
+        if (!shapeBodyAtPixel(pressPx)) {
+            return false;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        setMapInteractionsEnabled(false);
+        isDragging = true;
+        cursorTargetEl.style.cursor = 'move';
+
+        var startCoord = pixelToImageCoord(pressPx);
+        var startX = savedGeometry.x;
+        var startY = savedGeometry.y;
+
+        function computeMove(moveEvent) {
+            var movePx = [moveEvent.clientX - rect.left, moveEvent.clientY - rect.top];
+            var moveCoord = pixelToImageCoord(movePx);
+            var ddx = movePx[0] - pressPx[0];
+            var ddy = movePx[1] - pressPx[1];
+            return {
+                x: startX + (moveCoord[0] - startCoord[0]),
+                y: startY + (moveCoord[1] - startCoord[1]),
+                screenDistance: Math.sqrt(ddx * ddx + ddy * ddy),
+            };
+        }
+
+        function onMove(moveEvent) {
+            var moved = computeMove(moveEvent);
+            savedGeometry.x = moved.x;
+            savedGeometry.y = moved.y;
+            redraw();
+        }
+
+        function onUp(upEvent) {
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', onUp, true);
+            setMapInteractionsEnabled(true);
+            isDragging = false;
+
+            var moved = computeMove(upEvent);
+            savedGeometry.x = moved.x;
+            savedGeometry.y = moved.y;
+            redraw();
+
+            if (moved.screenDistance < MOVE_CLICK_THRESHOLD) {
+                // Not a real drag - see this function's own docblock.
+                return;
+            }
+
+            ajax('hotspot_save', {
+                type: savedGeometry.type,
+                x: moved.x,
+                y: moved.y,
+                rx: savedGeometry.rx,
+                ry: savedGeometry.ry,
+                rotation: savedGeometry.rotation || 0,
             }, 'POST').then(function(result) {
                 savedGeometry = result.geometry;
                 redraw();
@@ -664,6 +914,7 @@
             window.setTimeout(init, 300);
             return;
         }
+        cursorTargetEl = (typeof olmap.getViewport === 'function' && olmap.getViewport()) || viewportEl;
 
         overlayCanvas = document.createElement('canvas');
         overlayCanvas.id = 'omero-hotspot-author-overlay';
@@ -675,6 +926,7 @@
         viewportEl.appendChild(overlayCanvas);
 
         viewportEl.addEventListener('pointerdown', onViewportPointerDown, true);
+        viewportEl.addEventListener('pointermove', updateHoverCursor);
         olmap.on('postrender', redraw);
 
         buildToolbar();

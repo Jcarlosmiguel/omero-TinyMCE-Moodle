@@ -719,6 +719,7 @@
     // unchecking it) keeps the form honest about that, instead of letting
     // a teacher believe it's still an active, independent choice.
     var annotationsCheckbox = document.querySelector('input[type="checkbox"][name="enableannotations"]');
+    var hotspotDrawingHelp = document.getElementById('omero-hotspot-drawing-help');
 
     // "Active" goes through currentHotspotMode(), not hotspotModeSelect.value
     // directly - the dropdown itself lives inside author.php's
@@ -734,6 +735,9 @@
             if (active) {
                 annotationsCheckbox.checked = false;
             }
+        }
+        if (hotspotDrawingHelp) {
+            hotspotDrawingHelp.style.display = active ? 'inline-block' : 'none';
         }
     }
 

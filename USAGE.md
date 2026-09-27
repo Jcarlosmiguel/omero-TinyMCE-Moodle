@@ -62,6 +62,21 @@ written is ever lost, no matter how many times you switch back and forth.
 
 ![The layout radios, with a real slide already loaded behind them](local_omeroembed/pix/guide/step2-layout.png)
 
+## Viewing options (optional)
+
+Collapsed by default under a small "Viewing options ▾" toggle above the
+layout choice - click to expand it. Most teachers never need to touch
+anything here, since the defaults already give a clean, uncluttered
+slide.
+
+Each checkbox hides one piece of OMERO's own on-screen chrome (its
+overview map, coordinate/zoom readout, full-screen button, scale bar,
+zoom buttons, or top navigation bar) or shows its ROI markers by default;
+Width and Height set the embed's own pixel size, matched to your course
+page's real content width so the view looks right once pasted.
+
+![The Viewing options section expanded, showing all seven checkboxes plus the Width/Height fields](local_omeroembed/pix/guide/step2b-viewing-options.png)
+
 ## Step 3: Write your text and add view-links
 
 (Skipped if you chose "Slide only".)
@@ -167,6 +182,57 @@ layout.
 
 ![A drawn region selected, showing the round rotate handle above it and the 4 square resize handles at its corners, mid-rotation](local_omeroembed/pix/guide/hotspot-d-rotate-resize.png)
 *A selected region, mid-rotation, with the resize handles at its corners.*
+
+#### Drawing and adjusting a region, step by step
+
+The drawing toolbar has an ellipse-mode button, a rectangle-mode button, a
+lock button, and Clear - nothing is drawn until ellipse or rectangle mode
+is switched on.
+
+**Press at the centre of the feature you're marking, then drag outward** -
+not corner-to-corner like many drawing tools. Wherever you first press
+becomes the region's centre; how far you drag sets how far it extends in
+every direction. Starting the drag anywhere other than the centre offsets
+the whole region from where you meant to mark it.
+
+![The drawing toolbar before anything is selected: ellipse mode, rectangle mode, the lock button, and Clear](local_omeroembed/pix/guide/hotspot-e-toolbar-default.jpg)
+*Nothing is drawn until ellipse or rectangle mode is switched on.*
+
+![Ellipse mode switched on - the button highlights to show it's active](local_omeroembed/pix/guide/hotspot-f-ellipse-mode-active.jpg)
+*Ellipse mode active.*
+
+![Rectangle mode switched on instead - the two modes are mutually exclusive](local_omeroembed/pix/guide/hotspot-g-rectangle-mode-active.jpg)
+*Rectangle mode active.*
+
+![A rectangle mid-draw, dragged outward from its centre point](local_omeroembed/pix/guide/hotspot-h-drawing-rectangle.jpg)
+*Press at the centre, then drag outward - not corner-to-corner.*
+
+Hold Shift while dragging - or switch the lock button on first - to
+constrain the shape to a perfect circle or square instead of a free
+ellipse/rectangle.
+
+![The same drag with the lock switched on, constraining the shape to a perfect square](local_omeroembed/pix/guide/hotspot-i-lock-square.jpg)
+*Hold Shift, or switch on the lock button, to constrain to a circle or square.*
+
+After drawing, the mode button you used stays switched on, so you can draw
+several regions in a row without reselecting it each time. To select an
+already-drawn region instead - needed to reshape, rotate, or delete just
+that one - click that same mode button again first, to switch it off.
+Clicking a region while a draw mode is still active starts a new region
+there instead of selecting the existing one.
+
+Only the currently-selected region shows its rotate handle (the round
+handle above it) and its 4 square resize handles at the corners - every
+other region stays a plain dashed outline until you click it instead.
+"Delete region" only ever removes whichever one is currently selected.
+
+Resize and rotate are the only two ways to adjust a region once it's
+drawn - there's no way to drag it to a different spot. If you drew one in
+the wrong place, delete it and draw it again rather than trying to move
+it.
+
+![Two regions drawn with both draw modes switched off - the left one unselected (a plain dashed outline), the right one selected, showing its rotate handle and 4 resize corner handles](local_omeroembed/pix/guide/hotspot-j-selected-rotate-resize.jpg)
+*Switch off the draw mode, then click a region to select it - only the selected one shows its handles.*
 
 There's also a separate, fuller Moodle quiz question type
 (`qtype_omerohotspot`/`qtype_omerohotspotmulti`) for graded hotspot

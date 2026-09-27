@@ -34,6 +34,7 @@ $string['loadslide'] = 'Load slide';
 $string['loadslidehelp'] = 'Choose a subject account and image, click "Load slide" below, then drag an ellipse or rectangle over each acceptable answer directly on the slide - mark as many as you need.';
 $string['missinggeometry'] = 'No correct-answer regions have been drawn yet - load the slide below and drag out at least one correct region before saving.';
 $string['needscoursecontext'] = 'This question needs to be created inside a course (or activity) question bank - the slide preview needs a real course to check permissions against.';
+$string['openingviewhelp'] = 'Optional: pan/zoom the slide above to the position you want a student to see it at, then click "Set as opening view". Skip this and the slide just opens at OMERO\'s own default view (the whole slide, default zoom).';
 $string['pleaseclickimage'] = 'Please click a location on the image.';
 $string['pluginname'] = 'OMERO hotspot (multi-region)';
 $string['pluginname_help'] = 'The student answers by clicking directly on a whole-slide OMERO image - correct if the click lands inside ANY of one or more regions you mark as acceptable answers (e.g. several equally-correct examples of a feature on the same slide), which stay hidden from students at all times, including in review.';
