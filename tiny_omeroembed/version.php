@@ -87,7 +87,11 @@ defined('MOODLE_INTERNAL') || die();
 // coordinated small change on that side too (see its own version.php).
 // Both live-verified: the tab renders with real content, and the link
 // resolves to a real course's guide page via contextid alone.
-$plugin->version   = 2026092700;
+//
+// 2026092701 (still 1.1.0): no code change. The local_omeroembed
+// dependency pin (which had fallen behind, 2026092605) now matches the
+// build this component ships alongside.
+$plugin->version   = 2026092701;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
 $plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
@@ -103,5 +107,5 @@ $plugin->maturity  = MATURITY_STABLE;
 // there's no reason to leave this pin pointing at an older build than
 // what's actually being tested against.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026092605,
+    'local_omeroembed' => 2026092613,
 ];

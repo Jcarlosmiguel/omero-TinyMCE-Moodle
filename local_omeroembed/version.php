@@ -484,7 +484,15 @@ defined('MOODLE_INTERNAL') || die();
 // image after the swap above. Every guide image src now carries a
 // '?v=<mtime>' query string, so a changed file always gets a new URL and
 // is never served stale.
-$plugin->version   = 2026092612;
+//
+// 2026092613 (still 1.7.0): no behaviour change. author.php's help-link
+// call (the "See how to draw and adjust a region" link beside the live
+// preview) was laid out across lines in a way the Moodle Code Checker
+// rejects (opening parenthesis not last on its line, more than one
+// argument per line, closing parenthesis not on its own line) - caught by
+// GitHub Actions CI on the previous push, all local_omeroembed jobs
+// failing on it. Reformatted to Moodle's multi-line call style.
+$plugin->version   = 2026092613;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
 $plugin->release   = '1.7.0';

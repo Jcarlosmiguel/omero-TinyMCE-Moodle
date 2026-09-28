@@ -41,6 +41,7 @@
 
 import Config from 'core/config';
 import {getString} from 'core/str';
+import Notification from 'core/notification';
 
 /**
  * @param {String} wrapId id of the empty <div> the edit form left for the preview.
@@ -155,7 +156,11 @@ export const init = async(wrapId) => {
     openingViewButton.addEventListener('click', async() => {
         const view = readCurrentView();
         if (!view) {
-            window.alert(await getString('previewnotready', 'local_omeroembed'));
+            const [title, message] = await Promise.all([
+                getString('notice', 'moodle'),
+                getString('previewnotready', 'local_omeroembed'),
+            ]);
+            Notification.alert(title, message);
             return;
         }
         if (openingviewEl) {

@@ -52,7 +52,17 @@ $plugin->component = 'qtype_omerohotspot';
 // to that same walkthrough - always shown here, unlike author.php's own
 // equivalent (which only shows while a hotspot mode is chosen), since
 // this whole form is already one.
-$plugin->version   = 2026092602;
+//
+// 2026092603 (still 1.1.0): the "Set as opening view" button's
+// "preview not ready yet" message used window.alert(), which ESLint's
+// no-alert rule rejects (CI's grunt step runs with zero warnings allowed,
+// so this failed every qtype_omerohotspot job on the previous push).
+// Replaced with Moodle's own core/notification alert, which is also the
+// standard Moodle look for this kind of message. Same wording, no other
+// behaviour change. The local_omeroembed dependency pin is also brought up
+// to the build these components now ship with (it still pointed at a much
+// older build, 2026080308).
+$plugin->version   = 2026092603;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->release   = '1.1.0';
@@ -61,10 +71,11 @@ $plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires ex
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
 // embedding mechanism) and subject_repository.php (OMERO connections)
 // rather than duplicating either - see this plugin's own README/plan doc
-// for why. Can never be installed without it. Pinned to 2026080308
-// specifically - the release with the stored-XSS/cross-course-IDOR/
-// session-lock fixes, all in files this qtype's own rendering path
-// depends on directly.
+// for why. Can never be installed without it. Pinned to the build this
+// component ships alongside (2026092613), which also carries the
+// stored-XSS/cross-course-IDOR/session-lock fixes first made in
+// 2026080308 - all in files this qtype's own rendering path depends on
+// directly.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026080308,
+    'local_omeroembed' => 2026092613,
 ];

@@ -985,11 +985,14 @@ if ($hasslide) {
     // Deep-links straight to guide.php's own drawing walkthrough section
     // (see that file's own id="..." comment on this same heading), not
     // just the top of the guide.
-    echo html_writer::link($guideurl->out(false) . '#drawing-and-adjusting-a-region-step-by-step',
-        get_string('hotspotdrawinghelplink', 'local_omeroembed'), [
-        'id' => 'omero-hotspot-drawing-help', 'target' => '_blank', 'rel' => 'noopener',
-        'style' => 'display:none; margin-top:0.4rem;',
-    ]);
+    echo html_writer::link(
+        $guideurl->out(false) . '#drawing-and-adjusting-a-region-step-by-step',
+        get_string('hotspotdrawinghelplink', 'local_omeroembed'),
+        [
+            'id' => 'omero-hotspot-drawing-help', 'target' => '_blank', 'rel' => 'noopener',
+            'style' => 'display:none; margin-top:0.4rem;',
+        ]
+    );
 
     // Placeholder text (:empty::before, see the shared <style> block near
     // the Layout fieldset above) so an empty write-up box doesn't just look

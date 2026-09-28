@@ -50,7 +50,12 @@ $plugin->component = 'qtype_omerohotspotmulti';
 // own fuller walkthrough; edit_omerohotspotmulti_form.php gained the
 // same "See how to draw and adjust a region" link beside its own live
 // preview.
-$plugin->version   = 2026092602;
+//
+// 2026092603 (still 1.1.0): same as qtype_omerohotspot's own 2026092603 -
+// window.alert() replaced with Moodle's core/notification alert (ESLint
+// no-alert, failing CI's grunt step), and the local_omeroembed dependency
+// pin brought up to the build these components now ship with.
+$plugin->version   = 2026092603;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->release   = '1.1.0';
@@ -62,9 +67,10 @@ $plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires ex
 // docblock). Reuses local_omeroembed's proxy.php (the entire locked-down
 // OMERO-embedding mechanism) and subject_repository.php (OMERO connections)
 // rather than duplicating either. Can never be installed without it.
-// Pinned to 2026080308 specifically - the release with the stored-XSS/
-// cross-course-IDOR/session-lock fixes, all in files this qtype's own
-// rendering path depends on directly.
+// Pinned to the build this component ships alongside (2026092613), which
+// also carries the stored-XSS/cross-course-IDOR/session-lock fixes first
+// made in 2026080308 - all in files this qtype's own rendering path
+// depends on directly.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026080308,
+    'local_omeroembed' => 2026092613,
 ];
