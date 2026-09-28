@@ -62,7 +62,20 @@ $plugin->component = 'qtype_omerohotspot';
 // behaviour change. The local_omeroembed dependency pin is also brought up
 // to the build these components now ship with (it still pointed at a much
 // older build, 2026080308).
-$plugin->version   = 2026092603;
+//
+// 2026092604 (still 1.1.0): a real data-loss bug in this release's own new
+// opening-view feature, found while preparing the Marketplace update by
+// running an actual course backup and restore: the backup class listed the
+// option fields explicitly (subjectid, imageid, datasetid, geometry) and had
+// never been told about the new openingview field, so a backed-up, copied
+// or migrated course silently lost every question's opening view - the
+// restored questions all came back with it empty. Fixed by adding
+// openingview to the backup element. Verified with real round trips on the
+// dev site: before the fix the restored copies had no opening view at all;
+// after it they carry the exact same values as the originals, questions
+// without one stay empty, and a backup made before this fix (which has no
+// such field) still restores cleanly, since the column is nullable.
+$plugin->version   = 2026092604;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->release   = '1.1.0';

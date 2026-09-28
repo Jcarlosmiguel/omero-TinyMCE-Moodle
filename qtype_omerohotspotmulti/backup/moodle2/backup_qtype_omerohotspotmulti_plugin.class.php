@@ -42,7 +42,7 @@ class backup_qtype_omerohotspotmulti_plugin extends backup_qtype_plugin {
         $plugin->add_child($pluginwrapper);
 
         $options = new backup_nested_element('omerohotspotmulti', ['id'], [
-            'subjectid', 'imageid', 'datasetid', 'geometry',
+            'subjectid', 'imageid', 'datasetid', 'geometry', 'openingview',
         ]);
         $pluginwrapper->add_child($options);
         $options->set_source_table(
