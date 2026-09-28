@@ -68,6 +68,13 @@ not just the working tree.**
     gone" (migration path) - the embedid unique-index collision only
     ever showed up in the first of those two, never in isolated unit
     logic.
+    This also applies when a change only *adds a database field* to a
+    table that already has a backup class, even if no backup code was
+    touched: the backup classes list their fields by name, so a new field
+    is silently left out. Real case: the `openingview` field added to both
+    qtypes in 1.1.0 was dropped by every course backup/copy until a real
+    round trip showed the restored questions had it empty. Compare the
+    restored value with the original, not just "the restore ran".
   - Any AMD/JS build output: run the actual `grunt`/build step, don't
     assume checked-in `.min.js` matches source - stale build artifacts
     passed every static check and only grunt itself caught them.
