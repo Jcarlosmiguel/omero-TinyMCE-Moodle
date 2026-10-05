@@ -492,7 +492,31 @@ defined('MOODLE_INTERNAL') || die();
 // argument per line, closing parenthesis not on its own line) - caught by
 // GitHub Actions CI on the previous push, all local_omeroembed jobs
 // failing on it. Reformatted to Moodle's multi-line call style.
-$plugin->version   = 2026092613;
+//
+// 2026100500 (still 1.7.0): Moodle 5.3.0 was released 2026-10-05. Tested
+// directly against the real release (not the pre-release dev branch
+// checked on 2026-09-23 for the earlier 5.3 note below), in an isolated
+// environment separate from this plugin's own dev site, covering real
+// use rather than just install/upgrade:
+// - A fresh install, all four plugins, clean - including a real composer
+// install for a dependency gap in 5.3's own new REST API layer
+// (League\OAuth2\Server), unrelated to this plugin and only relevant to
+// a from-source checkout, not the packaged release a real site would
+// install.
+// - Both qtype edit forms, through Moodle 5.3's new question bank
+// architecture (now its own mod_qbank activity, replacing the old flat
+// list) - every field present, no errors.
+// - A real embed: loaded a real OMERO slide, generated the embed HTML,
+// inserted it into a real Page, viewed it as a real student account -
+// tiles loaded correctly through proxy.php's full reverse-proxy path.
+// - Real heatmap/tracking: started tracking, a real student panned/
+// zoomed the slide, five real samples landed in the database, the
+// five-minute frame-capture task produced a real frame, and the heatmap
+// page rendered it correctly over the slide.
+// No DEVELOPER-debug output anywhere in any of this. $plugin->supported
+// extended to include 503 on the strength of this pass, not just the
+// authoring-form check the 5.3 readiness note below originally covered.
+$plugin->version   = 2026100500;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
 $plugin->release   = '1.7.0';
@@ -500,11 +524,11 @@ $plugin->maturity  = MATURITY_STABLE;
 // Supported must be a strict [min, max] pair (core validates count()==2
 // in lib/classes/plugininfo/base.php - anything else throws a
 // coding_exception that breaks plugin_manager for the whole site, not just
-// this plugin) - it is already an INCLUSIVE RANGE, so [405, 502] means
-// "4.5 through 5.2", which already covered 5.0/5.1 all along. An earlier
-// version of this comment claimed [405, 500, 501, 502] was needed to
-// "include" 5.0/5.1 explicitly - that was wrong (confused this with a
+// this plugin) - it is already an INCLUSIVE RANGE, so [405, 503] means
+// "4.5 through 5.3", which already covers 5.0/5.1/5.2 all along. An
+// earlier version of this comment claimed [405, 500, 501, 502] was needed
+// to "include" 5.0/5.1 explicitly - that was wrong (confused this with a
 // discrete version list, which this field can't express) and is fatal;
 // caught via a real admin/cli/upgrade.php run. Now live-verified across
-// the whole range - see MOODLE_5.2_COMPAT.md.
-$plugin->supported = [405, 502];
+// the whole range, 5.3 included - see MOODLE_5.2_COMPAT.md.
+$plugin->supported = [405, 503];

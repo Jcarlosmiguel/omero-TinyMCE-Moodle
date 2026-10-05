@@ -75,20 +75,28 @@ $plugin->component = 'qtype_omerohotspot';
 // after it they carry the exact same values as the originals, questions
 // without one stay empty, and a backup made before this fix (which has no
 // such field) still restores cleanly, since the column is nullable.
-$plugin->version   = 2026092604;
+//
+// 2026100500 (still 1.1.0): no code change. Moodle 5.3.0 released
+// 2026-10-05; tested directly against the real release - see
+// local_omeroembed's own version.php for the full writeup, including
+// this qtype's own edit form going through Moodle 5.3's new mod_qbank
+// question bank with every field present and no errors. $plugin->
+// supported extended to include 503, and the local_omeroembed dependency
+// pin brought up to the build this component now ships with.
+$plugin->version   = 2026100500;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
 $plugin->release   = '1.1.0';
-$plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
+$plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
 // embedding mechanism) and subject_repository.php (OMERO connections)
 // rather than duplicating either - see this plugin's own README/plan doc
 // for why. Can never be installed without it. Pinned to the build this
-// component ships alongside (2026092613), which also carries the
+// component ships alongside (2026100500), which also carries the
 // stored-XSS/cross-course-IDOR/session-lock fixes first made in
 // 2026080308 - all in files this qtype's own rendering path depends on
 // directly.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026092613,
+    'local_omeroembed' => 2026100500,
 ];

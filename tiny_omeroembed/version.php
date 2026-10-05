@@ -91,10 +91,18 @@ defined('MOODLE_INTERNAL') || die();
 // 2026092701 (still 1.1.0): no code change. The local_omeroembed
 // dependency pin (which had fallen behind, 2026092605) now matches the
 // build this component ships alongside.
-$plugin->version   = 2026092701;
+//
+// 2026100500 (still 1.1.0): no code change. Moodle 5.3.0 released
+// 2026-10-05; tested directly against the real release alongside the
+// other three components - see local_omeroembed's own version.php for
+// the full writeup (a real embed through this plugin's own toolbar
+// button and Help dialog tab, not just an install check). $plugin->
+// supported extended to include 503, and the local_omeroembed dependency
+// pin brought up to the build this component now ships with.
+$plugin->version   = 2026100500;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
-$plugin->supported = [405, 502]; // Inclusive range (4.5-5.2) - core requires exactly [min, max], not a discrete list.
+$plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
 $plugin->release   = '1.1.0';
 $plugin->maturity  = MATURITY_STABLE;
 // Hard runtime dependency, not just thematic bundling - ui.js opens
@@ -107,5 +115,5 @@ $plugin->maturity  = MATURITY_STABLE;
 // there's no reason to leave this pin pointing at an older build than
 // what's actually being tested against.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026092613,
+    'local_omeroembed' => 2026100500,
 ];
