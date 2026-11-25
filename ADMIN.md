@@ -272,6 +272,34 @@ of the events the observer reacts to, so it sticks. It's only re-split
 apart the next time something else changes that quiz's structure (adding
 another question, deleting one, dragging a slot, or repaginating).
 
+### A question/embed shared across courses breaks if its subject's owner doesn't teach the new course
+
+As of the 2026-11-25 security fix pack, `proxy.php` requires that an
+embed's subject (the OMERO service account it authenticates as) belongs
+to someone who holds `moodle/course:manageactivities` in the course the
+request is actually coming from - this closes a real gap where any
+enrolled user could substitute another teacher's subject id and browse
+their OMERO account (see `local_omeroembed/version.php`'s 2026112500
+entry for the full explanation).
+
+One legitimate workflow this affects: reusing a `qtype_omerohotspot`/
+`qtype_omerohotspotmulti` question from a shared question bank in a
+course the original author doesn't teach. The embed/question itself
+still exists and still grades correctly - only the slide viewer fails to
+load, since the subject check now fails for that course.
+
+**Workaround for now:** whoever reuses the question in the new course
+should re-save it there with one of their own subjects selected, rather
+than relying on the original author's. There's no way around this today
+without an explicit action from someone who teaches the new course - it
+isn't automatic.
+
+**Planned fix, not yet built:** resolving the subject through the
+quiz's own question reference instead of (or in addition to) the
+subject's owner, so a question legitimately shared via a question bank
+keeps working without every reuse needing its own re-save. Tracked as
+follow-up work, not scheduled yet.
+
 ## Troubleshooting
 
 **"Image not found" when loading a slide.** Usually resolves itself

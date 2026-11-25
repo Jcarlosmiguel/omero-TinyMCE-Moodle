@@ -261,8 +261,11 @@ on *why* each step matters. Quick version:
 See [ADMIN.md](ADMIN.md) for the full list with explanations and what to
 do about each one - briefly: a stale OMERO session costs one extra request
 on self-heal rather than failing outright, new settings need a first save
-before their defaults take effect, and there's no way to give a
-duplicated/re-used slide a different display name beyond OMERO's own.
+before their defaults take effect, there's no way to give a
+duplicated/re-used slide a different display name beyond OMERO's own,
+and (as of the 2026-11-25 security fix pack) a hotspot question reused
+across courses via a shared question bank needs re-saving with a local
+subject if its original author doesn't teach the new course.
 
 ## License
 
