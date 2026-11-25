@@ -30,6 +30,7 @@ $string['clickedoutsideregion'] = 'Clicked outside the marked region';
 $string['currentanswer'] = 'Your answer: clicked at ({$a->x}, {$a->y})';
 $string['datasetidlabel'] = 'Dataset ID (optional)';
 $string['imageidlabel'] = 'Image ID';
+$string['invalidgeometry'] = 'The drawn correct-answer region is not valid (for example, it has no width or no height) - clear it and drag out the correct region again before saving.';
 $string['loadslide'] = 'Load slide';
 $string['loadslidehelp'] = 'Choose a subject account and image, click "Load slide" below, then drag an ellipse or rectangle over the correct answer directly on the slide.';
 $string['missinggeometry'] = 'No correct-answer region has been drawn yet - load the slide below and drag out the correct region before saving.';

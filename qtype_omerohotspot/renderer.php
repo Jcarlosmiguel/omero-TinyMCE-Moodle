@@ -97,7 +97,10 @@ class qtype_omerohotspot_renderer extends qtype_renderer {
 
         $wrapid = 'qtype_omerohotspot_attempt_' . $qa->get_slot();
         $result .= html_writer::start_div('qtype_omerohotspot_answer', ['id' => $wrapid]);
-        if ($clickx !== '' && $clicky !== '') {
+        // Same validity rule as the question's own is_complete_response(),
+        // not just "non-empty" - a stored "INF"/garbage value would
+        // otherwise show here as a click at (0, 0).
+        if (qtype_omerohotspot_is_finite_number($clickx) && qtype_omerohotspot_is_finite_number($clicky)) {
             $result .= html_writer::div(
                 get_string(
                     'currentanswer',

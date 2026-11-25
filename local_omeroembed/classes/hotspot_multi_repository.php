@@ -66,6 +66,14 @@ class hotspot_multi_repository {
      * outlines when reopening author.php). Never call this from the
      * student attempt path.
      *
+     * Any stored region that fails hotspot_repository::clean_geometry()
+     * (one saved before that validation existed) is left out - this
+     * matters more here than for the single-region sibling, because
+     * js/hotspot-multi-author.js POSTs the whole array back on every edit,
+     * and save() refuses the whole array if any one element is bad: handing
+     * a legacy degenerate region back to the authoring UI would make every
+     * later edit to the *good* regions fail too.
+     *
      * @param string $embedid
      * @return array|null Decoded array of {type,x,y,rx,ry,rotation} shapes, or null if none are defined yet.
      */
@@ -76,22 +84,27 @@ class hotspot_multi_repository {
         if (!$record) {
             return null;
         }
-        return json_decode($record->geometry, true);
+        $regions = json_decode($record->geometry, true);
+        if (!is_array($regions)) {
+            return [];
+        }
+        return array_values(array_filter($regions, function ($region) {
+            return hotspot_repository::clean_geometry($region) !== null;
+        }));
     }
 
     /**
-     * Whether at least one region has been defined at all yet - used by
-     * proxy.php to decide whether the student-facing attempt script is
-     * worth injecting, without needing the geometry itself.
+     * Whether at least one usable region has been defined at all yet - used
+     * by proxy.php to decide whether the student-facing attempt script is
+     * worth injecting, without needing the geometry itself. Regions that
+     * fail validation don't count (see get_geometry()), so a row holding
+     * only degenerate ones is treated the same as an empty one.
      *
      * @param string $embedid
      * @return bool
      */
     public static function exists(string $embedid): bool {
-        global $DB;
-
-        $record = $DB->get_record('local_omeroembed_hotspot_multi', ['embedid' => $embedid]);
-        return $record !== false && json_decode($record->geometry, true) !== [];
+        return !empty(self::get_geometry($embedid));
     }
 
     /**
@@ -99,9 +112,13 @@ class hotspot_multi_repository {
      * "one row per embed, save replaces the whole value" (see this class's
      * own docblock), same convention hotspot_repository::save() already
      * uses, just for an array instead of one shape. Every element is
-     * validated before anything is persisted - reject the whole request
-     * rather than partially save (same "never trust the client" stance
-     * ajax.php's own hotspot_save/create actions already take).
+     * validated through hotspot_repository::clean_geometry() (see its
+     * docblock for the zero-rx/ry DivisionByZeroError this closes) before
+     * anything is persisted - reject the whole request rather than
+     * partially save (same "never trust the client" stance ajax.php's own
+     * hotspot_save/create actions already take), so a teacher never ends
+     * up with fewer regions than they drew without being told. The
+     * cleaned copies (floats only, no stray keys) are what's stored.
      *
      * @param int $courseid
      * @param string $embedid
@@ -116,16 +133,13 @@ class hotspot_multi_repository {
         if (count($regions) > self::MAX_REGIONS) {
             throw new \moodle_exception('toomanyregions', 'local_omeroembed', '', self::MAX_REGIONS);
         }
+        $cleanregions = [];
         foreach ($regions as $region) {
-            if (
-                !is_array($region)
-                    || !isset($region['type'], $region['x'], $region['y'], $region['rx'], $region['ry'])
-                    || ($region['type'] !== annotations_repository::TYPE_ELLIPSE
-                        && $region['type'] !== annotations_repository::TYPE_RECTANGLE)
-                    || (float) $region['rx'] <= 0 || (float) $region['ry'] <= 0
-            ) {
+            $cleanregion = hotspot_repository::clean_geometry($region);
+            if ($cleanregion === null) {
                 throw new \moodle_exception('invalidregion', 'local_omeroembed');
             }
+            $cleanregions[] = $cleanregion;
         }
 
         $now = time();
@@ -137,12 +151,12 @@ class hotspot_multi_repository {
             'courseid' => $courseid,
             'embedid' => $embedid,
             'createdby' => $userid,
-            'geometry' => json_encode(array_values($regions)),
+            'geometry' => json_encode($cleanregions),
             'timecreated' => $now,
             'timemodified' => $now,
         ];
         $record->id = $DB->insert_record('local_omeroembed_hotspot_multi', $record);
-        $record->geometry = array_values($regions);
+        $record->geometry = $cleanregions;
         return $record;
     }
 
@@ -192,6 +206,11 @@ class hotspot_multi_repository {
      * selection code uses, same reasoning as hotspot_repository's own
      * check_attempt().
      *
+     * Re-validates every region itself as a last line of defence, same
+     * reasoning as hotspot_repository::check_attempt() - an unusable
+     * region is skipped (it can never be hit), the rest of the set still
+     * counts, and nothing here ever throws.
+     *
      * @param string $embedid
      * @param float $x Image-pixel x of the student's click.
      * @param float $y Image-pixel y of the student's click.
@@ -199,14 +218,21 @@ class hotspot_multi_repository {
      */
     public static function check_attempt(string $embedid, float $x, float $y): bool {
         $regions = self::get_geometry($embedid);
-        if (empty($regions)) {
+        if (empty($regions) || !is_finite($x) || !is_finite($y)) {
             return false;
         }
 
         foreach ($regions as $region) {
-            $local = self::unrotate($x - $region['x'], $y - $region['y'], $region['rotation'] ?? 0);
+            $region = hotspot_repository::clean_geometry($region);
+            if ($region === null) {
+                continue;
+            }
+            $local = self::unrotate($x - $region['x'], $y - $region['y'], $region['rotation']);
             if ($region['type'] === annotations_repository::TYPE_ELLIPSE) {
-                $normalised = (($local[0] ** 2) / ($region['rx'] ** 2)) + (($local[1] ** 2) / ($region['ry'] ** 2));
+                // Divide before squaring - same underflow reasoning as
+                // hotspot_repository::check_attempt()'s own comment on
+                // this line.
+                $normalised = (($local[0] / $region['rx']) ** 2) + (($local[1] / $region['ry']) ** 2);
                 if ($normalised <= 1) {
                     return true;
                 }

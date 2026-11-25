@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->libdir . '/questionlib.php');
+require_once($CFG->dirroot . '/question/type/omerohotspotmulti/lib.php');
 
 /**
  * The OMERO multi-region hotspot question type class - no question_answers
@@ -45,7 +46,7 @@ class qtype_omerohotspotmulti extends question_type {
     public function save_question_options($question) {
         global $DB;
 
-        $regions = json_decode($question->geometry, true);
+        $regions = json_decode($question->geometry ?? '', true);
         if (!is_array($regions) || count($regions) < 1) {
             // At least one region required - a question with none is
             // unwinnable (see this plugin's own plan doc's "explicit scope
@@ -57,26 +58,27 @@ class qtype_omerohotspotmulti extends question_type {
             // takes.
             throw new \moodle_exception('missinggeometry', 'qtype_omerohotspotmulti');
         }
+        // Every region through the same shared rule the edit form's
+        // validation() already applied - repeated here for the same
+        // "reachable without that form" reason qtype_omerohotspot's own
+        // save_question_options() gives. One bad region refuses the whole
+        // save rather than being quietly dropped, so the teacher never
+        // ends up with fewer regions than they drew without being told.
+        $cleanregions = [];
         foreach ($regions as $region) {
-            if (
-                !is_array($region) || !isset(
-                    $region['type'],
-                    $region['x'],
-                    $region['y'],
-                    $region['rx'],
-                    $region['ry']
-                )
-            ) {
-                throw new \moodle_exception('missinggeometry', 'qtype_omerohotspotmulti');
+            $cleanregion = qtype_omerohotspotmulti_clean_region($region);
+            if ($cleanregion === null) {
+                throw new \moodle_exception('invalidgeometry', 'qtype_omerohotspotmulti');
             }
+            $cleanregions[] = $cleanregion;
         }
 
         // Optional, unlike $regions above - same reasoning
         // qtype_omerohotspot's own save_question_options() gives on this
         // same line.
         $openingview = '';
-        $decodedopeningview = json_decode($question->openingview ?? '', true);
-        if (is_array($decodedopeningview) && isset($decodedopeningview['x'], $decodedopeningview['y'], $decodedopeningview['zm'])) {
+        $decodedopeningview = qtype_omerohotspotmulti_clean_openingview(json_decode($question->openingview ?? '', true));
+        if ($decodedopeningview !== null) {
             $openingview = json_encode($decodedopeningview);
         }
 
@@ -86,7 +88,7 @@ class qtype_omerohotspotmulti extends question_type {
         $record->subjectid = (int) $question->subjectid;
         $record->imageid = $question->imageid ?? '';
         $record->datasetid = $question->datasetid ?? '';
-        $record->geometry = json_encode(array_values($regions));
+        $record->geometry = json_encode($cleanregions);
         $record->openingview = $openingview;
 
         if ($options) {
@@ -139,9 +141,16 @@ class qtype_omerohotspotmulti extends question_type {
         $question->subjectid = (int) $questiondata->options->subjectid;
         $question->imageid = $questiondata->options->imageid;
         $question->datasetid = $questiondata->options->datasetid;
-        $question->regions = json_decode($questiondata->options->geometry, true);
+        // Same "validate on load too" reasoning as qtype_omerohotspot's own
+        // initialise_question_instance() - unusable regions are dropped
+        // here (qtype_omerohotspotmulti_check() would skip them anyway),
+        // the rest still count.
+        $decodedregions = json_decode($questiondata->options->geometry ?? '', true);
+        $question->regions = is_array($decodedregions)
+            ? array_values(array_filter(array_map('qtype_omerohotspotmulti_clean_region', $decodedregions)))
+            : [];
         $question->openingview = !empty($questiondata->options->openingview)
-            ? json_decode($questiondata->options->openingview, true)
+            ? qtype_omerohotspotmulti_clean_openingview(json_decode($questiondata->options->openingview, true))
             : null;
     }
 

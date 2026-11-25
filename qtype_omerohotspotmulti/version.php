@@ -76,10 +76,20 @@ $plugin->component = 'qtype_omerohotspotmulti';
 // question bank with every field present and no errors. $plugin->
 // supported extended to include 503, and the local_omeroembed dependency
 // pin brought up to the build this component now ships with.
-$plugin->version   = 2026100500;
+//
+// 2026112500 (1.1.1): Security fix pack, following a Moodle Marketplace
+// review - same pass as qtype_omerohotspot's identical version bump, see
+// that plugin's own entry for the full explanation. Every fix applies
+// here too: clickx/clicky validation (an out-of-range or empty value
+// could crash summarise_response() and, worse, poison the site-wide
+// overdue-quiz auto-submit cron), degenerate-region validation at save/
+// restore/hit-test time (a zero-width region, reachable through the
+// normal authoring UI, caused the same fatal/cron-poisoning effect),
+// and format_string() on the subject name in the edit form.
+$plugin->version   = 2026112500;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.1.0';
+$plugin->release   = '1.1.1';
 $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
 
 // A sibling of qtype_omerohotspot, not a mode of it - a click is correct

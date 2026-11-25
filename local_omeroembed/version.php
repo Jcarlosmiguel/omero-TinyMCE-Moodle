@@ -516,10 +516,28 @@ defined('MOODLE_INTERNAL') || die();
 // No DEVELOPER-debug output anywhere in any of this. $plugin->supported
 // extended to include 503 on the strength of this pass, not just the
 // authoring-form check the 5.3 readiness note below originally covered.
-$plugin->version   = 2026100500;
+//
+// 2026112500 (1.7.1): Security fix pack, following a Moodle Marketplace
+// review. proxy.php and heatmap_renderer.php now require that a subject's
+// owner actually holds moodle/course:manageactivities in the requesting
+// course before authenticating as it - previously any enrolled user could
+// substitute another teacher's subject id and browse their OMERO account
+// via /api/ and /webgateway/ (see subject_repository::resolve_for_course()).
+// author.js's postMessage write-up handler now sanitises received HTML
+// (strips script/on*/javascript: etc.) before inserting it - confirmed
+// exploitable end-to-end, though only as defence-in-depth: the same
+// payload already executes via this site's own TinyMCE config regardless
+// of this plugin. hotspot_repository.php/hotspot_multi_repository.php's
+// hit-test also hardened against degenerate (zero-width) regions, same
+// fix as qtype_omerohotspot/qtype_omerohotspotmulti this same pass - see
+// their own version.php entries. Known follow-up, not yet fixed: a
+// question/embed shared across courses via a question bank still breaks
+// if its subject's owner doesn't teach the course it's reused in - needs
+// a proper lookup through quiz slots/question references.
+$plugin->version   = 2026112500;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.7.0';
+$plugin->release   = '1.7.1';
 $plugin->maturity  = MATURITY_STABLE;
 // Supported must be a strict [min, max] pair (core validates count()==2
 // in lib/classes/plugininfo/base.php - anything else throws a

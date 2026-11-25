@@ -284,6 +284,14 @@ if ($action === 'hotspot_save') {
         throw new \moodle_exception('invalidradius', 'local_omeroembed', '', "rx=$rx, ry=$ry");
     }
     $geometry = ['type' => $type, 'x' => $x, 'y' => $y, 'rx' => $rx, 'ry' => $ry, 'rotation' => $rotation];
+    // The radius check above only gives the common case a specific error
+    // message - PARAM_FLOAT is a bare (float) cast, so "1e999" arrives here
+    // as INF for any of the five numbers, which that check can't see. The
+    // full rule is hotspot_repository::clean_geometry(), applied here at
+    // the request boundary and enforced again inside save() itself.
+    if (hotspot_repository::clean_geometry($geometry) === null) {
+        throw new \moodle_exception('invalidregion', 'local_omeroembed');
+    }
 
     hotspot_repository::verify_course($embedid, $courseid);
     $record = hotspot_repository::save($courseid, $embedid, $USER->id, $geometry);
@@ -296,13 +304,20 @@ if ($action === 'hotspotmulti_save') {
     // of regions is sent as one JSON-encoded 'regions' param (per-field
     // params like hotspot_save's don't scale to N shapes) and replaces the
     // stored set outright, same "bulk overwrite" convention. Every element
-    // is validated inside hotspot_multi_repository::save() itself, using
-    // the same annotations_repository::TYPE_ELLIPSE/TYPE_RECTANGLE
-    // constants and invalidregion exception for a malformed element.
+    // goes through the same hotspot_repository::clean_geometry() rule
+    // hotspot_save uses (json_decode() turns a 1e999 into INF just as
+    // PARAM_FLOAT does) - checked here at the request boundary, and again
+    // inside hotspot_multi_repository::save() itself, with the same
+    // invalidregion exception for a malformed element.
     $regionsraw = required_param('regions', PARAM_RAW);
     $regions = json_decode($regionsraw, true);
     if (!is_array($regions)) {
         throw new \moodle_exception('invalidregion', 'local_omeroembed');
+    }
+    foreach ($regions as $region) {
+        if (hotspot_repository::clean_geometry($region) === null) {
+            throw new \moodle_exception('invalidregion', 'local_omeroembed');
+        }
     }
 
     hotspot_multi_repository::verify_course($embedid, $courseid);
@@ -328,6 +343,14 @@ if ($action === 'hotspotmulti_clear') {
 if ($action === 'hotspot_attempt') {
     $x = required_param('x', PARAM_FLOAT);
     $y = required_param('y', PARAM_FLOAT);
+    // Same PARAM_FLOAT "1e999" -> INF gap as hotspot_save above. Refused
+    // before record_attempt() rather than left to check_attempt() alone
+    // (which already treats it as a miss) - an INF can't be written to the
+    // attempts table's own number columns, and json_encode() can't
+    // represent one either.
+    if (!is_finite($x) || !is_finite($y)) {
+        throw new \moodle_exception('invalidcoordinates', 'local_omeroembed');
+    }
 
     // The only thing this response - or any code path reachable from a
     // student session - is ever allowed to reveal about the hidden region.
@@ -344,6 +367,10 @@ if ($action === 'hotspotmulti_attempt') {
     // hotspot_multi_repository::check_attempt()'s own docblock for why).
     $x = required_param('x', PARAM_FLOAT);
     $y = required_param('y', PARAM_FLOAT);
+    // See hotspot_attempt's own comment on this same check.
+    if (!is_finite($x) || !is_finite($y)) {
+        throw new \moodle_exception('invalidcoordinates', 'local_omeroembed');
+    }
 
     hotspot_multi_repository::verify_course($embedid, $courseid);
     $correct = hotspot_multi_repository::check_attempt($embedid, $x, $y);

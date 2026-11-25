@@ -26,16 +26,33 @@ namespace local_omeroembed;
  * requesting $userid and checks it against the row's own owner - a
  * mismatch behaves exactly like "no such row" (mysubjects.php's 404),
  * never "forbidden", so guessing another teacher's id doesn't even
- * confirm it exists. The one exception is get_credentials_by_id(),
- * deliberately unscoped - proxy.php serving a student's request has no
- * reason to know or care which teacher owns the entry being used, same
- * trust model the old global list already had.
+ * confirm it exists. get_credentials_by_id() is deliberately not
+ * scoped to the *requesting* user - proxy.php serving a student's request
+ * legitimately authenticates as a teacher's entry the student doesn't own.
+ * But it is no longer unscoped altogether: proxy.php (and the heatmap
+ * capture task) resolve the {subject} path segment through
+ * resolve_for_course() first, which ties the entry to the course being
+ * requested via its owner's own role there - see that method's docblock
+ * for the real, confirmed gap that closes (the old "same trust model the
+ * old global list already had" reasoning stopped holding the moment
+ * entries became per-teacher: "only you can see or use them" was the
+ * promise, and any logged-in user could use any of them by id).
  *
  * @package    local_omeroembed
  * @copyright  2026 University of Glasgow MVLS
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class subject_repository {
+    /**
+     * @var string What an entry's owner must hold in a course for that
+     * entry to be usable from it at all - see resolve_for_course(). The
+     * same capability author.php itself requires before it will build an
+     * embed (or render the subject dropdown an entry is picked from) in a
+     * course, so "the owner could have legitimately authored an embed
+     * here" is exactly the condition being checked, nothing broader.
+     */
+    const OWNER_CAPABILITY = 'moodle/course:manageactivities';
+
     /**
      * This teacher's own entries (id + name only) - for author.php's
      * dropdown and mysubjects.php's listing.
@@ -135,9 +152,85 @@ class subject_repository {
     }
 
     /**
-     * The unscoped lookup omero_session.php itself needs to actually
-     * authenticate as this subject - deliberately not ownership-checked,
-     * see this class's own docblock for why.
+     * Resolves a {subject} path segment (proxy.php's own URL, or a
+     * tracking row's stored sourceurl) to the one row id that should
+     * actually be authenticated as for a request scoped to $courseid - or
+     * null if there's no such row, OR there is one but its owner holds no
+     * OWNER_CAPABILITY in $courseid. Callers treat null exactly like
+     * "no such subject" (unknownsubject), never "forbidden" - same
+     * don't-confirm-it-exists convention as every other lookup here.
+     *
+     * SECURITY: confirmed real gap this closes - {subject} is a plain,
+     * sequential local_omeroembed_subjects.id in every embed's own iframe
+     * src (visible via view-source), and proxy.php used to hand it straight
+     * to omero_session::get_session() with no check beyond require_login()
+     * on the *declared* courseid. Any user enrolled in any course could
+     * swap in another id and browse, through /api/ and /webgateway/,
+     * whatever that teacher's OMERO account can see - from their own
+     * course's proxy.php path, against another teacher's credentials.
+     *
+     * Why "owner has a teaching role in this course" and not something
+     * per-embed: nothing in this plugin's data model records which subject
+     * a given embed uses - embedid is optional (embeds from before the
+     * annotation feature have none), the qtype modes never have one, and
+     * the only table that does store a subject (embed_tracking.sourceurl)
+     * only exists for embeds a teacher has opened heatmap.php for. An
+     * entry's owner (userid, already on every row) is the one binding
+     * every legitimate mode shares: author.php only ever offers the
+     * current teacher's own entries, in a course they already hold
+     * OWNER_CAPABILITY in, and the qtype edit forms do the same. Known,
+     * accepted consequence: an embed stops working in a course once its
+     * entry's owner no longer holds OWNER_CAPABILITY there (e.g. they left
+     * the course) - another teacher re-picks one of their own entries.
+     * has_capability() rather than is_enrolled() so category-level
+     * managers and site admins (the owner of every entry migrated from the
+     * old site-wide list - see db/upgrade.php's 2026080100 step) still
+     * count, and so a deleted owner fails closed (has_capability() returns
+     * false for a deleted user).
+     *
+     * Legacy plain-name segments (see omero_session::
+     * get_credentials_for_subject()) are resolved here too, not just
+     * numeric ids - otherwise a name would be a second, unchecked way to
+     * reach exactly the same rows, since get_credentials_by_legacy_name()
+     * matches any owner, including a teacher's own new-style entry that
+     * happens to share an old name. Every matching row is considered,
+     * oldest first (the migrated admin-owned original always predates any
+     * teacher's later same-named entry), and the first one whose owner is
+     * actually authorised wins - deterministic, unlike the bare
+     * IGNORE_MULTIPLE pick get_credentials_by_legacy_name() itself makes.
+     * Returning the resolved *id* (not a yes/no) is deliberate: callers
+     * then authenticate as exactly the row that was checked, rather than
+     * re-resolving the name a second time and possibly landing on a
+     * different one.
+     *
+     * @param string $subject Raw {subject} path segment.
+     * @param int $courseid The course the request is scoped to.
+     * @return int|null The local_omeroembed_subjects.id to authenticate as, or null.
+     */
+    public static function resolve_for_course(string $subject, int $courseid): ?int {
+        global $DB;
+
+        if ($subject === '') {
+            return null;
+        }
+        $conditions = ctype_digit($subject) ? ['id' => (int) $subject] : ['name' => $subject];
+        $candidates = $DB->get_records('local_omeroembed_subjects', $conditions, 'id ASC', 'id, userid');
+
+        $context = \context_course::instance($courseid);
+        foreach ($candidates as $candidate) {
+            if (has_capability(self::OWNER_CAPABILITY, $context, (int) $candidate->userid)) {
+                return (int) $candidate->id;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The lookup omero_session.php itself needs to actually authenticate
+     * as this subject - deliberately not checked against the *requesting*
+     * user, see this class's own docblock for why. Callers serving a
+     * course-scoped request must resolve the id via resolve_for_course()
+     * first, not pass a raw request value straight through to here.
      *
      * @param int $id
      * @return array{username: string, password: string}|null

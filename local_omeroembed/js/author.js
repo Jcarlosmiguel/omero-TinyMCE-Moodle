@@ -80,6 +80,95 @@
             .replace(/'/g, '&#39;');
     }
 
+    // Removed outright, children and all - see sanitizeHtml(). noscript,
+    // svg and math aren't script sinks themselves: they're the known
+    // mutation-XSS vectors for exactly this parse -> serialize -> re-parse
+    // round trip (noscript parses differently in DOMParser's scripting-
+    // disabled document than in this live page; svg/math namespace
+    // switching doesn't reliably round-trip), and none of them belong in a
+    // write-up anyway. base/meta could redirect relative links/the page.
+    var SANITIZE_DROP_TAGS = ['script', 'noscript', 'template', 'svg', 'math', 'base', 'meta'];
+    var SANITIZE_URL_ATTRS = ['href', 'src', 'action', 'formaction', 'xlink:href', 'data', 'poster', 'background'];
+
+    /**
+     * Whether a URL attribute's value would run script (javascript:/
+     * vbscript:) or smuggle in arbitrary inline content (data:). Browsers
+     * ignore embedded tabs/newlines and leading control characters/spaces
+     * when parsing a scheme (so "java\tscript:" still runs), hence all of
+     * them stripped before comparing - character references are already
+     * decoded by the parser by this point.
+     *
+     * One deliberate exception to "no data:" - a raster data:image on an
+     * <img src>: that's what pasting a screenshot into a contenteditable
+     * box (this write-up) actually produces, an <img> never executes its
+     * source whatever the type, and dropping it would silently lose a
+     * teacher's pasted image on every re-edit.
+     *
+     * @param {Element} el
+     * @param {string} attrName Lowercased.
+     * @param {string} value
+     * @return {boolean}
+     */
+    function isUnsafeUrl(el, attrName, value) {
+        var normalised = String(value).replace(/[\u0000-\u0020\u007f-\u009f]/g, '').toLowerCase();
+        if (normalised.indexOf('javascript:') === 0 || normalised.indexOf('vbscript:') === 0) {
+            return true;
+        }
+        if (normalised.indexOf('data:') === 0) {
+            return !(el.tagName === 'IMG' && attrName === 'src' && /^data:image\/(png|gif|jpe?g|webp|bmp)[;,]/.test(normalised));
+        }
+        return false;
+    }
+
+    /**
+     * Strips script-capable markup from externally-sourced write-up HTML
+     * while keeping its ordinary rich formatting (bold/italic, lists,
+     * tables, images, view-links...) intact - the write-up is deliberately
+     * rich HTML (see the 'omero-embed-existing-writeup' listener at the
+     * bottom of this file), so escaping it to plain text isn't an option.
+     *
+     * SECURITY: confirmed exploitable before this existed - a write-up
+     * saved with e.g. <p oncontentvisibilityautostatechange="..."> (which
+     * survives this site's TinyMCE p[*] config) ran with zero interaction
+     * in a *different* teacher's browser the moment they re-opened that
+     * embed here, via the listener's raw innerHTML assignment. The same
+     * stored payload already runs through Moodle core's own page view/edit
+     * form first, so this is defense in depth rather than a privilege
+     * boundary - but this page shouldn't be one more sink for it, nor pass
+     * it along into the next generated embed (see generateEmbed()).
+     *
+     * Parsed with DOMParser, not a detached element's innerHTML: a
+     * DOMParser document is inert (no script runs, no <img> loads, no
+     * event handler fires while it's being cleaned), whereas an
+     * element created in this live document would already fire an
+     * <img onerror> during parsing, before anything here could strip it.
+     *
+     * @param {string} html
+     * @return {string}
+     */
+    function sanitizeHtml(html) {
+        var body = new DOMParser().parseFromString(String(html), 'text/html').body;
+        if (!body) {
+            return '';
+        }
+        Array.prototype.slice.call(body.querySelectorAll(SANITIZE_DROP_TAGS.join(','))).forEach(function(el) {
+            if (el.parentNode) {
+                el.parentNode.removeChild(el);
+            }
+        });
+        Array.prototype.slice.call(body.querySelectorAll('*')).forEach(function(el) {
+            // A static copy - removeAttribute() mutates el.attributes live.
+            Array.prototype.slice.call(el.attributes).forEach(function(attr) {
+                var name = attr.name.toLowerCase();
+                if (name.indexOf('on') === 0 || name === 'srcdoc'
+                        || (SANITIZE_URL_ATTRS.indexOf(name) !== -1 && isUnsafeUrl(el, name, attr.value))) {
+                    el.removeAttribute(attr.name);
+                }
+            });
+        });
+        return body.innerHTML;
+    }
+
     /**
      * @return {string} A stable token identifying this specific embed
      *                   placement - reused from an existing embed being
@@ -579,12 +668,17 @@
                 + 'document.getElementById("' + resetBtnId + '").addEventListener("click", function() {'
                 + 'var f = document.getElementById("' + config.iframeName + '"); var s = f.src; f.src = ""; f.src = s;'
                 + '});</script>';
+            // Both write-up reads below go through sanitizeHtml() too, not
+            // just the postMessage listener that fills the box - this is the
+            // string that gets saved into course content for every student,
+            // and the box's contents can also arrive by paste, which this
+            // file has no control over.
             inner = iframeHtml + '\n  ' + resetHtml +
-                '\n  <div style="margin-top: 0.5rem; text-align: left;">' + textBelowWriteup.innerHTML + '</div>';
+                '\n  <div style="margin-top: 0.5rem; text-align: left;">' + sanitizeHtml(textBelowWriteup.innerHTML) + '</div>';
         } else {
             var writeup = document.getElementById(config.writeupId);
             var slideCell = '<td>' + iframeHtml + '</td>';
-            var writeupCell = '<td style="width: 50%; text-align: left;">' + writeup.innerHTML + '</td>';
+            var writeupCell = '<td style="width: 50%; text-align: left;">' + sanitizeHtml(writeup.innerHTML) + '</td>';
             var cells = layout === 'slideright' ? (writeupCell + '\n      ' + slideCell)
                 : (slideCell + '\n      ' + writeupCell);
 
@@ -832,7 +926,11 @@
             }
             var writeup = document.getElementById(config.writeupId);
             if (writeup) {
-                writeup.innerHTML = event.data.html;
+                // Same-origin only (checked above), but that origin is the
+                // whole Moodle site, and the HTML itself is whatever was
+                // saved in the embed being re-edited - possibly by a
+                // different teacher. See sanitizeHtml()'s own docblock.
+                writeup.innerHTML = sanitizeHtml(event.data.html);
             }
         });
         window.parent.postMessage({type: 'omero-embed-ready'}, window.location.origin);

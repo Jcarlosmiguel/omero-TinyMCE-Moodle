@@ -66,12 +66,78 @@ class hotspot_repository {
     }
 
     /**
+     * Whether a value is a real, finite number - accepts a PHP int/float or a
+     * numeric string (a decoded-JSON value can be either). Same rule as
+     * qtype_omerohotspot's own qtype_omerohotspot_is_finite_number(), and
+     * the same reason both halves are needed: is_numeric('1e999') is true,
+     * but (float) '1e999' overflows to INF - and PARAM_FLOAT is nothing more
+     * than a (float) cast, while json_decode('1e999') gives INF directly,
+     * so both of ajax.php's save paths can hand this class an INF.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    public static function is_finite_number($value): bool {
+        return is_numeric($value) && is_finite((float) $value);
+    }
+
+    /**
+     * The one shared rule for what counts as a usable hidden region - used
+     * by save() here, by hotspot_multi_repository for each of its own
+     * regions (same {type, x, y, rx, ry, rotation} shape, same plugin, so
+     * called directly rather than ported again the way the two qtype
+     * plugins had to), by the restore class, and by both classes' own
+     * check_attempt() as a last line of defence. A zero rx/ry (reachable
+     * just by dragging a perfectly horizontal/vertical line in
+     * js/hotspot-author.js or js/hotspot-multi-author.js) used to reach
+     * check_attempt()'s ellipse formula unchecked and throw
+     * DivisionByZeroError for every student attempting the embed - the
+     * same bug qtype_omerohotspot_clean_geometry() closes for the question
+     * types.
+     *
+     * 'rotation' is the one optional key - ajax.php's own hotspot_save has
+     * always defaulted a missing one to 0, and check_attempt() has always
+     * treated it the same way - but if present it must still be a finite
+     * number.
+     *
+     * @param mixed $geometry Decoded geometry, as json_decode(..., true) gives it.
+     * @return array|null Normalised {type, x, y, rx, ry, rotation} (all numbers cast to float), or null if not usable.
+     */
+    public static function clean_geometry($geometry): ?array {
+        $types = [annotations_repository::TYPE_ELLIPSE, annotations_repository::TYPE_RECTANGLE];
+        if (!is_array($geometry) || !in_array($geometry['type'] ?? null, $types, true)) {
+            return null;
+        }
+        $clean = ['type' => $geometry['type']];
+        foreach (['x', 'y', 'rx', 'ry'] as $key) {
+            if (!array_key_exists($key, $geometry) || !self::is_finite_number($geometry[$key])) {
+                return null;
+            }
+            $clean[$key] = (float) $geometry[$key];
+        }
+        $rotation = $geometry['rotation'] ?? 0;
+        if (!self::is_finite_number($rotation)) {
+            return null;
+        }
+        $clean['rotation'] = (float) $rotation;
+        if ($clean['rx'] <= 0 || $clean['ry'] <= 0) {
+            return null;
+        }
+        return $clean;
+    }
+
+    /**
      * The current hidden region for one embed, decoded - teacher-authoring
      * use only (rendering the existing region as a reference outline when
      * reopening author.php). Never call this from the student attempt path.
      *
+     * A stored region that fails clean_geometry() (one saved before that
+     * validation existed) is reported as no region at all - the teacher
+     * just sees an empty canvas and draws a new one, rather than being
+     * handed back a degenerate shape they can't see properly or grab.
+     *
      * @param string $embedid
-     * @return array|null Decoded geometry, or null if no region is defined yet.
+     * @return array|null Decoded geometry, or null if no usable region is defined yet.
      */
     public static function get_geometry(string $embedid): ?array {
         global $DB;
@@ -80,28 +146,33 @@ class hotspot_repository {
         if (!$record) {
             return null;
         }
-        return json_decode($record->geometry, true);
+        $geometry = json_decode($record->geometry, true);
+        return self::clean_geometry($geometry) === null ? null : $geometry;
     }
 
     /**
-     * Whether a region has been defined at all yet - used by proxy.php to
-     * decide whether the student-facing attempt script is worth injecting,
-     * without needing the geometry itself.
+     * Whether a usable region has been defined at all yet - used by
+     * proxy.php to decide whether the student-facing attempt script is
+     * worth injecting, without needing the geometry itself. A row whose
+     * geometry fails clean_geometry() doesn't count, for the same reason
+     * a missing row doesn't: there's nothing a student could ever hit.
      *
      * @param string $embedid
      * @return bool
      */
     public static function exists(string $embedid): bool {
-        global $DB;
-
-        return $DB->record_exists('local_omeroembed_hotspots', ['embedid' => $embedid]);
+        return self::get_geometry($embedid) !== null;
     }
 
     /**
      * Creates or replaces the hidden region for one embed - "one region per
      * embed" (see this class's own docblock) means there's no partial-edit
      * case to handle, a new drawn region always simply supersedes the old
-     * one outright.
+     * one outright. $geometry is validated through clean_geometry() before
+     * anything is touched - same "never trust the client" stance ajax.php's
+     * own hotspot_save action takes, repeated here so no other caller can
+     * skip it - and it's the cleaned copy (floats only, no stray keys)
+     * that's stored.
      *
      * @param int $courseid
      * @param string $embedid
@@ -109,9 +180,15 @@ class hotspot_repository {
      * @param array $geometry {type, x, y, rx, ry, rotation} - same shape as
      *                        an annotation's own ellipse/rectangle geometry.
      * @return \stdClass The saved row, geometry re-decoded for the caller's convenience.
+     * @throws \moodle_exception If $geometry is not a usable region (see clean_geometry()).
      */
     public static function save(int $courseid, string $embedid, int $userid, array $geometry): \stdClass {
         global $DB;
+
+        $geometry = self::clean_geometry($geometry);
+        if ($geometry === null) {
+            throw new \moodle_exception('invalidregion', 'local_omeroembed');
+        }
 
         $now = time();
         $existing = $DB->get_record('local_omeroembed_hotspots', ['embedid' => $embedid]);
@@ -176,20 +253,30 @@ class hotspot_repository {
      * it here would make the true region larger than what the teacher
      * actually drew, a real correctness bug, not just an inconsistency).
      *
+     * Re-validates the stored geometry itself through clean_geometry() as
+     * a last line of defence (a row saved or restored before that
+     * validation existed can still be degenerate) - an unusable region, or
+     * a non-finite click, is simply "not a hit", never a thrown error.
+     *
      * @param string $embedid
      * @param float $x Image-pixel x of the student's click.
      * @param float $y Image-pixel y of the student's click.
      * @return bool
      */
     public static function check_attempt(string $embedid, float $x, float $y): bool {
-        $geometry = self::get_geometry($embedid);
-        if ($geometry === null) {
+        $geometry = self::clean_geometry(self::get_geometry($embedid));
+        if ($geometry === null || !is_finite($x) || !is_finite($y)) {
             return false;
         }
 
-        $local = self::unrotate($x - $geometry['x'], $y - $geometry['y'], $geometry['rotation'] ?? 0);
+        $local = self::unrotate($x - $geometry['x'], $y - $geometry['y'], $geometry['rotation']);
         if ($geometry['type'] === annotations_repository::TYPE_ELLIPSE) {
-            $normalised = (($local[0] ** 2) / ($geometry['rx'] ** 2)) + (($local[1] ** 2) / ($geometry['ry'] ** 2));
+            // Divide before squaring (mathematically identical to
+            // x^2/rx^2 + y^2/ry^2) - a tiny-but-positive rx such as 1e-200
+            // still passes clean_geometry()'s rx > 0 rule, but rx ** 2
+            // underflows to 0.0 and would bring the DivisionByZeroError
+            // straight back. Same fix as qtype_omerohotspot_check().
+            $normalised = (($local[0] / $geometry['rx']) ** 2) + (($local[1] / $geometry['ry']) ** 2);
             return $normalised <= 1;
         }
         return abs($local[0]) <= $geometry['rx'] && abs($local[1]) <= $geometry['ry'];

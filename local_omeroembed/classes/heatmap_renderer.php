@@ -81,8 +81,22 @@ class heatmap_renderer {
             return null;
         }
 
+        // SECURITY: same check proxy.php makes before authenticating as a
+        // subject (see subject_repository::resolve_for_course()) - this
+        // path never goes through proxy.php at all, and sourceurl is
+        // seeded from a request param on heatmap.php's first visit, so
+        // without this any holder of local/omeroembed:viewheatmap could
+        // point it at another teacher's subject id and have this task
+        // render (and video.php serve) a thumbnail fetched with that
+        // teacher's OMERO credentials. Skipped like any other unrenderable
+        // embed, not thrown - one bad row shouldn't fail the whole run.
+        $subjectid = subject_repository::resolve_for_course($parsed['subject'], (int) $tracking->courseid);
+        if ($subjectid === null) {
+            return null;
+        }
+
         $baseurl = rtrim((string) get_config('local_omeroembed', 'omerobaseurl'), '/');
-        $session = omero_session::get_session($parsed['subject']);
+        $session = omero_session::get_session((string) $subjectid);
 
         $dimensions = self::fetch_image_dimensions($baseurl, $session, $parsed['imageid']);
         if (!$dimensions) {

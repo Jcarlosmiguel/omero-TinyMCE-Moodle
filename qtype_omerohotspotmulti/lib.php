@@ -47,6 +47,77 @@ function qtype_omerohotspotmulti_unrotate(float $px, float $py, float $rotation)
 }
 
 /**
+ * Whether a value is a real, finite number - same rule and reasoning as
+ * qtype_omerohotspot's own qtype_omerohotspot_is_finite_number() (the
+ * "1e999" -> INF -> round() TypeError -> poisoned quiz cron task chain),
+ * ported rather than called cross-plugin for the same independence reason
+ * qtype_omerohotspotmulti_unrotate() above gives.
+ *
+ * @param mixed $value
+ * @return bool
+ */
+function qtype_omerohotspotmulti_is_finite_number($value): bool {
+    return is_numeric($value) && is_finite((float) $value);
+}
+
+/**
+ * The one shared rule for what counts as a usable correct-answer region -
+ * applied per region here (this qtype stores an array of them), otherwise
+ * identical to qtype_omerohotspot's own qtype_omerohotspot_clean_geometry()
+ * (see its docblock for the zero-rx/ry DivisionByZeroError this closes,
+ * and why 'rotation' alone is optional). Called from the edit form's
+ * validation(), save_question_options(), the restore class, and
+ * qtype_omerohotspotmulti_check() itself.
+ *
+ * @param mixed $region One decoded region, as json_decode(..., true) gives it.
+ * @return array|null Normalised {type, x, y, rx, ry, rotation} (all numbers cast to float), or null if not usable.
+ */
+function qtype_omerohotspotmulti_clean_region($region): ?array {
+    if (!is_array($region) || !in_array($region['type'] ?? null, ['ellipse', 'rectangle'], true)) {
+        return null;
+    }
+    $clean = ['type' => $region['type']];
+    foreach (['x', 'y', 'rx', 'ry'] as $key) {
+        if (!array_key_exists($key, $region) || !qtype_omerohotspotmulti_is_finite_number($region[$key])) {
+            return null;
+        }
+        $clean[$key] = (float) $region[$key];
+    }
+    $rotation = $region['rotation'] ?? 0;
+    if (!qtype_omerohotspotmulti_is_finite_number($rotation)) {
+        return null;
+    }
+    $clean['rotation'] = (float) $rotation;
+    if ($clean['rx'] <= 0 || $clean['ry'] <= 0) {
+        return null;
+    }
+    return $clean;
+}
+
+/**
+ * Validates a decoded opening view ({x, y, zm}) - identical rule and
+ * reasoning to qtype_omerohotspot's own
+ * qtype_omerohotspot_clean_openingview() (an array-valued x/y/zm from a
+ * crafted backup made moodle_url throw in renderer.php).
+ *
+ * @param mixed $view Decoded opening view, as json_decode(..., true) gives it.
+ * @return array|null Normalised {x, y, zm} (cast to float), or null if not usable.
+ */
+function qtype_omerohotspotmulti_clean_openingview($view): ?array {
+    if (!is_array($view)) {
+        return null;
+    }
+    $clean = [];
+    foreach (['x', 'y', 'zm'] as $key) {
+        if (!array_key_exists($key, $view) || !qtype_omerohotspotmulti_is_finite_number($view[$key])) {
+            return null;
+        }
+        $clean[$key] = (float) $view[$key];
+    }
+    return $clean;
+}
+
+/**
  * The security-critical hit-test this whole plugin exists for: checks a
  * student's clicked image-pixel coordinates against every region in the
  * hidden set, entirely server-side, short-circuiting on the first match -
@@ -57,16 +128,30 @@ function qtype_omerohotspotmulti_unrotate(float $px, float $py, float $rotation)
  * *selecting* it in the drawing tools, applying it here would make the
  * true regions larger than what the teacher actually drew.
  *
- * @param array $regions Array of {type, x, y, rx, ry, rotation} shapes.
+ * Re-validates every region itself as a last line of defence, same
+ * reasoning as qtype_omerohotspot_check() - an unusable region is skipped
+ * (it can never be hit), the rest of the set still counts, and nothing
+ * here ever throws.
+ *
+ * @param mixed $regions Array of {type, x, y, rx, ry, rotation} shapes, or anything else (treated as no usable regions).
  * @param float $x Image-pixel x of the student's click.
  * @param float $y Image-pixel y of the student's click.
  * @return bool
  */
-function qtype_omerohotspotmulti_check(array $regions, float $x, float $y): bool {
+function qtype_omerohotspotmulti_check($regions, float $x, float $y): bool {
+    if (!is_array($regions) || !is_finite($x) || !is_finite($y)) {
+        return false;
+    }
     foreach ($regions as $region) {
-        $local = qtype_omerohotspotmulti_unrotate($x - $region['x'], $y - $region['y'], $region['rotation'] ?? 0);
+        $region = qtype_omerohotspotmulti_clean_region($region);
+        if ($region === null) {
+            continue;
+        }
+        $local = qtype_omerohotspotmulti_unrotate($x - $region['x'], $y - $region['y'], $region['rotation']);
         if ($region['type'] === 'ellipse') {
-            $normalised = (($local[0] ** 2) / ($region['rx'] ** 2)) + (($local[1] ** 2) / ($region['ry'] ** 2));
+            // Divide before squaring - same underflow reasoning as
+            // qtype_omerohotspot_check()'s own comment on this line.
+            $normalised = (($local[0] / $region['rx']) ** 2) + (($local[1] / $region['ry']) ** 2);
             if ($normalised <= 1) {
                 return true;
             }

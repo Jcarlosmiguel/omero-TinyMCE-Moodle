@@ -63,10 +63,16 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
     /**
      * The response fields this question expects: the raw click position.
      *
+     * PARAM_RAW_TRIMMED, not PARAM_FLOAT - same choice (and reasoning) as
+     * qtype_omerohotspot's own get_expected_data(), itself following
+     * qtype_numerical: PARAM_FLOAT turned an unclicked (empty) field into
+     * "0" and '1e999' into INF. Numeric validation happens in
+     * is_complete_response() instead.
+     *
      * @return array
      */
     public function get_expected_data() {
-        return ['clickx' => PARAM_FLOAT, 'clicky' => PARAM_FLOAT];
+        return ['clickx' => PARAM_RAW_TRIMMED, 'clicky' => PARAM_RAW_TRIMMED];
     }
 
     /**
@@ -85,13 +91,15 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
      * @return string|null
      */
     public function summarise_response(array $response) {
-        if (!array_key_exists('clickx', $response) || !array_key_exists('clicky', $response)) {
+        // Validated first, not just key-checked - same round() TypeError
+        // reasoning as qtype_omerohotspot's own summarise_response().
+        if (!$this->is_complete_response($response)) {
             return null;
         }
         return get_string(
             'clickedat',
             'qtype_omerohotspotmulti',
-            (object) ['x' => round($response['clickx']), 'y' => round($response['clicky'])]
+            (object) ['x' => round((float) $response['clickx']), 'y' => round((float) $response['clicky'])]
         );
     }
 
@@ -124,14 +132,18 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
     }
 
     /**
-     * Whether a click position was submitted at all.
+     * Whether a real click position was submitted - both coordinates
+     * present and finite numbers. Empty, non-numeric or non-finite all
+     * count as "not answered" - same rule as qtype_omerohotspot's own
+     * is_complete_response().
      *
      * @param array $response
      * @return bool
      */
     public function is_complete_response(array $response) {
         return array_key_exists('clickx', $response) && array_key_exists('clicky', $response)
-            && $response['clickx'] !== '' && $response['clicky'] !== '';
+            && qtype_omerohotspotmulti_is_finite_number($response['clickx'])
+            && qtype_omerohotspotmulti_is_finite_number($response['clicky']);
     }
 
     /**
@@ -177,7 +189,10 @@ class qtype_omerohotspotmulti_question extends question_graded_automatically {
      * @return array
      */
     public function grade_response(array $response) {
-        $correct = qtype_omerohotspotmulti_check($this->regions, (float) $response['clickx'], (float) $response['clicky']);
+        // Invalid response graded as a miss rather than cast blind - same
+        // reasoning as qtype_omerohotspot's own grade_response().
+        $correct = $this->is_complete_response($response)
+            && qtype_omerohotspotmulti_check($this->regions, (float) $response['clickx'], (float) $response['clicky']);
         $fraction = $correct ? 1 : 0;
         return [$fraction, question_state::graded_state_for_fraction($fraction)];
     }

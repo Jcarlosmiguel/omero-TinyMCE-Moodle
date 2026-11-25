@@ -857,9 +857,15 @@
                 return;
             }
             var radii = screenRadii(finished.x, finished.y, finished.rx, finished.ry);
-            if (Math.max(radii[0], radii[1]) < HIT_RADIUS) {
-                // Too small to be deliberate - discard rather than add a
-                // near-invisible region nobody could ever click inside.
+            // Math.min, not Math.max - same zero-width/zero-height reasoning
+            // as hotspot-author.js's own comment on this same line (server
+            // side: hotspot_repository.php's clean_geometry(), applied per
+            // region). Matters even more here: one degenerate region would
+            // make the server refuse the whole array on every later save.
+            if (Math.min(radii[0], radii[1]) < HIT_RADIUS) {
+                // Too small (or too thin) to be deliberate - discard rather
+                // than add a near-invisible region nobody could ever click
+                // inside.
                 redraw();
                 return;
             }

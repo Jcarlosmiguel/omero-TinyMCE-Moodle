@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/question/type/edit_question_form.php');
+require_once($CFG->dirroot . '/question/type/omerohotspot/lib.php');
 
 /**
  * OMERO hotspot question editing form. The hidden correct-answer region is
@@ -54,7 +55,11 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
         $subjects = \local_omeroembed\subject_repository::get_for_user($this->qtypeobj_userid());
         $subjectchoices = [0 => get_string('choosesubject', 'local_omeroembed')];
         foreach ($subjects as $subject) {
-            $subjectchoices[$subject->id] = $subject->name;
+            // Through format_string() - Moodle's select element template prints
+            // option text unescaped. Only the user's own subjects are
+            // listed, so raw output was self-XSS at worst, but this is
+            // the standard Moodle handling for user-entered names anyway.
+            $subjectchoices[$subject->id] = format_string($subject->name, true, ['context' => $this->context]);
         }
         $mform->addElement('select', 'subjectid', get_string('subjectlabel', 'local_omeroembed'), $subjectchoices);
         $mform->addRule('subjectid', null, 'required', null, 'client');
@@ -215,8 +220,13 @@ class qtype_omerohotspot_edit_form extends question_edit_form {
             $errors['imageid'] = get_string('missingimageordataset', 'local_omeroembed');
         }
         $geometry = json_decode($data['geometry'] ?? '', true);
-        if (!is_array($geometry) || !isset($geometry['type'], $geometry['x'], $geometry['y'], $geometry['rx'], $geometry['ry'])) {
+        if (!is_array($geometry)) {
             $errors['loadslidehelp'] = get_string('missinggeometry', 'qtype_omerohotspot');
+        } else if (qtype_omerohotspot_clean_geometry($geometry) === null) {
+            // Present but unusable (zero width/height, non-numeric, an
+            // unknown type...) - see qtype_omerohotspot_clean_geometry()
+            // for the full rule, shared with saving and restoring.
+            $errors['loadslidehelp'] = get_string('invalidgeometry', 'qtype_omerohotspot');
         }
 
         return $errors;

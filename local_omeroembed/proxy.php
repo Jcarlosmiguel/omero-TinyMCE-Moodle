@@ -169,6 +169,27 @@ if ($authoring) {
     require_capability('moodle/course:manageactivities', context_course::instance($courseid));
 }
 
+// SECURITY: require_login($course) above only proves the *viewer* belongs
+// in $courseid - it says nothing about whether $subject does. Without this,
+// $subject (a plain sequential row id, visible in any embed's own iframe
+// src) went straight to omero_session::get_session(), so anyone enrolled
+// in any course could swap in another teacher's id and browse whatever
+// that teacher's OMERO account can see via /api/ and /webgateway/ - see
+// subject_repository::resolve_for_course()'s own docblock for the full gap
+// and for why "the entry's owner can author embeds in this course" is the
+// binding checked, rather than anything per-embed. Every mode below
+// (student embed, authoring preview, heatmap, both qtypes' edit form and
+// attempt) goes through this same check - each one's own subject was
+// picked by a teacher of this course in the first place. Thrown as
+// unknownsubject, not a permissions error, so probing ids doesn't reveal
+// which ones exist. $subjectid (not $subject) is what actually gets
+// authenticated as below; $subject itself stays the path segment every
+// rewritten proxy URL ($proxybase) is built from, so URLs are unchanged.
+$subjectid = \local_omeroembed\subject_repository::resolve_for_course($subject, $courseid);
+if ($subjectid === null) {
+    throw new \moodle_exception('unknownsubject', 'local_omeroembed', '', $subject);
+}
+
 if (!in_array_prefix($path, PROXY_PATH_PREFIXES)) {
     throw new \moodle_exception('invalidproxypath', 'local_omeroembed', '', $path);
 }
@@ -381,7 +402,8 @@ if ($path === '/iviewer/') {
 
 $targeturl = $baseurl . $path . $querystring;
 
-$session = omero_session::get_session($subject);
+// The resolved id, never the raw $subject - see $subjectid's own comment.
+$session = omero_session::get_session((string) $subjectid);
 $result = fetch_from_omero($targeturl, $session);
 if (looks_like_stale_session($result)) {
     // Force a fresh login and retry exactly once - cheaper than it sounds, since
@@ -391,7 +413,7 @@ if (looks_like_stale_session($result)) {
     // timeout outpacing SESSION_TTL_SECONDS being the one confirmed via real
     // testing, but this doesn't depend on that specific cause) - see
     // omero_session::get_session()'s own docblock for the $forcerefresh contract.
-    $session = omero_session::get_session($subject, true);
+    $session = omero_session::get_session((string) $subjectid, true);
     $result = fetch_from_omero($targeturl, $session);
 }
 ['status' => $status, 'contenttype' => $contenttype, 'body' => $responsebody, 'location' => $locationheader] = $result;

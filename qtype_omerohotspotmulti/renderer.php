@@ -91,7 +91,9 @@ class qtype_omerohotspotmulti_renderer extends qtype_renderer {
 
         $wrapid = 'qtype_omerohotspotmulti_attempt_' . $qa->get_slot();
         $result .= html_writer::start_div('qtype_omerohotspotmulti_answer', ['id' => $wrapid]);
-        if ($clickx !== '' && $clicky !== '') {
+        // Same validity rule as qtype_omerohotspot's own renderer - see its
+        // comment on this same line.
+        if (qtype_omerohotspotmulti_is_finite_number($clickx) && qtype_omerohotspotmulti_is_finite_number($clicky)) {
             $result .= html_writer::div(
                 get_string(
                     'currentanswer',

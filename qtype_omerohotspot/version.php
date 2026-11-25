@@ -83,10 +83,28 @@ $plugin->component = 'qtype_omerohotspot';
 // question bank with every field present and no errors. $plugin->
 // supported extended to include 503, and the local_omeroembed dependency
 // pin brought up to the build this component now ships with.
-$plugin->version   = 2026100500;
+//
+// 2026112500 (1.1.1): Security fix pack, following a Moodle Marketplace
+// review. A student could set the hidden clickx/clicky inputs to an
+// out-of-range value (e.g. 1e999) via devtools, which was stored as the
+// string "INF" - summarise_response() then crashed casting it, breaking
+// the student's own quiz finish, the teacher's review page, and the
+// site-wide overdue-quiz auto-submit cron (it only catches
+// moodle_exception, not the TypeError this produced). An unanswered
+// question was also silently recorded as a click at (0,0) rather than
+// not-answered, for the same underlying reason (PARAM_FLOAT cleaning an
+// empty string to 0.0). Both now validated properly (see lib.php's new
+// is_finite_number()/clean_geometry()). A degenerate (zero-width) region
+// - reachable through the normal authoring UI, not just tampering - had
+// the same fatal/cron-poisoning effect via a division by zero in the
+// hit-test; validated at save, restore and hit-test time now. Restore
+// no longer inserts unvalidated geometry/openingview from a crafted or
+// corrupt backup. Subject name in the edit form now wrapped in
+// format_string() (self-XSS only, but good practice).
+$plugin->version   = 2026112500;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.1.0';
+$plugin->release   = '1.1.1';
 $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-

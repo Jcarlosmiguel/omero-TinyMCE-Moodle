@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->libdir . '/questionlib.php');
+require_once($CFG->dirroot . '/question/type/omerohotspot/lib.php');
 
 /**
  * The OMERO hotspot question type class - no question_answers involved
@@ -44,16 +45,8 @@ class qtype_omerohotspot extends question_type {
     public function save_question_options($question) {
         global $DB;
 
-        $geometry = json_decode($question->geometry, true);
-        if (
-            !is_array($geometry) || !isset(
-                $geometry['type'],
-                $geometry['x'],
-                $geometry['y'],
-                $geometry['rx'],
-                $geometry['ry']
-            )
-        ) {
+        $decodedgeometry = json_decode($question->geometry ?? '', true);
+        if (!is_array($decodedgeometry)) {
             // The edit form's own JS is what normally populates this -
             // refuse rather than silently save a question with no real
             // answer region, same "never trust the client, even our own
@@ -61,13 +54,20 @@ class qtype_omerohotspot extends question_type {
             // already takes for its own hotspot_save action.
             throw new \moodle_exception('missinggeometry', 'qtype_omerohotspot');
         }
+        // Same shared rule the edit form's validation() already applied -
+        // repeated here because save_question_options() is also reachable
+        // without that form (question import, generators, web services).
+        $geometry = qtype_omerohotspot_clean_geometry($decodedgeometry);
+        if ($geometry === null) {
+            throw new \moodle_exception('invalidgeometry', 'qtype_omerohotspot');
+        }
 
         // Optional, unlike $geometry above - a fresh question with no
         // opening view set yet, or an invalid/tampered-with hidden field
         // value, both just mean "no opening view", not a save failure.
         $openingview = '';
-        $decodedopeningview = json_decode($question->openingview ?? '', true);
-        if (is_array($decodedopeningview) && isset($decodedopeningview['x'], $decodedopeningview['y'], $decodedopeningview['zm'])) {
+        $decodedopeningview = qtype_omerohotspot_clean_openingview(json_decode($question->openingview ?? '', true));
+        if ($decodedopeningview !== null) {
             $openingview = json_encode($decodedopeningview);
         }
 
@@ -130,9 +130,14 @@ class qtype_omerohotspot extends question_type {
         $question->subjectid = (int) $questiondata->options->subjectid;
         $question->imageid = $questiondata->options->imageid;
         $question->datasetid = $questiondata->options->datasetid;
-        $question->geometry = json_decode($questiondata->options->geometry, true);
+        // Both run through the same shared validation as saving/restoring,
+        // so a row stored before that validation existed (or edited
+        // directly in the DB) loads as "no usable region"/"no opening
+        // view" - graded as a miss and OMERO's own default view - rather
+        // than reaching the hit-test or moodle_url malformed.
+        $question->geometry = qtype_omerohotspot_clean_geometry(json_decode($questiondata->options->geometry ?? '', true));
         $question->openingview = !empty($questiondata->options->openingview)
-            ? json_decode($questiondata->options->openingview, true)
+            ? qtype_omerohotspot_clean_openingview(json_decode($questiondata->options->openingview, true))
             : null;
     }
 

@@ -129,6 +129,16 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
     /**
      * Process one restored local_omeroembed_hotspots row.
      *
+     * A backup file is just as untrusted as an ajax.php request (crafted,
+     * corrupt, or made before this plugin validated hotspot geometry at
+     * all), so the region goes through the same
+     * hotspot_repository::clean_geometry() rule saving does. A failure
+     * doesn't abort the restore - same "log a warning and carry on with
+     * what's safe" approach qtype_omerohotspot's own restore class takes -
+     * the row is simply skipped, which is this table's own documented
+     * "no region defined yet" state (the attempt script isn't injected,
+     * and the teacher can draw a fresh region in author.php).
+     *
      * @param array|object $data
      */
     public function process_local_omeroembed_hotspot($data) {
@@ -144,6 +154,13 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
         if (!$newcreatedby) {
             return;
         }
+        $geometry = \local_omeroembed\hotspot_repository::clean_geometry(json_decode($data->geometry ?? '', true));
+        if ($geometry === null) {
+            $this->task->log('local_omeroembed: invalid hotspot region for embed ' . $data->embedid .
+                ' - not restored, redraw it before use', backup::LOG_WARNING);
+            return;
+        }
+        $data->geometry = json_encode($geometry);
         $data->courseid = $this->task->get_courseid();
         $data->createdby = $newcreatedby;
         $DB->insert_record('local_omeroembed_hotspots', $data);
@@ -151,6 +168,15 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
 
     /**
      * Process one restored local_omeroembed_hotspot_multi row.
+     *
+     * Same "backup is untrusted input" validation and log-and-carry-on
+     * fallback as process_local_omeroembed_hotspot() above, adapted for an
+     * array of regions the same way qtype_omerohotspotmulti's own restore
+     * class does: each region is checked individually and only the
+     * unusable ones are dropped, so one bad region doesn't cost the
+     * teacher every good one. If none survive, the row is skipped - the
+     * same "no regions defined yet" state hotspot_multi_repository::exists()
+     * already treats an empty set as.
      *
      * @param array|object $data
      */
@@ -167,6 +193,29 @@ class restore_local_omeroembed_plugin extends restore_local_plugin {
         if (!$newcreatedby) {
             return;
         }
+        $decodedregions = json_decode($data->geometry ?? '', true);
+        $cleanregions = [];
+        $droppedcount = 0;
+        if (is_array($decodedregions)) {
+            foreach ($decodedregions as $region) {
+                $cleanregion = \local_omeroembed\hotspot_repository::clean_geometry($region);
+                if ($cleanregion === null) {
+                    $droppedcount++;
+                } else {
+                    $cleanregions[] = $cleanregion;
+                }
+            }
+        }
+        if (!is_array($decodedregions) || $droppedcount > 0) {
+            $this->task->log('local_omeroembed: multi-region hotspot for embed ' . $data->embedid . ' kept ' .
+                count($cleanregions) . ' valid region(s), dropped ' .
+                (is_array($decodedregions) ? $droppedcount : 'unreadable geometry') .
+                ' - redraw any missing regions before use', backup::LOG_WARNING);
+        }
+        if (!$cleanregions) {
+            return;
+        }
+        $data->geometry = json_encode($cleanregions);
         $data->courseid = $this->task->get_courseid();
         $data->createdby = $newcreatedby;
         $DB->insert_record('local_omeroembed_hotspot_multi', $data);

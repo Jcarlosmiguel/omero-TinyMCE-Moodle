@@ -947,6 +947,19 @@
             if (Math.max(radii[0], radii[1]) < HIT_RADIUS) {
                 return;
             }
+            // Deliberately still Math.max above, not the Math.min the
+            // hotspot authoring tools switched to - a long, thin student
+            // annotation (e.g. marking along a membrane) is a legitimate
+            // mark of their own, not an answer region someone else has to
+            // click inside, and nothing server-side hit-tests annotations.
+            // Only an *exactly* zero radius (a perfectly horizontal/vertical
+            // drag) is unusable: ajax.php's 'create' action rejects rx/ry
+            // <= 0, and the error response would otherwise be pushed into
+            // annotations[] below as if it were a real annotation, breaking
+            // every later redraw(). Discarded here, before the label prompt.
+            if (!(finished.rx > 0) || !(finished.ry > 0)) {
+                return;
+            }
 
             var label = window.prompt(config.strings.labelprompt, '');
             if (label === null) {

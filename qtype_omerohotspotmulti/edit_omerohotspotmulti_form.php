@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/question/type/edit_question_form.php');
+require_once($CFG->dirroot . '/question/type/omerohotspotmulti/lib.php');
 
 /**
  * OMERO multi-region hotspot question editing form - a sibling of
@@ -56,7 +57,9 @@ class qtype_omerohotspotmulti_edit_form extends question_edit_form {
         $subjects = \local_omeroembed\subject_repository::get_for_user($this->qtypeobj_userid());
         $subjectchoices = [0 => get_string('choosesubject', 'local_omeroembed')];
         foreach ($subjects as $subject) {
-            $subjectchoices[$subject->id] = $subject->name;
+            // Through format_string() - same reasoning as qtype_omerohotspot's own
+            // edit form gives on this same line.
+            $subjectchoices[$subject->id] = format_string($subject->name, true, ['context' => $this->context]);
         }
         $mform->addElement('select', 'subjectid', get_string('subjectlabel', 'local_omeroembed'), $subjectchoices);
         $mform->addRule('subjectid', null, 'required', null, 'client');
@@ -204,8 +207,12 @@ class qtype_omerohotspotmulti_edit_form extends question_edit_form {
             $errors['loadslidehelp'] = get_string('missinggeometry', 'qtype_omerohotspotmulti');
         } else {
             foreach ($regions as $region) {
-                if (!is_array($region) || !isset($region['type'], $region['x'], $region['y'], $region['rx'], $region['ry'])) {
-                    $errors['loadslidehelp'] = get_string('missinggeometry', 'qtype_omerohotspotmulti');
+                // Any one unusable region (zero width/height, non-numeric,
+                // an unknown type...) blocks the save - see
+                // qtype_omerohotspotmulti_clean_region() for the full rule,
+                // shared with saving and restoring.
+                if (qtype_omerohotspotmulti_clean_region($region) === null) {
+                    $errors['loadslidehelp'] = get_string('invalidgeometry', 'qtype_omerohotspotmulti');
                     break;
                 }
             }

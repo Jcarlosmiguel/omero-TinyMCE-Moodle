@@ -711,7 +711,10 @@
                 return;
             }
             var radii = screenRadii(finished.x, finished.y, finished.rx, finished.ry);
-            if (Math.max(radii[0], radii[1]) < HIT_RADIUS) {
+            // Math.min, not Math.max - same zero-width/zero-height reasoning
+            // as hotspot-qtype-author.js's own comment on this same line
+            // (server side: qtype_omerohotspotmulti_clean_region()).
+            if (Math.min(radii[0], radii[1]) < HIT_RADIUS) {
                 redraw();
                 return;
             }

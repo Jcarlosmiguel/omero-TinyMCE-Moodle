@@ -544,9 +544,16 @@
                 return;
             }
             var radii = screenRadii(finished.x, finished.y, finished.rx, finished.ry);
-            if (Math.max(radii[0], radii[1]) < HIT_RADIUS) {
-                // Too small to be deliberate - discard rather than save a
-                // near-invisible region nobody could ever click inside.
+            // Math.min, not Math.max - a perfectly horizontal/vertical drag
+            // has one radius of exactly 0 but the other large, which a max
+            // check let through as a zero-width/zero-height region (the
+            // server now rejects those too - see hotspot_repository.php's
+            // own clean_geometry() - but catching it here means the teacher
+            // just redraws, rather than the save silently failing).
+            if (Math.min(radii[0], radii[1]) < HIT_RADIUS) {
+                // Too small (or too thin) to be deliberate - discard rather
+                // than save a near-invisible region nobody could ever click
+                // inside.
                 redraw();
                 return;
             }

@@ -51,7 +51,7 @@ class qtype_omerohotspot_question extends question_graded_automatically {
     /** @var string OMERO dataset id, if browsing a dataset rather than one fixed image. */
     public $datasetid;
 
-    /** @var array {type,x,y,rx,ry,rotation} - the hidden correct-answer region. */
+    /** @var array|null {type,x,y,rx,ry,rotation} - the hidden correct-answer region, null if the stored one isn't usable. */
     public $geometry;
 
     /** @var array|null {x,y,zm} - the position/zoom the slide opens on for a student, or null for OMERO's own default. */
@@ -60,10 +60,19 @@ class qtype_omerohotspot_question extends question_graded_automatically {
     /**
      * The response fields this question expects: the raw click position.
      *
+     * PARAM_RAW_TRIMMED, not PARAM_FLOAT - same choice qtype_numerical
+     * makes for its own answer field, for the same reason: PARAM_FLOAT is
+     * just (float) $param, which turns the always-posted empty hidden
+     * field (nothing clicked yet) into "0", indistinguishable from a real
+     * click at (0,0), and turns '1e999' into INF. Keeping the raw string
+     * lets is_complete_response() tell all of those apart; numeric
+     * validation happens there (and everywhere else these are used), not
+     * at clean time.
+     *
      * @return array
      */
     public function get_expected_data() {
-        return ['clickx' => PARAM_FLOAT, 'clicky' => PARAM_FLOAT];
+        return ['clickx' => PARAM_RAW_TRIMMED, 'clicky' => PARAM_RAW_TRIMMED];
     }
 
     /**
@@ -82,13 +91,16 @@ class qtype_omerohotspot_question extends question_graded_automatically {
      * @return string|null
      */
     public function summarise_response(array $response) {
-        if (!array_key_exists('clickx', $response) || !array_key_exists('clicky', $response)) {
+        // Validated first, not just key-checked - round() on a stored
+        // non-numeric string such as "INF" throws a TypeError on PHP 8
+        // (see qtype_omerohotspot_is_finite_number()'s own docblock).
+        if (!$this->is_complete_response($response)) {
             return null;
         }
         return get_string(
             'clickedat',
             'qtype_omerohotspot',
-            (object) ['x' => round($response['clickx']), 'y' => round($response['clicky'])]
+            (object) ['x' => round((float) $response['clickx']), 'y' => round((float) $response['clicky'])]
         );
     }
 
@@ -125,14 +137,20 @@ class qtype_omerohotspot_question extends question_graded_automatically {
     }
 
     /**
-     * Whether a click position was submitted at all.
+     * Whether a real click position was submitted - both coordinates
+     * present and finite numbers. An empty string (nothing clicked yet),
+     * anything non-numeric, or a non-finite value (INF from '1e999') all
+     * count as "not answered", never as a click (see
+     * get_expected_data()'s own docblock for how each one used to slip
+     * through).
      *
      * @param array $response
      * @return bool
      */
     public function is_complete_response(array $response) {
         return array_key_exists('clickx', $response) && array_key_exists('clicky', $response)
-            && $response['clickx'] !== '' && $response['clicky'] !== '';
+            && qtype_omerohotspot_is_finite_number($response['clickx'])
+            && qtype_omerohotspot_is_finite_number($response['clicky']);
     }
 
     /**
@@ -177,7 +195,11 @@ class qtype_omerohotspot_question extends question_graded_automatically {
      * @return array
      */
     public function grade_response(array $response) {
-        $correct = qtype_omerohotspot_check($this->geometry, (float) $response['clickx'], (float) $response['clicky']);
+        // Core only calls this for a gradable response, but an invalid one
+        // is graded as a miss here rather than cast blind - (float) 'abc'
+        // would silently become a click at 0.
+        $correct = $this->is_complete_response($response)
+            && qtype_omerohotspot_check($this->geometry, (float) $response['clickx'], (float) $response['clicky']);
         $fraction = $correct ? 1 : 0;
         return [$fraction, question_state::graded_state_for_fraction($fraction)];
     }
