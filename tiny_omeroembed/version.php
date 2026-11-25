@@ -118,11 +118,18 @@ defined('MOODLE_INTERNAL') || die();
 // toolbar button on each, with no console errors, and the write-up
 // round trip (the WRITEUP_MESSAGE_TYPE postMessage into author.js's
 // sanitizeHtml()) coming back correctly rather than reset to defaults.
-$plugin->version   = 2026112500;
+//
+// 2026112501 (1.1.2): no further code change - same Marketplace
+// versioning requirement as local_omeroembed's own 2026112501 entry:
+// release notes text changed (the testing confirmation above) after
+// 1.1.1's zip had already been built once, and Marketplace needs a new
+// version to carry updated release notes. Bumped solely for that; same
+// as 1.1.1 otherwise.
+$plugin->version   = 2026112501;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
 $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
-$plugin->release   = '1.1.1';
+$plugin->release   = '1.1.2';
 $plugin->maturity  = MATURITY_STABLE;
 // Hard runtime dependency, not just thematic bundling - ui.js opens
 // local_omeroembed's own author.php by URL directly (see amd/src/ui.js),

@@ -541,10 +541,17 @@ defined('MOODLE_INTERNAL') || die();
 // re-opened and re-edited through the authoring tool on each, exercising
 // the access-control fix and the write-up sanitisation, with no console
 // errors or failed requests on the teacher's own authorised path.
-$plugin->version   = 2026112500;
+//
+// 2026112501 (1.7.2): no further code change. Moodle Marketplace requires
+// a new version whenever a plugin's release notes text changes - the
+// testing confirmation above was added to this plugin's own Marketplace
+// release notes after 1.7.1's zip had already been built once, so 1.7.1
+// itself can't carry the updated text. Bumped solely to let the current
+// release notes be published; same fixes as 1.7.1.
+$plugin->version   = 2026112501;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).
-$plugin->release   = '1.7.1';
+$plugin->release   = '1.7.2';
 $plugin->maturity  = MATURITY_STABLE;
 // Supported must be a strict [min, max] pair (core validates count()==2
 // in lib/classes/plugininfo/base.php - anything else throws a
