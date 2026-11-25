@@ -534,6 +534,13 @@ defined('MOODLE_INTERNAL') || die();
 // question/embed shared across courses via a question bank still breaks
 // if its subject's owner doesn't teach the course it's reused in - needs
 // a proper lookup through quiz slots/question references.
+//
+// Verified end-to-end via real browser automation against both Moodle
+// 4.5.16 and 5.3.1 (the latest point releases as of 2026-11-25, not just
+// the 4.5/5.3 branch): a real embed inserted and an existing one
+// re-opened and re-edited through the authoring tool on each, exercising
+// the access-control fix and the write-up sanitisation, with no console
+// errors or failed requests on the teacher's own authorised path.
 $plugin->version   = 2026112500;
 $plugin->requires  = 2024100100;         // Requires this Moodle version (4.5+).
 $plugin->component = 'local_omeroembed'; // Full name of the plugin (used for diagnostics).

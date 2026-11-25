@@ -86,10 +86,21 @@ $plugin->component = 'qtype_omerohotspotmulti';
 // restore/hit-test time (a zero-width region, reachable through the
 // normal authoring UI, caused the same fatal/cron-poisoning effect),
 // and format_string() on the subject name in the edit form.
-$plugin->version   = 2026112500;
+//
+// 2026112501 (1.1.2): no behaviour change of its own - same pin
+// correction as qtype_omerohotspot's own identical 2026112501 entry, see
+// that plugin's own version.php for the full explanation. Bumped to a
+// new release rather than silently editing the already tagged/released
+// 1.1.1, since that build is already public.
+//
+// Verified directly: the corrected pin resolves cleanly through a real
+// admin/cli/upgrade.php run on both Moodle 4.5.16 and 5.3.1 (the latest
+// point releases as of 2026-11-25), with no dependency/version-mismatch
+// error.
+$plugin->version   = 2026112501;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.1.1';
+$plugin->release   = '1.1.2';
 $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
 
 // A sibling of qtype_omerohotspot, not a mode of it - a click is correct
@@ -98,10 +109,8 @@ $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires ex
 // docblock). Reuses local_omeroembed's proxy.php (the entire locked-down
 // OMERO-embedding mechanism) and subject_repository.php (OMERO connections)
 // rather than duplicating either. Can never be installed without it.
-// Pinned to the build this component ships alongside (2026100500), which
-// also carries the stored-XSS/cross-course-IDOR/session-lock fixes first
-// made in 2026080308 - all in files this qtype's own rendering path
-// depends on directly.
+// Pinned to the build carrying the matching proxy.php access-control and
+// write-up sanitisation fixes (2026112500, release 1.7.1).
 $plugin->dependencies = [
-    'local_omeroembed' => 2026100500,
+    'local_omeroembed' => 2026112500,
 ];

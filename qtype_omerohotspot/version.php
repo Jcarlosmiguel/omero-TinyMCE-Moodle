@@ -101,20 +101,35 @@ $plugin->component = 'qtype_omerohotspot';
 // no longer inserts unvalidated geometry/openingview from a crafted or
 // corrupt backup. Subject name in the edit form now wrapped in
 // format_string() (self-XSS only, but good practice).
-$plugin->version   = 2026112500;
+//
+// 2026112501 (1.1.2): no behaviour change of its own. The
+// local_omeroembed dependency pin below still named 2026100500, the
+// pre-fix build, even after the security fix pack above shipped
+// local_omeroembed 2026112500 with the matching proxy.php access-control
+// fix this plugin's own rendering path depends on directly - left as-is,
+// a site could install this "fixed" release alongside the still-
+// vulnerable local_omeroembed build and Moodle would never object.
+// Bumped to a new release rather than silently editing the already
+// tagged/released 1.1.1, since that build is already public. Pin
+// corrected to require 2026112500 or later.
+//
+// Verified directly: the corrected pin resolves cleanly through a real
+// admin/cli/upgrade.php run on both Moodle 4.5.16 and 5.3.1 (the latest
+// point releases as of 2026-11-25), with no dependency/version-mismatch
+// error.
+$plugin->version   = 2026112501;
 $plugin->requires  = 2024100100;
 $plugin->maturity  = MATURITY_STABLE;
-$plugin->release   = '1.1.1';
+$plugin->release   = '1.1.2';
 $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
 
 // Reuses local_omeroembed's proxy.php (the entire locked-down OMERO-
 // embedding mechanism) and subject_repository.php (OMERO connections)
 // rather than duplicating either - see this plugin's own README/plan doc
-// for why. Can never be installed without it. Pinned to the build this
-// component ships alongside (2026100500), which also carries the
-// stored-XSS/cross-course-IDOR/session-lock fixes first made in
-// 2026080308 - all in files this qtype's own rendering path depends on
-// directly.
+// for why. Can never be installed without it. Pinned to the build
+// carrying the matching proxy.php access-control and write-up
+// sanitisation fixes (2026112500, release 1.7.1) - all in files this
+// qtype's own rendering path depends on directly.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026100500,
+    'local_omeroembed' => 2026112500,
 ];

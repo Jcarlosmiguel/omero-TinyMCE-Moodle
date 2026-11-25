@@ -99,21 +99,38 @@ defined('MOODLE_INTERNAL') || die();
 // button and Help dialog tab, not just an install check). $plugin->
 // supported extended to include 503, and the local_omeroembed dependency
 // pin brought up to the build this component now ships with.
-$plugin->version   = 2026100500;
+//
+// 2026112500 (1.1.1): no code change in this plugin. Following the same
+// Moodle Marketplace security review that produced local_omeroembed
+// 1.7.1 - a subject access-control fix in proxy.php/author.php, and
+// sanitisation of the write-up HTML this plugin's own ui.js receives
+// over postMessage and writes into the editor via
+// editor.insertContent()/setOuterHTML() - checked this plugin's own code
+// directly: handleAction()/ui.js never builds that HTML itself, it only
+// forwards what local_omeroembed's author.js already sanitises before
+// posting it back, so there was nothing to fix here. The dependency pin
+// below is bumped to require that build, so this plugin can never end up
+// paired with the pre-fix local_omeroembed.
+//
+// Verified directly via real browser automation against both Moodle
+// 4.5.16 and 5.3.1 (the latest point releases as of 2026-11-25): a real
+// embed inserted and an existing one re-opened through this plugin's own
+// toolbar button on each, with no console errors, and the write-up
+// round trip (the WRITEUP_MESSAGE_TYPE postMessage into author.js's
+// sanitizeHtml()) coming back correctly rather than reset to defaults.
+$plugin->version   = 2026112500;
 $plugin->requires  = 2024100100;
 $plugin->component = 'tiny_omeroembed';
 $plugin->supported = [405, 503]; // Inclusive range (4.5-5.3) - core requires exactly [min, max], not a discrete list.
-$plugin->release   = '1.1.0';
+$plugin->release   = '1.1.1';
 $plugin->maturity  = MATURITY_STABLE;
 // Hard runtime dependency, not just thematic bundling - ui.js opens
 // local_omeroembed's own author.php by URL directly (see amd/src/ui.js),
 // the same way qtype_omerohotspot/qtype_omerohotspotmulti depend on it
-// for rendering via local_omeroembed/proxy.php. Their own version.php
-// files already declare this; this one didn't, which was a real gap.
-// Pinned to match local_omeroembed's own current build - both components
-// are shipping together as one coordinated (not yet released) cycle, so
-// there's no reason to leave this pin pointing at an older build than
-// what's actually being tested against.
+// for rendering via local_omeroembed/proxy.php. Pinned to the build
+// carrying the proxy.php access-control and write-up sanitisation fixes
+// (2026112500, release 1.7.1) this plugin's own modal/postMessage flow
+// depends on directly.
 $plugin->dependencies = [
-    'local_omeroembed' => 2026100500,
+    'local_omeroembed' => 2026112500,
 ];
